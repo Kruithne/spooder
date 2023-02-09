@@ -180,7 +180,7 @@ app.route('/login', (req, res) => {
 
 ## Errors
 
-In the event that an error occurs somewhere in the middleware chain, the following priority list will be used to determine the error. If any of them are not defined or throw an error, the next one will be used.
+In the event that an error occurs somewhere in the middleware chain, the following priority list will be used to handle the error. If any of them are not defined or throw an error, the next one will be used.
 
 1. Middleware registered with `app.route()` (we're assuming something in this chain throws an error).
 2. Handler for status code 500 registered with `app.handle(500, (req, res) => {})`.
