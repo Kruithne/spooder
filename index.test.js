@@ -283,7 +283,7 @@ test('http: middleware chain with status code rejection', async () => {
 	}
 });
 
-test('http: middleware using res.json()', async () => {
+test('http: using res.json()', async () => {
 	const app = createServer();
 	try {
 		const port = await app.listen(0);
@@ -304,7 +304,7 @@ test('http: middleware using res.json()', async () => {
 	}
 });
 
-test('http: middleware using res.json() with a custom status code', async () => {
+test('http: using res.json() with a custom status code', async () => {
 	const app = createServer();
 	try {
 		const port = await app.listen(0);
@@ -320,6 +320,46 @@ test('http: middleware using res.json() with a custom status code', async () => 
 		expect(res.headers['content-type']).toBe('application/json');
 		expect(res.headers['content-length']).toBe(String(Buffer.byteLength('{"message":"Hello, client!"}', 'utf8')));
 		expect((await getResponseBody(res)).toString()).toBe('{"message":"Hello, client!"}');
+	} finally {
+		await app.close();
+	}
+});
+
+test('http: using res.redirect()', async () => {
+	const app = createServer();
+	try {
+		const port = await app.listen(0);
+
+		// Set a route for /hello with multiple middleware functions.
+		app.route('/hello', (req, res) => {
+			res.redirect('/world');
+		}, 'GET');
+
+		const res = await getResponse({ port, path: '/hello' });
+
+		expect(res.statusCode).toBe(302);
+		expect(res.headers.location).toBe('/world');
+		expect((await getResponseBody(res)).toString()).toBe('');
+	} finally {
+		await app.close();
+	}
+});
+
+test('http: using res.redirect() with a custom status code', async () => {
+	const app = createServer();
+	try {
+		const port = await app.listen(0);
+
+		// Set a route for /hello with multiple middleware functions.
+		app.route('/hello', (req, res) => {
+			res.redirect('/world', 307);
+		}, 'GET');
+
+		const res = await getResponse({ port, path: '/hello' });
+
+		expect(res.statusCode).toBe(307);
+		expect(res.headers.location).toBe('/world');
+		expect((await getResponseBody(res)).toString()).toBe('');
 	} finally {
 		await app.close();
 	}

@@ -157,6 +157,27 @@ app.route('/data/current-weather', async (req, res) => {
 });
 ```
 
+### `res.redirect()`
+
+Another common task is to redirect a user to another page. The following code covers the most common implementation of this:
+
+```js
+app.route('/login', (req, res) => {
+	res.writeHead(302, {
+		'Location': '/login.html'
+	});
+	res.end();
+});
+```
+
+Using `res.redirect()`, we can reduce this to the following with identical functionality:
+
+```js
+app.route('/login', (req, res) => {
+	res.redirect('/login.html');
+});
+```
+
 ## Handlers and Fallback
 
 In the interest of being hands-off, spooder covers very little ground when it comes to handling requests. This is by design, as it allows you to implement your own logic for handling requests.

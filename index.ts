@@ -42,6 +42,18 @@ class ServerResponse<Request extends http.IncomingMessage = http.IncomingMessage
 
 		this.end(json);
 	}
+
+	/**
+	 * Sends a redirect response.
+	 * @param url - The URL to redirect to.
+	 * @param statusCode - The status code to send.
+	 */
+	redirect(url: string, statusCode: number = 302): void {
+		this.writeHead(statusCode, {
+			'Location': url
+		});
+		this.end();
+	}
 }
 
 class ServerApp {
