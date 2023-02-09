@@ -178,6 +178,25 @@ app.route('/login', (req, res) => {
 });
 ```
 
+## Errors
+
+In the event that an error occurs somewhere in the middleware chain, the following priority list will be used to determine the error. If any of them are not defined or throw an error, the next one will be used.
+
+1. Middleware registered with `app.route()` (we're assuming something in this chain throws an error).
+2. Handler for status code 500 registered with `app.handle(500, (req, res) => {})`.
+3. Fallback handler registered with `app.fallback(() => {code, req, res})`.
+4. The internal default fallback handler.
+
+By design, all errors that occur in the middleware chain and inside the handlers are swallowed. This is to prevent the server from crashing if an error occurs. In the event that you want to listen for errors, for logging or debugging purposes, you can register an error listener.
+
+```js
+app.error((err, req, res) => {
+	// Log the error somewhere!
+});
+```
+
+> **Note**: The error handler should only be used for observing errors. Mutating req/res objects in the error handler is not recommended. Additionally, async error listeners are not awaited and will not affect the normal error handling flow.
+
 ## Handlers and Fallback
 
 In the interest of being hands-off, spooder covers very little ground when it comes to handling requests. This is by design, as it allows you to implement your own logic for handling requests.

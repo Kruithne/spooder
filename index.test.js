@@ -393,3 +393,106 @@ test('http: using res.redirect() with a custom status code', async () => {
 		await app.close();
 	}
 });
+
+test('http: error thrown from both middleware and status handler', async () => {
+	const app = createServer();
+	try {
+		const port = await app.listen(0);
+
+		// Set a route for /hello with multiple middleware functions.
+		app.route('/hello', [
+			(req, res) => {
+				throw new Error('Something went wrong');
+			}
+		], 'GET');
+
+		app.handle(500, (req, res) => {
+			// If an error occurs in here, it should be caught by the fallback handler.
+			throw new Error('Something went wrong here too!');
+		});
+
+		app.fallback((statusCode, req, res) => {
+			res.writeHead(500);
+			res.end('Fallback handler picked it up!');
+		});
+
+		const res = await getResponse({ port, path: '/hello' });
+
+		expect(res.statusCode).toBe(500);
+		expect((await getResponseBody(res)).toString()).toBe('Fallback handler picked it up!');
+	} finally {
+		await app.close();
+	}
+});
+
+test('http: error thrown from middleware, status handler and fallback handler', async () => {
+	const app = createServer();
+	try {
+		const port = await app.listen(0);
+
+		// Set a route for /hello with multiple middleware functions.
+		app.route('/hello', [
+			(req, res) => {
+				throw new Error('Something went wrong');
+			}
+		], 'GET');
+
+		app.handle(500, (req, res) => {
+			// If an error occurs in here, it should be caught by the fallback handler.
+			throw new Error('Something went wrong here too!');
+		});
+
+		app.fallback((statusCode, req, res) => {
+			// If an error occurs in here, it should be caught by the default fallback handler.
+			throw new Error('Something went wrong here too!');
+		});
+
+		const res = await getResponse({ port, path: '/hello' });
+
+		expect(res.statusCode).toBe(500);
+		expect((await getResponseBody(res)).toString()).toBe('500 Internal Server Error');
+	} finally {
+		await app.close();
+	}
+});
+
+test('http: errors caught with app.error()', async () => {
+	const app = createServer();
+	try {
+		const port = await app.listen(0);
+		const errors = [];
+
+		// Set a route for /hello with multiple middleware functions.
+		app.route('/hello', [
+			(req, res) => {
+				throw new Error('Something went wrong!');
+			}
+		], 'GET');
+
+		app.handle(500, (req, res) => {
+			// If an error occurs in here, it should be caught by the fallback handler.
+			throw new Error('Something went wrong here!');
+		});
+
+		app.fallback((statusCode, req, res) => {
+			// If an error occurs in here, it should be caught by the default fallback handler.
+			throw new Error('Something went wrong here too!');
+		});
+
+		app.error((err, req, res) => {
+			errors.push(err);
+		});
+
+		const res = await getResponse({ port, path: '/hello' });
+
+		expect(res.statusCode).toBe(500);
+		expect((await getResponseBody(res)).toString()).toBe('500 Internal Server Error');
+
+		expect(errors.length).toBe(3);
+		expect(errors[0].message).toBe('Something went wrong!');
+		expect(errors[1].message).toBe('Something went wrong here!');
+		expect(errors[2].message).toBe('Something went wrong here too!');
+	} finally {
+		await app.close();
+	}
+});

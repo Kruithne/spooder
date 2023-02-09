@@ -6,6 +6,7 @@ type RouterCallbackReturnType = undefined | number;
 type RouterCallback = (req: IncomingMessage, res: ServerResponse) => RouterCallbackReturnType | Promise<RouterCallbackReturnType>;
 type Router = { callbacks: Array<RouterCallback>; method: string };
 
+type ErrorHandler = (error: Error, req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
 type FallbackHandler = (statusCode: number, req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
 
 type Server = http.Server | https.Server;
@@ -60,6 +61,7 @@ class ServerApp {
 	server: Server;
 	#routes = new Map<string, Router>();
 	#handlers = new Map<number, RouterCallback>();
+	#errorCallbacks = new Array<ErrorHandler>();
 	#fallbackHandler: FallbackHandler = defaultFallbackHandler;
 
 	constructor(options: ServerOptions, factory: ServerFactory) {
@@ -89,7 +91,7 @@ class ServerApp {
 						try {
 							statusCode = await callback(req, res);
 						} catch (err) {
-							// TODO: Expose error in some meainingful way.
+							this.#dispatchError(err, req, res);
 							statusCode = 500;
 						}
 
@@ -107,14 +109,47 @@ class ServerApp {
 				}
 			}
 
-			// If no route handler was used, check if a status handler exists, otherwise
-			// drop to the fallback handler.
+			// If a handler exists for the status code, call it.
 			const handler = this.#handlers.get(statusFallback);
-			if (handler !== undefined)
-				await handler(req, res);
-			else
+			if (handler !== undefined) {
+				try {
+					await handler(req, res);
+					return;
+				} catch (err) {
+					this.#dispatchError(err, req, res);
+				}
+			}
+
+			// If no handler exists (or errored), call the fallback handler.
+			try {
 				await this.#fallbackHandler(statusFallback, req, res);
+			} catch (err) {
+				this.#dispatchError(err, req, res);
+
+				// Last resort: call the default fallback handler.
+				if (this.#fallbackHandler !== defaultFallbackHandler)
+					defaultFallbackHandler(statusFallback, req, res);
+			}
 		});
+	}
+
+	/**
+	 * Dispatch an error to any error listeners.
+	 * @param err - The error to dispatch.
+	 * @param req - The request that caused the error.
+	 * @param res - The response object.
+	 */
+	#dispatchError(err: Error, req: IncomingMessage, res: ServerResponse): void {
+		for (const callback of this.#errorCallbacks)
+			callback(err, req, res);
+	}
+
+	/**
+	 * Attach an error listener.
+	 * @param callback - The callback to call when an error occurs.
+	 */
+	error(callback: ErrorHandler): void {
+		this.#errorCallbacks.push(callback);
 	}
 
 	/**
