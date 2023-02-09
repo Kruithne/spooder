@@ -283,6 +283,35 @@ test('http: middleware chain with status code rejection', async () => {
 	}
 });
 
+test('http: middleware throwing an error', async () => {
+	const app = createServer();
+	try {
+		const port = await app.listen(0);
+
+		// Set a route for /hello with multiple middleware functions.
+		app.route('/hello', [
+			(req, res) => {
+				res.setHeader('X-Test-Header', 'foo');
+				throw new Error('Something went wrong');
+			},
+
+			(req, res) => {
+				// This should never be called since the previous function threw an error.
+				res.writeHead(418);
+				res.end('I\'m a teapot');
+			}
+		], 'GET');
+
+		const res = await getResponse({ port, path: '/hello' });
+
+		expect(res.statusCode).toBe(500);
+		expect(res.headers['x-test-header']).toBe('foo');
+		expect((await getResponseBody(res)).toString()).toBe('500 Internal Server Error');
+	} finally {
+		await app.close();
+	}
+});
+
 test('http: using res.json()', async () => {
 	const app = createServer();
 	try {

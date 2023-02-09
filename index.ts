@@ -84,7 +84,15 @@ class ServerApp {
 					// Iterate through the callback tree, halting when a callback returns a status code.
 					let dropRoute = false;
 					for (const callback of router.callbacks) {
-						const statusCode = await callback(req, res);
+						let statusCode: number;
+
+						try {
+							statusCode = await callback(req, res);
+						} catch (err) {
+							// TODO: Expose error in some meainingful way.
+							statusCode = 500;
+						}
+
 						if (statusCode !== undefined) {
 							statusFallback = statusCode;
 							dropRoute = true;
