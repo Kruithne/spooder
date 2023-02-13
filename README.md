@@ -1,7 +1,7 @@
 <p align="center"><img src="docs/project-logo.png"/></p>
 
 # Spooder - A Tiny Middleware Manager
-![tests status](https://github.com/Kruithne/spooder/actions/workflows/github-actions-test.yml/badge.svg) [![license badge](https://img.shields.io/github/license/Kruithne/spooder?color=blue)](LICENSE)
+![tests status](https://github.com/Kruithne/spooder/actions/workflows/github-actions-test.yml/badge.svg) ![typescript](https://img.shields.io/badge/language-typescript-blue) [![license badge](https://img.shields.io/github/license/Kruithne/spooder?color=blue)](LICENSE)  ![npm version](https://img.shields.io/npm/v/spooder?color=blue)
 
 `spooder` is a lightweight middleware manager that sits atop the Node.js HTTP/HTTPS server with the goal of being simple to use and easy to extend.
 
