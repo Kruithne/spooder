@@ -1,16 +1,28 @@
 name: publish
 
 on:
-  release:
-    types: [created]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Updated registry version'
+        required: true
+
+permissions:
+  contents: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    permissions:
-      packages: write
-
     steps:
+      - name: Validate version format
+        run: |
+          if [[ ! ${{ github.event.inputs.version }} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version '${{ github.event.inputs.version }}' is not a valid semver version."
+            exit 1
+          fi
+
+      - run-name: "Publish ${{ github.event.inputs.version }} 🤖"
+
       - name: Checkout repository source
         uses: actions/checkout@v3
 
@@ -19,6 +31,11 @@ jobs:
         with:
           node-version: '19.x'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Configure git
+        run: |
+          git config --global user.name "Kruithne"
+          git config --global user.email "kruithne@gmail.com"
 
       - name: Install dependencies
         run: npm ci
@@ -35,7 +52,28 @@ jobs:
       - name: ESLint check
         run: npx eslint .
 
-      - name: Publish to npmjs.org
+      - name: Update package version to ${{ github.event.inputs.version }}
+        run: npm version ${{ github.event.inputs.version }} -m "Release ${{ github.event.inputs.version }} ✨"
+
+      - name: Push version tag to GitHub
+        run: git push --follow-tags
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish package to npmjs.org
         run: npm publish --access=public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create release tarball
+        run: npm pack --output=release-${{ github.event.inputs.version }}.tgz
+
+      - name: Upload release package to GitHub
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release-${{ github.event.inputs.version }}.tgz
+          tag_name: ${{ github.event.inputs.version }}
+          name: ${{ github.event.inputs.version }}
+          body: |
+            Release ${{ github.event.inputs.version }} ✨
