@@ -22,3 +22,7 @@ async function getResponse(opts, module = http) {
 		req.end();
 	});
 }
+
+test('', () => {
+	// Placeholder test
+});
