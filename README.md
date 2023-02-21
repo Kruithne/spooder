@@ -25,11 +25,7 @@ Yes, feel free to use `spooder` if it serves your needs. However, keep in mind t
 
 ### Should I use it?
 
-Only if you want to. If you are looking for a general-purpose web server that can be configured to your specific needs, I recommend [Express](https://expressjs.com/).
-
-### Why is this open source / publicly available?
-
-Why not? I didn't see any reason that the project should be should be kept private, despite it's goals. If you find it useful, feel free to use it.
+If it serves your needs and you're happy with it, then please feel free. If you are looking for a general-purpose web server that can be configured to your specific needs, I recommend [Express](https://expressjs.com/).
 
 ## Contributing / Feedback / Issues
 
