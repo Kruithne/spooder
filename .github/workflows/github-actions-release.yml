@@ -22,8 +22,6 @@ jobs:
             exit 1
           fi
 
-
-
       - name: Checkout repository source
         uses: actions/checkout@v3
 
