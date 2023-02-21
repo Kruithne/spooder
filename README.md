@@ -11,7 +11,7 @@
 
 I maintain a large number of projects both personally and professionally that require web servers. For over a decade they have been running on [Apache](https://httpd.apache.org/)/[Nginx](https://www.nginx.com/)/[PHP](https://www.php.net/). While this has served me well, I decided it was time for change.
 
-- PHP only exists in my projects because it is required by my current web server stack. `spooder` allows me to focus entirely on [TypeScript](https://www.typescriptlang.org/).
+- [PHP](https://www.php.net/) only exists in my projects because it is required by my current web server stack. `spooder` allows me to focus entirely on [TypeScript](https://www.typescriptlang.org/).
 - [Apache](https://httpd.apache.org/) and [Nginx](https://www.nginx.com/) feel dated and come with a lot of features and overhead that I don't need.
 - A custom server stack on [Node.js](https://nodejs.org/en/) allows me to build a server that is specifically designed for my projects with no compromises.
 
