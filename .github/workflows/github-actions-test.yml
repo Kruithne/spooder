@@ -26,11 +26,8 @@ jobs:
       - name: Install node dependencies
         run: npm ci
 
-      - name: Install TypeScript
-        run: npm install -g typescript
-
       - name: Compile TypeScript
-        run: tsc
+        run: npx tsc
 
       - name: Run tests
         run: npm test
