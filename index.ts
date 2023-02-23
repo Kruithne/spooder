@@ -2,232 +2,187 @@ import http from 'node:http';
 import https from 'node:https';
 import type { AddressInfo, Socket } from 'node:net';
 
+/** Indicates if the current environment is development. */
+const IS_DEV = process.env.NODE_ENV !== 'production';
+
+/** Indicates if the internal server (production) has started */
+let hasStarted = false;
+
+/** Map of domains to their handlers. */
+const domains = new Map<string, DomainHandler>();
+
+/** -----  Types ----- */
+
+type Cache = Map<string, Buffer | string>;
+
 type RouterCallbackReturnType = undefined | number;
 type RouterCallback = (req: IncomingMessage, res: ServerResponse) => RouterCallbackReturnType | Promise<RouterCallbackReturnType>;
-type Router = { callbacks: Array<RouterCallback>; method: string };
+type DomainCallback = (handler: DomainHandler) => void;
 
-type ErrorHandler = (error: Error, req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
-type FallbackHandler = (statusCode: number, req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
+/** -----  Classes ----- */
 
-type Server = http.Server | https.Server;
-type ServerOptions = http.ServerOptions | https.ServerOptions;
-type ServerFactory = (options: ServerOptions, requestListener: http.RequestListener) => Server;
-
-const defaultFallbackHandler: FallbackHandler = (statusCode, req, res) => {
-	res.writeHead(statusCode);
-	res.end(statusCode + ' ' + http.STATUS_CODES[statusCode]);
-};
-
+/** IncomingMessage is an extension of http.IncomingMessage that adds additional methods. */
 class IncomingMessage extends http.IncomingMessage {
 	constructor(socket: Socket) {
 		super(socket);
 	}
 }
 
+/** ServerResponse is an extension of http.ServerResponse that adds additional methods.*/
 class ServerResponse<Request extends http.IncomingMessage = http.IncomingMessage> extends http.ServerResponse<Request> {
 	constructor(req: Request) {
 		super(req);
 	}
+}
 
-	/**
-	 * Sends a JSON response.
-	 * @param data - The data to send.
-	 * @param statusCode - The status code to send.
-	 */
-	json(data: unknown, statusCode: number = 200): void {
-		const json = JSON.stringify(data);
-		this.writeHead(statusCode, {
-			'Content-Type': 'application/json',
-			'Content-Length': Buffer.byteLength(json)
-		});
+class DomainHandler {
+	public domain: string;
+	public privateKey: string;
+	public certificate: string;
 
-		this.end(json);
+	private routes = new Array<[string, RouterCallback]>();
+	private handlers = new Map<number, RouterCallback>();
+
+	private isIntendingToSort = false;
+
+	constructor(domain: string) {
+		this.domain = domain;
+
+		this.privateKey = '/etc/letsencrypt/live/' + domain + '/privkey.pem';
+		this.certificate = '/etc/letsencrypt/live/' + domain + '/fullchain.pem';
 	}
 
 	/**
-	 * Sends a redirect response.
-	 * @param url - The URL to redirect to.
-	 * @param statusCode - The status code to send.
+	 * Handles a status code for this domain.
+	 * @param statusCode - The status code to handle.
+	 * @param req - The request.
+	 * @param res - The response.
 	 */
-	redirect(url: string, statusCode: number = 302): void {
-		this.writeHead(statusCode, {
-			'Location': url
-		});
-		this.end();
+	async handleStatusCode(statusCode: number, req: IncomingMessage, res: ServerResponse): Promise<void> {
+		const handler = this.handlers.get(statusCode);
+		if (handler !== undefined)
+			await handler(req, res);
+		else
+			res.writeHead(statusCode).end();
+	}
+
+	/**
+	 * Handles a request for this domain.
+	 * @param req - The request.
+	 * @param res - The response.
+	 */
+	async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+		try {
+			for (const [path, callback] of this.routes) {
+				if (path === req.url) {
+					const result: RouterCallbackReturnType = await callback(req, res);
+					if (result !== undefined)
+						this.handleStatusCode(result, req, res);
+					else if (!res.headersSent)
+						throw new Error('No response formed for ' + req.url);
+
+					return;
+				}
+			}
+
+			this.handleStatusCode(404, req, res);
+		} catch (err) {
+			// TODO: Provide this error to a generic error handler for diagnostics?
+			console.error(err);
+
+			this.handleStatusCode(500, req, res);
+		}
+	}
+
+	cache(cache: Cache): void {
+		// TODO: Implement.
+	}
+
+	route(path: string, route: RouterCallback): void {
+		this.routes.push([path, route]);
+
+		// Instead of resorting the routes every time a new route is added, schedule
+		// a sort to happen on the next tick. This allows multiple routes to be added
+		// in succession without resorting the routes multiple times.
+		if (!this.isIntendingToSort) {
+			this.isIntendingToSort = true;
+			setImmediate(() => {
+				// Sort the routes by length, longest first. This ensures that the
+				// most specific routes are checked first.
+				this.routes.sort((a, b) => b[0].length - a[0].length);
+				this.isIntendingToSort = false;
+			});
+		}
+	}
+
+	handle(status: number, callback: RouterCallback): void {
+		this.handlers.set(status, callback);
+	}
+
+	getCacheFor(file: string): Cache {
+		// TODO: Implement.
+		return null;
 	}
 }
 
-class ServerApp {
-	server: Server;
-	#routes = new Map<string, Router>();
-	#handlers = new Map<number, RouterCallback>();
-	#errorCallbacks = new Array<ErrorHandler>();
-	#fallbackHandler: FallbackHandler = defaultFallbackHandler;
+/** ----- Internal ----- */
 
-	constructor(options: ServerOptions, factory: ServerFactory) {
-		if (options === undefined) {
-			options = { IncomingMessage, ServerResponse };
-		} else {
-			options.IncomingMessage ??= IncomingMessage;
-			options.ServerResponse ??= ServerResponse;
+/**
+ * Handles an incoming request.
+ * @param req - The request.
+ * @param res - The response.
+ */
+async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+	try {
+		const domain: DomainHandler = domains.get(req.headers.host);
+		if (domain === undefined)
+			throw new Error('No domain handler for ' + req.headers.host);
+
+		await domain.handleRequest(req, res);
+	} catch (e) {
+		console.error(e);
+		// TODO: Can we raise this with a general error handler to make the issue
+		// transparent to the developer?
+		if (!res.headersSent) {
+			res.writeHead(500);
+			res.end(http.STATUS_CODES[500]);
+		}
+	}
+}
+
+/** -----  API ----- */
+
+export function domain(domain: string, callback: DomainCallback): void {
+	const handler: DomainHandler = new DomainHandler(domain);
+
+	if (IS_DEV) {
+		// In development mode, run a separate http server for each domain which
+		// listens on a separate port, this allows for easy local development.
+
+		// Each domain server is mapped to a port based on the domain name.
+		// This is done instead of using completely random (or OS assigned) ports
+		// so that the port is consistent across restarts, allowing quick reloads.
+		const port: number = domain.split('').reduce((a, b) => a + b.charCodeAt(0), 0) % 10000 + 10000;
+
+		http.createServer({}, handleRequest).listen(port, () => {
+			console.log(domain + ' initialized at http://localhost:' + port);
+		});
+
+		domains.set('localhost:' + port, handler);
+	} else {
+		// In production mode, run a single https server on port 443.
+		// Domain certificates are mapped via the SNICallback.
+		if (!hasStarted) {
+			https.createServer({}, handleRequest).listen(443);
+			hasStarted = true;
 		}
 
-		this.server = factory(options, async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
-			let statusFallback = 404;
-			for (const [routePath, router] of this.#routes) {
-				// Check if the route matches.
-				if (req.url?.startsWith(routePath)) {
-					// If the route exists but does not listen to this method, return 405: Method Not Allowed.
-					if (router.method !== undefined && router.method !== req.method) {
-						statusFallback = 405;
-						break;
-					}
-
-					// Iterate through the callback tree, halting when a callback returns a status code.
-					let dropRoute = false;
-					for (const callback of router.callbacks) {
-						let statusCode: number;
-
-						try {
-							statusCode = await callback(req, res);
-						} catch (err) {
-							this.#dispatchError(err, req, res);
-							statusCode = 500;
-						}
-
-						if (statusCode !== undefined) {
-							statusFallback = statusCode;
-							dropRoute = true;
-							break;
-						}
-					}
-
-					if (dropRoute)
-						break;
-
-					return;
-				}
-			}
-
-			// If a handler exists for the status code, call it.
-			const handler = this.#handlers.get(statusFallback);
-			if (handler !== undefined) {
-				try {
-					await handler(req, res);
-					return;
-				} catch (err) {
-					this.#dispatchError(err, req, res);
-				}
-			}
-
-			// If no handler exists (or errored), call the fallback handler.
-			try {
-				await this.#fallbackHandler(statusFallback, req, res);
-			} catch (err) {
-				this.#dispatchError(err, req, res);
-
-				// Last resort: call the default fallback handler.
-				if (this.#fallbackHandler !== defaultFallbackHandler)
-					defaultFallbackHandler(statusFallback, req, res);
-			}
-		});
+		domains.set(domain + ':443', handler);
 	}
 
-	/**
-	 * Dispatch an error to any error listeners.
-	 * @param err - The error to dispatch.
-	 * @param req - The request that caused the error.
-	 * @param res - The response object.
-	 */
-	#dispatchError(err: Error, req: IncomingMessage, res: ServerResponse): void {
-		for (const callback of this.#errorCallbacks)
-			callback(err, req, res);
-	}
-
-	/**
-	 * Attach an error listener.
-	 * @param callback - The callback to call when an error occurs.
-	 */
-	error(callback: ErrorHandler): void {
-		this.#errorCallbacks.push(callback);
-	}
-
-	/**
-	 * Routes a request for the specified path.
-	 * @param routePath - The path to route to.
-	 * @param callback - The callback to call when the route is matched.
-	 * @param method - The method to route to.
-	 */
-	route(routePath: string, callback: RouterCallback | Array<RouterCallback>, method?: string): void {
-		if (!Array.isArray(callback))
-			callback = [callback];
-
-		this.#routes.set(routePath, { callbacks: callback, method });
-	}
-
-	/**
-	 * Sets the fallback handler.
-	 * @param callback - The callback to call when no route has been found.
-	 */
-	fallback(callback: FallbackHandler): void {
-		this.#fallbackHandler = callback;
-	}
-
-	/**
-	 * Handles the specified status code if no route has been found.
-	 * @param status - HTTP status code.
-	 * @param callback - The callback to call when the status code is returned.
-	 */
-	handle(status: number, callback: RouterCallback): void {
-		this.#handlers.set(status, callback);
-	}
-
-	/**
-	 * Starts listening on the specified port and hostname.
-	 * @param port - The port to listen on.
-	 * @param hostname - The hostname to listen on.
-	 * @returns Promise that resolves when the server is listening.
-	 */
-	async listen(port: number, hostname?: string): Promise<number> {
-		return new Promise(resolve => {
-			this.server.listen(port, hostname, () => {
-				const address = this.server.address() as AddressInfo;
-				resolve(address.port);
-			});
-		});
-	}
-
-	/**
-	 * @returns Promise that resolves when the server is closed.
-	 */
-	async close(): Promise<void> {
-		return new Promise(resolve => {
-			this.server.close(() => {
-				resolve();
-			});
-		});
-	}
-}
-
-/**
- * Creates a server using the http module.
- * @param options - The options to pass to the http module.
- * @returns Server application.
- */
-export function createServer(options: http.ServerOptions): ServerApp {
-	return new ServerApp(options, http.createServer);
-}
-
-/**
- * Creates a server using the https module.
- * @param options - The options to pass to the https module.
- * @returns Server application.
- */
-export function createSecureServer(options: https.ServerOptions): ServerApp {
-	return new ServerApp(options, https.createServer);
+	callback(handler);
 }
 
 export default {
-	createServer,
-	createSecureServer
+	domain
 };
