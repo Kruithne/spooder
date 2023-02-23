@@ -4,9 +4,6 @@
 	"type": "module",
 	"description": "Purpose-built web server for Node.js",
 	"main": "index.js",
-	"scripts": {
-		"test": "node --no-warnings --experimental-vm-modules node_modules/jest/bin/jest.js"
-	},
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/Kruithne/spooder.git"
