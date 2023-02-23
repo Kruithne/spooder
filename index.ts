@@ -1,6 +1,6 @@
 import http from 'node:http';
 import https from 'node:https';
-import type { AddressInfo, Socket } from 'node:net';
+import type { Socket } from 'node:net';
 
 /** Indicates if the current environment is development. */
 const IS_DEV = process.env.NODE_ENV !== 'production';
