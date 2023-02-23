@@ -2,7 +2,7 @@
 	"name": "spooder",
 	"version": "1.0.0",
 	"type": "module",
-	"description": "Purpose-built web server for Node.js",
+	"description": "Purpose-built web server written in TypeScript / Node.js",
 	"main": "index.js",
 	"repository": {
 		"type": "git",
