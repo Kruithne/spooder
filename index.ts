@@ -165,13 +165,6 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 /** -----  API ----- */
 
 export function serve(rootOrOptions: ServeArgument): RouterCallback {
-	// serve is a middleware
-	// serve takes either a path or an configuration objects.
-	// serve takes static files from a directory and serves them.
-	// serve will filter based on `match`, if specified.
-	// serve will transform files based on `transform`, if specified.
-	// serve will use the configured caches to serve files.
-	// serve will prevent directory traversal.
 	const options: ServeOptions = typeof rootOrOptions === 'string' ? { root: rootOrOptions } : rootOrOptions;
 	options.root = path.resolve(options.root);
 
