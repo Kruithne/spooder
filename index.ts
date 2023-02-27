@@ -177,7 +177,14 @@ export function serve(rootOrOptions: ServeArgument): RouterCallback {
 	return async (req: IncomingMessage, res: ServerResponse, route: string): Promise<RouterCallbackReturnType> => {
 		let handle: fs.promises.FileHandle;
 		try {
-			const filePath = path.join(options.root, req.url.substring(route.length));
+			const urlPath = decodeURIComponent(req.url);
+			const filePath = path.join(options.root, urlPath.substring(route.length));
+			const resolvedPath = path.resolve(filePath);
+
+			// Prevent directory traversal.
+			if (!resolvedPath.startsWith(options.root))
+				return 403;
+
 			handle = await fs.promises.open(filePath, 'r');
 			const stat = await handle.stat();
 
