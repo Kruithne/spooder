@@ -208,8 +208,10 @@ export function serve(rootOrOptions: ServeArgument): RouterCallback {
 			if (!stat.isFile())
 				return 403;
 
-			res.setHeader('Content-Type', 'text/plain');
-			res.setHeader('Content-Length', stat.size);
+			res.writeHead(200, {
+				'Content-Type': 'text/plain',
+				'Content-Length': stat.size
+			});
 
 			const readStream = fs.createReadStream(null, { fd: handle.fd });
 			const stream = readStream.pipe(res, { end: false });
@@ -220,7 +222,6 @@ export function serve(rootOrOptions: ServeArgument): RouterCallback {
 				stream.on('error', reject);
 			});
 
-			res.writeHead(200);
 			res.end();
 		} catch (e) {
 			// Return 404 if the file doesn't exist, otherwise return 500.
