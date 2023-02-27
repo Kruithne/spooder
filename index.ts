@@ -85,19 +85,16 @@ class DomainHandler {
 	 */
 	async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
 		try {
-			for (const [path, callback] of this.routes) {
-				if (req.url.startsWith(path)) {
-					const result: RouterCallbackReturnType = await callback(req, res, path);
-					if (result !== undefined)
-						await this.handleStatusCode(result, req, res);
-					else if (!res.headersSent)
-						throw new Error('No response formed for ' + req.url);
-
-					return;
-				}
+			const [path, callback] = this.routes.find(([path]) => req.url.startsWith(path));
+			if (path !== undefined) {
+				const result: RouterCallbackReturnType = await callback(req, res, path);
+				if (result !== undefined)
+					await this.handleStatusCode(result, req, res);
+				else if (!res.headersSent)
+					throw new Error('No response formed for ' + req.url);
+			} else {
+				await this.handleStatusCode(404, req, res);
 			}
-
-			await this.handleStatusCode(404, req, res);
 		} catch (err) {
 			// TODO: Provide this error to a generic error handler for diagnostics?
 			console.error(err);
@@ -185,17 +182,9 @@ export function serve(rootOrOptions: ServeArgument): RouterCallback {
 
 			// Filter based on matches array, if specified.
 			if (options.match !== undefined) {
-				let matched = false;
-				for (const match of options.match) {
-					if (match.test(resolvedPath)) {
-						matched = true;
-						break;
-					}
-				}
-
 				// If no matches are found, return 404. Returning 403 would be a security
 				// risk, as it would reveal the existence of files configured to be hidden.
-				if (!matched)
+				if (options.match.find((match) => match.test(resolvedPath) === undefined))
 					return 404;
 			}
 
