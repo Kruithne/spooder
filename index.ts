@@ -1,5 +1,7 @@
 import http from 'node:http';
 import https from 'node:https';
+import fs, { WriteStream } from 'node:fs';
+import path from 'node:path';
 import type { Socket } from 'node:net';
 
 /** Indicates if the current environment is development. */
@@ -16,8 +18,18 @@ const domains = new Map<string, DomainHandler>();
 type Cache = Map<string, Buffer | string>;
 
 type RouterCallbackReturnType = undefined | number;
-type RouterCallback = (req: IncomingMessage, res: ServerResponse) => RouterCallbackReturnType | Promise<RouterCallbackReturnType>;
+type RouterCallback = (req: IncomingMessage, res: ServerResponse, route: string) => RouterCallbackReturnType | Promise<RouterCallbackReturnType>;
+type HandlerCallback = (req: IncomingMessage, res: ServerResponse) => RouterCallbackReturnType | Promise<RouterCallbackReturnType>;
 type DomainCallback = (handler: DomainHandler) => void;
+
+type ServeArgument = string | ServeOptions;
+type ServeOptions = {
+	/** The directory to serve files from. */
+	root: string;
+
+	/** An array of patterns to match files. */
+	match?: string[];
+}
 
 /** -----  Classes ----- */
 
@@ -41,7 +53,7 @@ class DomainHandler {
 	public certificate: string;
 
 	private routes = new Array<[string, RouterCallback]>();
-	private handlers = new Map<number, RouterCallback>();
+	private handlers = new Map<number, HandlerCallback>();
 
 	private isIntendingToSort = false;
 
@@ -74,8 +86,8 @@ class DomainHandler {
 	async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
 		try {
 			for (const [path, callback] of this.routes) {
-				if (path === req.url) {
-					const result: RouterCallbackReturnType = await callback(req, res);
+				if (req.url.startsWith(path)) {
+					const result: RouterCallbackReturnType = await callback(req, res, path);
 					if (result !== undefined)
 						this.handleStatusCode(result, req, res);
 					else if (!res.headersSent)
@@ -115,7 +127,7 @@ class DomainHandler {
 		}
 	}
 
-	handle(status: number, callback: RouterCallback): void {
+	handle(status: number, callback: HandlerCallback): void {
 		this.handlers.set(status, callback);
 	}
 
@@ -151,6 +163,50 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 }
 
 /** -----  API ----- */
+
+export function serve(rootOrOptions: ServeArgument): RouterCallback {
+	// serve is a middleware
+	// serve takes either a path or an configuration objects.
+	// serve takes static files from a directory and serves them.
+	// serve will filter based on `match`, if specified.
+	// serve will transform files based on `transform`, if specified.
+	// serve will use the configured caches to serve files.
+	// serve will prevent directory traversal.
+	const options: ServeOptions = typeof rootOrOptions === 'string' ? { root: rootOrOptions } : rootOrOptions;
+
+	return async (req: IncomingMessage, res: ServerResponse, route: string): Promise<RouterCallbackReturnType> => {
+		let handle: fs.promises.FileHandle;
+		try {
+			const filePath = path.join(options.root, req.url.substring(route.length));
+			handle = await fs.promises.open(filePath, 'r');
+			const stat = await handle.stat();
+
+			if (!stat.isFile())
+				return 403;
+
+			res.setHeader('Content-Type', 'text/plain');
+			res.setHeader('Content-Length', stat.size);
+
+			const readStream = fs.createReadStream(null, { fd: handle.fd });
+			const stream = readStream.pipe(res, { end: false });
+
+			await new Promise((resolve, reject) => {
+				readStream.on('error', reject);
+				stream.on('end', resolve);
+				stream.on('error', reject);
+			});
+
+			res.writeHead(200);
+			res.end();
+		} catch (e) {
+			console.log(e);
+			// TODO: Check if the error is a file not found error, if so, return 404.
+			return 500;
+		} finally {
+			handle?.close();
+		}
+	};
+}
 
 export function domain(domain: string, callback: DomainCallback): void {
 	const handler: DomainHandler = new DomainHandler(domain);
