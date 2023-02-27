@@ -199,8 +199,11 @@ export function serve(rootOrOptions: ServeArgument): RouterCallback {
 			res.writeHead(200);
 			res.end();
 		} catch (e) {
-			console.log(e);
-			// TODO: Check if the error is a file not found error, if so, return 404.
+			// Return 404 if the file doesn't exist, otherwise return 500.
+			if (e.code === 'ENOENT')
+				return 404;
+
+			// TODO: Provide this error to a generic error handler for diagnostics?
 			return 500;
 		} finally {
 			handle?.close();
