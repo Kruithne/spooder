@@ -28,7 +28,7 @@ type ServeOptions = {
 	root: string;
 
 	/** An array of patterns to match files. */
-	match?: string[];
+	match?: RegExp[];
 }
 
 /** -----  Classes ----- */
@@ -89,7 +89,7 @@ class DomainHandler {
 				if (req.url.startsWith(path)) {
 					const result: RouterCallbackReturnType = await callback(req, res, path);
 					if (result !== undefined)
-						this.handleStatusCode(result, req, res);
+						await this.handleStatusCode(result, req, res);
 					else if (!res.headersSent)
 						throw new Error('No response formed for ' + req.url);
 
@@ -97,12 +97,12 @@ class DomainHandler {
 				}
 			}
 
-			this.handleStatusCode(404, req, res);
+			await this.handleStatusCode(404, req, res);
 		} catch (err) {
 			// TODO: Provide this error to a generic error handler for diagnostics?
 			console.error(err);
 
-			this.handleStatusCode(500, req, res);
+			await this.handleStatusCode(500, req, res);
 		}
 	}
 
@@ -173,6 +173,7 @@ export function serve(rootOrOptions: ServeArgument): RouterCallback {
 	// serve will use the configured caches to serve files.
 	// serve will prevent directory traversal.
 	const options: ServeOptions = typeof rootOrOptions === 'string' ? { root: rootOrOptions } : rootOrOptions;
+	options.root = path.resolve(options.root);
 
 	return async (req: IncomingMessage, res: ServerResponse, route: string): Promise<RouterCallbackReturnType> => {
 		let handle: fs.promises.FileHandle;
@@ -185,7 +186,23 @@ export function serve(rootOrOptions: ServeArgument): RouterCallback {
 			if (!resolvedPath.startsWith(options.root))
 				return 403;
 
-			handle = await fs.promises.open(filePath, 'r');
+			// Filter based on matches array, if specified.
+			if (options.match !== undefined) {
+				let matched = false;
+				for (const match of options.match) {
+					if (match.test(resolvedPath)) {
+						matched = true;
+						break;
+					}
+				}
+
+				// If no matches are found, return 404. Returning 403 would be a security
+				// risk, as it would reveal the existence of files configured to be hidden.
+				if (!matched)
+					return 404;
+			}
+
+			handle = await fs.promises.open(resolvedPath, 'r');
 			const stat = await handle.stat();
 
 			if (!stat.isFile())
