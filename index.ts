@@ -176,6 +176,10 @@ export function serve(rootOrOptions: ServeArgument): RouterCallback {
 	options.root = path.resolve(options.root);
 
 	return async (req: IncomingMessage, res: ServerResponse, route: string): Promise<RouterCallbackReturnType> => {
+		// Only GET and HEAD requests are supported by this middleware.
+		if (req.method !== 'GET' && req.method !== 'HEAD')
+			return 405;
+
 		let handle: fs.promises.FileHandle;
 		try {
 			const urlPath = decodeURIComponent(req.url);
@@ -212,6 +216,12 @@ export function serve(rootOrOptions: ServeArgument): RouterCallback {
 				'Content-Type': 'text/plain',
 				'Content-Length': stat.size
 			});
+
+			// Return early if this is a HEAD request.
+			if (req.method === 'HEAD') {
+				res.end();
+				return;
+			}
 
 			const buffer = Buffer.alloc(4096);
 			let bytesRead = 0;
