@@ -273,5 +273,6 @@ export function domain(domain: string, callback: DomainCallback): void {
 }
 
 export default {
-	domain
+	domain,
+	serve
 };
