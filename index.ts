@@ -1,6 +1,6 @@
 import http from 'node:http';
 import https from 'node:https';
-import fs, { WriteStream } from 'node:fs';
+import fs from 'node:fs';
 import path from 'node:path';
 import type { Socket } from 'node:net';
 
@@ -213,14 +213,16 @@ export function serve(rootOrOptions: ServeArgument): RouterCallback {
 				'Content-Length': stat.size
 			});
 
-			const readStream = fs.createReadStream(null, { fd: handle.fd });
-			const stream = readStream.pipe(res, { end: false });
+			const buffer = Buffer.alloc(4096);
+			let bytesRead = 0;
 
-			await new Promise((resolve, reject) => {
-				readStream.on('error', reject);
-				stream.on('end', resolve);
-				stream.on('error', reject);
-			});
+			while (bytesRead < stat.size) {
+				const read = (await handle.read(buffer, 0, buffer.length, null)).bytesRead;
+				if (read > 0) {
+					bytesRead += read;
+					res.write(buffer.subarray(0, read));
+				}
+			}
 
 			res.end();
 		} catch (e) {
@@ -231,7 +233,7 @@ export function serve(rootOrOptions: ServeArgument): RouterCallback {
 			// TODO: Provide this error to a generic error handler for diagnostics?
 			return 500;
 		} finally {
-			handle?.close();
+			await handle?.close();
 		}
 	};
 }
