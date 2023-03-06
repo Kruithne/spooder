@@ -143,7 +143,10 @@ class DomainHandler {
  */
 async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
 	try {
-		const domain: DomainHandler = domains.get(req.headers.host);
+		if (req.headers.host === undefined)
+			throw new Error('No host header provided.'); // TODO: Throw this as a 400 instead?
+
+		const domain: DomainHandler | undefined = domains.get(req.headers.host);
 		if (domain === undefined)
 			throw new Error('No domain handler for ' + req.headers.host);
 
