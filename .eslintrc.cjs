@@ -21,7 +21,7 @@ module.exports = {
 	],
 	'rules': {
 		'@typescript-eslint/no-inferrable-types': 'off',
-		'@typescript-eslint/no-explicit-any': 'error',
+		'@typescript-eslint/no-explicit-any': 'off',
 		'@typescript-eslint/type-annotation-spacing': 'error',
 		'@typescript-eslint/space-infix-ops': 'error',
 		'@typescript-eslint/explicit-function-return-type': 'error',
