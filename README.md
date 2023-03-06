@@ -1,6 +1,6 @@
 <p align="center"><img src="docs/project-logo.png"/></p>
 
-# Spooder &middot; ![tests status](https://github.com/Kruithne/spooder/actions/workflows/github-actions-test.yml/badge.svg) ![typescript](https://img.shields.io/badge/%3C%2F%3E-typescript-blue) [![license badge](https://img.shields.io/github/license/Kruithne/spooder?color=blue)](LICENSE)  ![npm version](https://img.shields.io/npm/v/spooder?color=blue)
+# Spooder &middot; [![license badge](https://img.shields.io/github/license/Kruithne/spooder?color=blue)](LICENSE)  ![npm version](https://img.shields.io/npm/v/spooder?color=blue)
 
 `spooder` a purpose-built web server built with [TypeScript](https://www.typescriptlang.org/) and [Node.js](https://nodejs.org/en/) that is specifically designed to run [my projects](https://github.com/Kruithne).
 
