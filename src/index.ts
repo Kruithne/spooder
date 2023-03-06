@@ -172,7 +172,7 @@ export function serve(rootOrOptions: ServeArgument): RouterCallback {
 
 		let handle: fs.promises.FileHandle;
 		try {
-			const urlPath = decodeURIComponent(req.url);
+			const urlPath = decodeURIComponent(req.url ?? '/');
 			const filePath = path.join(options.root, urlPath.substring(route.length));
 			const resolvedPath = path.resolve(filePath);
 
