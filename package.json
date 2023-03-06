@@ -4,6 +4,9 @@
 	"type": "module",
 	"description": "Purpose-built web server written in TypeScript / Node.js",
 	"main": "index.js",
+	"scripts": {
+		"spooder": "node --experimental-vm-modules ./dist/index.js"
+	},
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/Kruithne/spooder.git"

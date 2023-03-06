@@ -4,9 +4,10 @@
 		"module": "esnext",
 		"target": "esnext",
 		"moduleResolution": "node",
-		"allowSyntheticDefaultImports": true
+		"allowSyntheticDefaultImports": true,
+		"outDir": "dist"
 	},
 	"include": [
-		"index.ts"
+		"src/**/*.ts"
 	]
 }
