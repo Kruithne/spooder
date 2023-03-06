@@ -85,7 +85,7 @@ class DomainHandler {
 	 */
 	async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
 		try {
-			const [path, callback] = this.routes.find(([path]) => req.url.startsWith(path));
+			const [path, callback] = this.routes.find(([path]) => req.url?.startsWith(path));
 			if (path !== undefined) {
 				const result: RouterCallbackReturnType = await callback(req, res, path);
 				if (result !== undefined)
