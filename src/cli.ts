@@ -144,9 +144,8 @@ async function loadDomain(domainDir: string): Promise<void> {
 				const domainDir = path.resolve(domain.directory);
 
 				// Attempt to update the sources for the domain.
-				const updatedFiles = updateDomainSource(domainDir);
-
-				//const domainRouteScript = path.join(domainDir, FILE_ROUTER_SCRIPT);
+				const updatedFiles = updateDomainSource(domainDir); // TODO: Use these updated files.
+				await loadDomain(domainDir);
 			}
 		}
 
