@@ -13,8 +13,6 @@ let hasStarted = false;
 /** Map of domains to their handlers. */
 const domains = new Map<string, DomainHandler>();
 
-/** -----  Types ----- */
-
 type Cache = Map<string, Buffer | string>;
 
 type RouterCallbackReturnType = undefined | number;
@@ -30,8 +28,6 @@ type ServeOptions = {
 	/** An array of patterns to match files. */
 	match?: RegExp[];
 }
-
-/** -----  Classes ----- */
 
 /** IncomingMessage is an extension of http.IncomingMessage that adds additional methods. */
 class IncomingMessage extends http.IncomingMessage {
@@ -134,8 +130,6 @@ class DomainHandler {
 	}
 }
 
-/** ----- Internal ----- */
-
 /**
  * Handles an incoming request.
  * @param req - The request.
@@ -161,8 +155,6 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 		}
 	}
 }
-
-/** -----  API ----- */
 
 export function serve(rootOrOptions: ServeArgument): RouterCallback {
 	const options: ServeOptions = typeof rootOrOptions === 'string' ? { root: rootOrOptions } : rootOrOptions;

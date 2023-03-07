@@ -3,10 +3,10 @@ import { spawnSync } from 'child_process';
 /**
  * Check if the given directory is a git repository.
  * @param dir - The directory to check.
- * @returns The status code of the git rev-parse command.
+ * @returns True if the given directory is a git repository, false otherwise.
  */
-export function exists(dir: string): number {
-	return spawnSync('git', ['rev-parse', '--is-inside-work-tree'], { cwd: dir }).status;
+export function exists(dir: string): boolean {
+	return spawnSync('git', ['rev-parse', '--is-inside-work-tree'], { cwd: dir }).status === 0;
 }
 
 /**
