@@ -1,12 +1,14 @@
 #!/usr/bin/env node --experimental-vm-modules --no-warnings=ExpermentalWarning
 import { SourceTextModule, SyntheticModule, createContext } from 'node:vm';
 import { log } from '@kogs/logger';
-import { parse } from '@kogs/argv';
 import { tryCatch, tryCatchAsync, printZodError } from './generics.js';
 import git from './git.js';
 import { z } from 'zod';
 import path from 'node:path';
 import fs from 'node:fs';
+
+/** Indicates if the current environment is development. */
+const IS_DEV = process.env.NODE_ENV !== 'production';
 
 const FILE_CLUSTER_CONFIG: string = 'spooder.config.json';
 const FILE_ROUTER_SCRIPT: string = 'spooder.routes.mjs';
@@ -132,11 +134,8 @@ async function loadDomain(domainDir: string): Promise<void> {
 }
 
 (async (): Promise<void> => {
-	const argv = parse(process.argv.slice(2));
-	const argActionName = argv.arguments.asString(0);
-
-	if (argActionName === 'cluster') {
-		log.info('Starting server in {cluster} mode...');
+	if (!IS_DEV) {
+		log.info('Starting server in {production} mode...');
 
 		const config = loadClusterConfig();
 		if (config !== undefined) {
@@ -151,12 +150,8 @@ async function loadDomain(domainDir: string): Promise<void> {
 
 		// TODO: Start each of the domains in the config file by parsing the source text of their
 		// indivudual spooder.routes.mjs files and evaluating them.
-	} else if (argActionName === 'dev') {
-		log.info('Starting server in {development} mode...');
-
-		await loadDomain('./');
 	} else {
-		log.error('Invalid operation, please consult the documentation.');
-		return;
+		log.info('Starting server in {development} mode...');
+		await loadDomain('./');
 	}
 })();

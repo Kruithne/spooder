@@ -249,7 +249,9 @@ export function domain(domain: string, callback: DomainCallback): void {
 		// Domain certificates are mapped via the SNICallback.
 		if (!hasStarted) {
 			// TODO: SNI callback.
-			https.createServer({}, handleRequest).listen(443);
+			https.createServer({}, handleRequest).listen(443, () => {
+				log.info('Server initialized on port 443');
+			});
 			hasStarted = true;
 		}
 

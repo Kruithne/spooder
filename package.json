@@ -33,7 +33,6 @@
 		"jest": "^29.4.2"
 	},
 	"dependencies": {
-		"@kogs/argv": "^1.2.4",
 		"@kogs/logger": "^3.3.13",
 		"zod": "^3.21.2"
 	}
