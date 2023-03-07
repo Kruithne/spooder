@@ -98,6 +98,11 @@ function loadClusterConfig(): z.infer<typeof SCHEMA_CLUSTER_CONFIG> | undefined 
 	return config;
 }
 
+/**
+ * Attempts to initialize a domain.
+ * @param domainDir - The directory of the domain to initialize.
+ * @returns A promise that resolves when the domain has been initialized.
+ */
 async function loadDomain(domainDir: string): Promise<void> {
 	const routeScript = path.join(domainDir, FILE_ROUTER_SCRIPT);
 
