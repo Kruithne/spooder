@@ -107,7 +107,7 @@ async function loadDomain(domainDir: string): Promise<void> {
 		return;
 	}
 
-	const context = createContext({});
+	const context = createContext({ process });
 	const stm = new SourceTextModule(routeScriptText, { context });
 
 	await stm.link(async (identifier: string) => {
