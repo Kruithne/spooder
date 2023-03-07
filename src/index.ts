@@ -150,11 +150,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 		log.error(e);
 		// TODO: Can we raise this with a general error handler to make the issue
 		// transparent to the developer?
-		if (!res.headersSent) {
-			// TODO: This should handle the same way handleStatusCode does.
-			res.writeHead(500);
-			res.end(http.STATUS_CODES[500]);
-		}
+		if (!res.headersSent)
+			res.writeHead(500).end();
 	}
 }
 
