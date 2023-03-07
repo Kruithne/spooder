@@ -2,7 +2,7 @@
 import { SourceTextModule, SyntheticModule, createContext } from 'node:vm';
 import { log } from '@kogs/logger';
 import { parse } from '@kogs/argv';
-import { tryCatch, printZodError } from './generics.js';
+import { tryCatch, tryCatchAsync, printZodError } from './generics.js';
 import git from './git.js';
 import { z } from 'zod';
 import path from 'node:path';
@@ -121,7 +121,9 @@ async function loadDomain(domainDir: string): Promise<void> {
 		}, { context });
 	});
 
-	await stm.evaluate();
+	const [stmError] = await tryCatchAsync(() => stm.evaluate());
+	if (stmError !== undefined)
+		log.error('{%s}: ' + stmError.message, routeScript);
 }
 
 (async (): Promise<void> => {
