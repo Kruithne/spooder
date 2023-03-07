@@ -240,7 +240,7 @@ export function domain(domain: string, callback: DomainCallback): void {
 		const port: number = domain.split('').reduce((a, b) => a + b.charCodeAt(0), 0) % 10000 + 10000;
 
 		http.createServer({}, handleRequest).listen(port, () => {
-			log.info('{%s} initialized at {http://localhost:%d}', domain, port);
+			log.info('{%s} ready at {http://localhost:%d}', domain, port);
 		});
 
 		domains.set('localhost:' + port, handler);
@@ -250,11 +250,12 @@ export function domain(domain: string, callback: DomainCallback): void {
 		if (!hasStarted) {
 			// TODO: SNI callback.
 			https.createServer({}, handleRequest).listen(443, () => {
-				log.info('Server initialized on port 443');
+				log.info('Server ready on port {443}');
 			});
 			hasStarted = true;
 		}
 
+		log.info('Initialized domain {%s}', domain);
 		domains.set(domain + ':443', handler);
 	}
 
