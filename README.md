@@ -48,7 +48,7 @@ domain('testdomain.net', server => {
 npm install spooder -g
 ```
 
-```json
+```js
 // spooder.config.json
 {
 	"domains": [
@@ -58,7 +58,7 @@ npm install spooder -g
 }
 ```
 
-```json
+```js
 // /var/www/testdomain.net/spooder.routes.mjs
 import { domain } from 'spooder';
 
