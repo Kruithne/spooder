@@ -10,36 +10,6 @@ export function exists(dir: string): boolean {
 }
 
 /**
- * Clone the git repository at the given URL into the given directory.
- * @param dir - The directory to clone the repository into.
- * @param url - The URL of the repository to clone.
- * @returns The status code of the git clone command.
- */
-export function clone(dir: string, url: string): number {
-	return spawnSync('git', ['clone', url, dir]).status;
-}
-
-/**
- * Get the remote URL of the git repository in the given directory.
- * @param dir - The directory to get the remote URL of.
- * @returns The status code of the command and the remote URL of the git repository in the given directory.
- */
-export function getRemote(dir: string): [number, string] {
-	const { status, stdout } = spawnSync('git', ['remote', 'get-url', 'origin'], { cwd: dir });
-	return [status, stdout.toString()];
-}
-
-/**
- * Set the remote URL of the git repository in the given directory.
- * @param dir - The directory to set the remote URL of.
- * @param url - The URL to set the remote to.
- * @returns The status code of the git remote set-url command.
- */
-export function setRemote(dir: string, url: string): number {
-	return spawnSync('git', ['remote', 'set-url', 'origin', url], { cwd: dir }).status;
-}
-
-/**
  * Fetch the latest changes from the remote of the git repository in the given directory.
  * @param dir - The directory to fetch the git repository in.
  * @returns The status code of the git fetch command.
@@ -69,9 +39,6 @@ export function pull(dir: string): number {
 
 export default {
 	exists,
-	clone,
-	getRemote,
-	setRemote,
 	fetch,
 	diff,
 	pull

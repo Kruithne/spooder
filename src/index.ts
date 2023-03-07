@@ -3,6 +3,7 @@ import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Socket } from 'node:net';
+import log from '@kogs/logger';
 
 /** Indicates if the current environment is development. */
 const IS_DEV = process.env.NODE_ENV !== 'production';
@@ -81,8 +82,9 @@ class DomainHandler {
 	 */
 	async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
 		try {
-			const [path, callback] = this.routes.find(([path]) => req.url?.startsWith(path));
-			if (path !== undefined) {
+			const route = this.routes.find(([path]) => req.url?.startsWith(path));
+			if (route !== undefined) {
+				const [path, callback] = route;
 				const result: RouterCallbackReturnType = await callback(req, res, path);
 				if (result !== undefined)
 					await this.handleStatusCode(result, req, res);
@@ -93,8 +95,7 @@ class DomainHandler {
 			}
 		} catch (err) {
 			// TODO: Provide this error to a generic error handler for diagnostics?
-			console.error(err);
-
+			log.error(err);
 			await this.handleStatusCode(500, req, res);
 		}
 	}
@@ -146,10 +147,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 
 		await domain.handleRequest(req, res);
 	} catch (e) {
-		console.error(e);
+		log.error(e);
 		// TODO: Can we raise this with a general error handler to make the issue
 		// transparent to the developer?
 		if (!res.headersSent) {
+			// TODO: This should handle the same way handleStatusCode does.
 			res.writeHead(500);
 			res.end(http.STATUS_CODES[500]);
 		}
@@ -238,7 +240,7 @@ export function domain(domain: string, callback: DomainCallback): void {
 		const port: number = domain.split('').reduce((a, b) => a + b.charCodeAt(0), 0) % 10000 + 10000;
 
 		http.createServer({}, handleRequest).listen(port, () => {
-			console.log(domain + ' initialized at http://localhost:' + port);
+			log.info('{%s} initialized at {http://localhost:%d}', domain, port);
 		});
 
 		domains.set('localhost:' + port, handler);
@@ -246,6 +248,7 @@ export function domain(domain: string, callback: DomainCallback): void {
 		// In production mode, run a single https server on port 443.
 		// Domain certificates are mapped via the SNICallback.
 		if (!hasStarted) {
+			// TODO: SNI callback.
 			https.createServer({}, handleRequest).listen(443);
 			hasStarted = true;
 		}
