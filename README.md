@@ -1,6 +1,6 @@
 <p align="center"><img src="docs/project-logo.png"/></p>
 
-# Spooder &middot; ![typescript](https://img.shields.io/badge/language-typescript-blue) [![license badge](https://img.shields.io/github/license/Kruithne/nwjs-installer?color=yellow)](LICENSE) ![npm version](https://img.shields.io/npm/v/nwjs-installer?color=c53635) ![bun](https://img.shields.io/badge/runtime-bun-f9f1e1)
+# Spooder &middot; ![typescript](https://img.shields.io/badge/language-typescript-blue) [![license badge](https://img.shields.io/github/license/Kruithne/spooder?color=yellow)](LICENSE) ![npm version](https://img.shields.io/npm/v/spooder?color=c53635) ![bun](https://img.shields.io/badge/runtime-bun-f9f1e1)
 
 `spooder` is a purpose-built web server solution written in [TypeScript](https://www.typescriptlang.org/) for [Bun](https://bun.sh/). It is designed to be highly opinionated with minimal configuration.
 
