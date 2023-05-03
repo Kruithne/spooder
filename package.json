@@ -2,17 +2,13 @@
 	"name": "spooder",
 	"module": "index.ts",
 	"type": "module",
-
-	"version": "1.0.0",
-
+	"version": "2.0.0",
 	"exports": {
 		"bun": "./src/api.ts"
 	},
-
 	"scripts": {
 		"watcher": "bun ./src/watcher.ts"
 	},
-
 	"devDependencies": {
 		"bun-types": "^0.5.0"
 	}
