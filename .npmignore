@@ -7,8 +7,5 @@ node_modules
 .gitignore
 .github
 
-# docs folder contains files for README.md
-docs
-
 # markdown files are used for documentation
 *.md
