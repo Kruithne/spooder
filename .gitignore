@@ -1,10 +1,4 @@
-# This file controls what files are ignored in source control (git).
+# This file controls what files are ignored from the git repository.
 
-# Ignore Node.js dependencies directory.
+# third-party dependencies
 node_modules
-
-# Don't ignore test files.
-!*.test.js
-
-# Ignore dist directory.
-dist

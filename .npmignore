@@ -1,24 +1,14 @@
-# This file controls what files are ignored for the npm package.
+# This file controls what files are ignored from the npm package.
 
-# Ignore TypeScript configuration.
-tsconfig.json
+# third-party dependencies
+node_modules
 
-# Ignore ESlint configuration.
-.eslintrc.cjs
-
-# Ignore the git ignore file.
+# git/github related
 .gitignore
-
-# Ignore TypeScript (except definition files).
-*.ts
-!*.d.ts
-
-# Ignore any unit tests.
-*.test.js
-
-# Ignore the GitHub workflow folder.
 .github
 
-# Ignore markdown files except README.md
+# docs folder contains files for README.md
+docs
+
+# markdown files are used for documentation
 *.md
-!README.md
