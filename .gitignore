@@ -2,3 +2,6 @@
 
 # third-party dependencies
 node_modules
+
+# typescript declaration files (automatically generated)
+*.d.ts
