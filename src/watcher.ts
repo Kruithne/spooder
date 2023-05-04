@@ -1,3 +1,5 @@
+#!/usr/bin/env bun
+
 console.log('Begin test.');
 
 setInterval(() => {
