@@ -2,7 +2,7 @@
 	"name": "spooder",
 	"module": "index.ts",
 	"type": "module",
-	"version": "2.0.2",
+	"version": "2.0.3",
 	"exports": {
 		"bun": "./src/api.ts"
 	},
