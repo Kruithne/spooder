@@ -1,10 +1,12 @@
 {
 	"name": "spooder",
-	"module": "index.ts",
 	"type": "module",
 	"version": "2.0.3",
 	"exports": {
-		"bun": "./src/api.ts"
+		".": {
+			"bun": "./src/api.ts",
+			"import": "./src/api.ts"
+		}
 	},
 	"scripts": {
 		"watcher": "bun ./src/watcher.ts"
