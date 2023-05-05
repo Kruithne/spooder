@@ -1,7 +1,7 @@
 {
 	"name": "spooder",
 	"type": "module",
-	"version": "2.0.7",
+	"version": "2.0.8",
 	"bin": {
 		"spooder": "./src/instance.ts",
 		"spooder-update": "./src/update.ts",
