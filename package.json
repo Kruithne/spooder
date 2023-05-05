@@ -1,16 +1,23 @@
 {
-  "name": "spooder",
-  "type": "module",
-  "version": "2.0.5",
-  "bin": {
-    "spooder": "./src/instance.ts",
-	"spooder-update": "./src/update.ts"
-  },
-  "devDependencies": {
-    "@types/node": "^20.0.0",
-    "bun-types": "^0.5.0"
-  },
-  "dependencies": {
-    "zod": "^3.21.4"
-  }
+	"name": "spooder",
+	"type": "module",
+	"version": "2.0.5",
+	"exports": {
+		".": {
+			"bun": "./src/api.ts",
+			"import": "./src/api.ts"
+		}
+	},
+	"bin": {
+		"spooder": "./src/instance.ts",
+		"spooder-update": "./src/update.ts",
+		"spooder-heartbeat": "./src/heartbeat.ts"
+	},
+	"devDependencies": {
+		"@types/node": "^20.0.0",
+		"bun-types": "^0.5.0"
+	},
+	"dependencies": {
+		"zod": "^3.21.4"
+	}
 }
