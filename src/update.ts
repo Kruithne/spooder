@@ -69,7 +69,7 @@ function init_git_repository(directory: string) {
 
 async function load_configuration() {
 	const config_file = join(process.cwd(), 'spooder.toml');
-	return ConfigSchema.parse(await import(config_file));
+	return ConfigSchema.parse((await import(config_file)).default);
 }
 
 async function main() {
