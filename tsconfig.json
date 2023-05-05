@@ -16,6 +16,7 @@
 		"declaration": true,
 		"allowJs": true,
 		"types": [
+			"node",
 			"bun-types" // add Bun global
 		]
 	}

@@ -16,5 +16,26 @@ The `instance` is an API that can be imported into a Bun process to scaffold a w
 
 The `watcher` is a daemon responsible for updating, starting and monitoring a collection of `instance` processes. It is intended to be run as a service on the host machine.
 
+## Watcher
+
+```toml
+# /var/www/spooder.toml
+[[domains]]
+name = "testdomain.net"
+path = "/var/www/testdomain.net"
+port = 3000
+```
+
+```bash
+# Installation
+bun add spooder -g
+```
+
+```bash
+# Running the watcher
+screen -S spooder # Create a new screen session
+spooder
+```
+
 ## License
 The code in this repository is licensed under the ISC license. See the [LICENSE](LICENSE) file for more information.
