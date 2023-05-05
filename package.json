@@ -1,10 +1,10 @@
 {
   "name": "spooder",
   "type": "module",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "bin": {
     "spooder": "./src/instance.ts",
-	"spooder-update": "./src/update.ts"
+    "spooder-update": "./src/update.ts"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
