@@ -28,7 +28,7 @@ cd /var/www/my_server/
 spooder
 ```
 
-While the intended use of this runner is for web servers, it can be used to run any Bun service. It provides two features: automatic updating and restarting.
+While the intended use of this runner is for web servers, it can be used to run anything. It provides two primary features: automatic updating and restarting.
 
 ### Entry Point
 
