@@ -2,12 +2,6 @@
 	"name": "spooder",
 	"type": "module",
 	"version": "3.0.3",
-	"exports": {
-		".": {
-			"bun": "./src/api.ts",
-			"import": "./src/api.ts"
-		}
-	},
 	"module": "./src/api.ts",
 	"devDependencies": {
 		"@types/node": "^20.0.0",
