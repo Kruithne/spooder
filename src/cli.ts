@@ -78,20 +78,18 @@ async function start_server() {
 		log('auto update exited with code %d', update.exitCode)
 	}
 
-	const server_process = Bun.spawn(parse_command(config_run_command), {
+	Bun.spawn(parse_command(config_run_command), {
 		cwd: process.cwd(),
 		stdout: 'inherit',
-		stderr: 'inherit'
-	});
+		stderr: 'inherit',
 
-	log('server process started with pid %d', server_process.pid);
+		onExit: (proc, exitCode, signal) => {
+			log('server exited with code %d', exitCode);
 
-	server_process.exited.then(() => {
-		log('server exited with code %d', server_process.exitCode);
-
-		if (config_auto_restart_ms > -1) {
-			log('restarting server in %dms', config_auto_restart_ms);
-			setTimeout(start_server, config_auto_restart_ms);
+			if (config_auto_restart_ms > -1) {
+				log('restarting server in %dms', config_auto_restart_ms);
+				setTimeout(start_server, config_auto_restart_ms);
+			}
 		}
 	});
 }
