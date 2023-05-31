@@ -1,7 +1,7 @@
 {
 	"name": "spooder",
 	"type": "module",
-	"version": "3.0.3",
+	"version": "3.0.4",
 	"module": "./src/api.ts",
 	"devDependencies": {
 		"@types/node": "^20.0.0",
