@@ -94,4 +94,4 @@ async function start_server() {
 	});
 }
 
-start_server();
+await start_server();
