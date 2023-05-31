@@ -71,13 +71,26 @@ When starting your server, `spooder` can automatically update the source code in
 ```json
 {
 	"spooder": {
-		"update": "git pull && bun install"
+		"update": "git pull"
 	}
 }
 ```
-It is worth nothing that if the `update` command fails to execute, the server will still be started. This is preferred over entering a restart loop or failing to start the server at all.
+To execute multiple commands in sequence, provide an array rather than using the `&&` operator.
 
-As well as being executed when the server is first started, the `update` command is also run when `spooder` automatically restarts the server after it exits.
+```json
+{
+	"spooder": {
+		"update": [
+			"git pull",
+			"bun install"
+		]
+	}
+}
+```
+
+If a command in the sequence fails, the remaining commands will not be executed. However, if the update fails, the server will still be started. This is preferred over entering a restart loop or failing to start the server at all.
+
+As well as being executed when the server is first started, the `update` commands are also run when `spooder` automatically restarts the server after it exits.
 
 You can utilize this to automatically update your server in response to a webhook or other event by simply exiting the process.
 
