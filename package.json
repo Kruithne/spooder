@@ -1,21 +1,18 @@
 {
 	"name": "spooder",
 	"type": "module",
-	"version": "3.0.0",
-
+	"version": "3.0.1",
 	"exports": {
 		".": {
 			"bun": "./src/api.ts",
 			"import": "./src/api.ts"
 		}
 	},
-
 	"module": "./src/api.ts",
 	"devDependencies": {
 		"@types/node": "^20.0.0",
 		"bun-types": "^0.5.0"
 	},
-
 	"bin": {
 		"spooder": "./src/cli.ts"
 	}
