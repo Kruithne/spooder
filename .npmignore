@@ -1,5 +1,8 @@
 # This file controls what files are ignored from the npm package.
 
+# documentation resources
+docs
+
 # third-party dependencies
 node_modules
 
