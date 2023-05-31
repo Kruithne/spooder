@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 import path from 'node:path';
 
 type Config = Record<string, unknown>;
