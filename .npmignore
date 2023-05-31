@@ -12,6 +12,3 @@ node_modules
 
 # markdown files are used for documentation
 *.md
-
-# ignore bun lockfile
-bun.lockb
