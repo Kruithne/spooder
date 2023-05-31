@@ -2,12 +2,19 @@
 	"name": "spooder",
 	"type": "module",
 	"version": "3.0.4",
+	"exports": {
+		".": {
+			"bun": "./src/api.ts",
+			"import": "./src/api.ts"
+		}
+	},
 	"module": "./src/api.ts",
 	"devDependencies": {
 		"@types/node": "^20.0.0",
 		"bun-types": "^0.5.0"
 	},
 	"bin": {
+		"cheese": "echo \"cheese\"",
 		"spooder": "bun run ./src/cli.ts"
 	}
 }
