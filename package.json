@@ -10,6 +10,6 @@
 	},
 
 	"bin": {
-		"spooder": "./src/cli.ts"
+		"spooder": "bun run ./src/cli.ts"
 	}
 }
