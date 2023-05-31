@@ -11,12 +11,16 @@
 ## Installation
 
 ```bash
+# Installing globally for CLI runner usage.
 bun add spooder --global
+
+# Install into local package for API usage.
+bun add spooder
 ```
 
 ## Runner
 
-`spooder` also includes a global command-line tool for running the server. It is recommended that you run this in a `screen` session.
+`spooder` includes a global command-line tool for running servers. It is recommended that you run this in a `screen` session.
 
 ```bash
 screen -S spooder # Create a new screen session
@@ -24,40 +28,65 @@ cd /var/www/my_server/
 spooder
 ```
 
-`spooder` will load the `module` defined in your `package.json` in a new process using `bun run <module>`. This can be overridden using the `entry` property of the `spooder section` in your `package.json`.
+While the intended use of this runner is for web servers, it can be used to run any Bun service. It provides two features: automatic updating and restarting.
+
+### Entry Point
+
+`spooder` will attempt to launch the server from the current working directory using the command `bun run index.ts` as a default.
+
+To customize this, provide an alternative command via the `run` configuration.
 
 ```json
 {
 	"spooder": {
-		"entry": "index.ts"
+		"run": "bun run my_server.ts"
 	}
 }
 ```
 
-In the event that the server exits (regardless of exit code), `spooder` will automatically restart it after a short delay. This delay is configurable in the `spooder` section of your `package.json`.
+While `spooder` uses a `bun run` command by default, it is possible to use any command string.
+
+It is possible to chain commands, such as updating your source with `git pull && bun run index.ts`, however it is recommended that `run` is only used to launch the service. Instead, use the `update` property for updating which will fail gracefully and will not block the server from starting.
+
+### Auto Restart
+
+In the event that the server exits (regardless of exit code), `spooder` will automatically restart it after a short delay.
+
+This feature is enabled by default with a delay of `5000` milliseconds. The delay can be changed by providing a value for `autoRestart` in the configuration.
 
 ```json
 {
 	"spooder": {
-		"autoRestart": true, // Defaults to true.
-		"restartDelay": 5000, // Defaults to 5000ms.
+		"autoRestart": 5000
 	}
 }
 ```
 
-When starting your server, `spooder` can automatically update the source code by running `git pull` in the working directory. This feature is disabled by default and can be enabled in the `spooder` section of your `package.json`.
+If set to `0`, the server will be restarted immediately without delay. If set to `-1`, the server will not be restarted at all.
+
+### Auto Update
+
+When starting your server, `spooder` can automatically update the source code in the working directory. To enable this feature, provide an update command as `update` in the configuration.
 
 ```json
 {
 	"spooder": {
-		"autoUpdate": true // Defaults to false.
+		"update": "git pull && bun install"
 	}
 }
 ```
+It is worth nothing that if the `update` command fails to execute, the server will still be started. This is preferred over entering a restart loop or failing to start the server at all.
 
-When `autoUpdate` is enabled, your server process can initiate a self-update by terminating with the exit code `205`. This will cause `spooder` to run `git pull` and restart the server, which can be useful for responding to webhooks.
+As well as being executed when the server is first started, the `update` command is also run when `spooder` automatically restarts the server after it exits.
 
-If `autoUpdate` is disabled, all exit codes will be considered a crash and the server will be restarted if `autoRestart` is enabled.
+You can utilize this to automatically update your server in response to a webhook or other event by simply exiting the process.
+
+```ts
+events.on('receive-webhook', () => {
+	// <- Gracefully finish processing here.
+	process.exit(0);
+});
+```
 
 ## API
 
