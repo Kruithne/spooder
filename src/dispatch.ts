@@ -60,7 +60,6 @@ function sanitize_string(input: string, local_env?: Map<string, string>): string
 // TODO:
 // - Hook up dispatch_report() to panic()/caution() API functions.
 // - Hook up dispatch_report() to the spooder runner on crash (add restart mention?).
-// - Move the GitHub App ID and private key to a separate file/environment variable.
 // - Add a throttle to dispatch_report() to prevent spamming.
 // - Implement system information (CPU, memory) to reports.
 // - Update README documentation.
@@ -69,9 +68,22 @@ export async function dispatch_report(report_title: string, report_body: Record<
 	const config = await get_config();
 	const local_env = await load_local_env();
 
+	const canary_app_id = process.env.SPOODER_CANARY_APP_ID as string;
+	const canary_app_key = process.env.SPOODER_CANARY_KEY as string;
+
+	if (canary_app_id === undefined)
+		throw new Error('dispatch_report() called without SPOODER_CANARY_APP_ID environment variable set');
+
+	if (canary_app_key === undefined)
+		throw new Error('dispatch_report() called without SPOODER_CANARY_KEY environment variable set');
+
+	const key_file = Bun.file(canary_app_key);
+	if (key_file.size === 0)
+		throw new Error('dispatch_report() failed to read canary private key file');
+
 	const app = new App({
-		appId: 341565,
-		privateKey: await Bun.file('./spooder-bot.key').text(),
+		appId: parseInt(canary_app_id, 10),
+		privateKey: await key_file.text(),
 	});
 
 	await app.octokit.request('GET /app');
