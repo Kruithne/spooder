@@ -5,3 +5,6 @@ node_modules
 
 # typescript declaration files (automatically generated)
 *.d.ts
+
+# bun lockfile
+bun.lockb
