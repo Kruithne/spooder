@@ -1,18 +1,5 @@
 #!/usr/bin/env bun
-import path from 'node:path';
-
-type Config = Record<string, unknown>;
-
-async function load_config(): Promise<Config> {
-	try {
-		const config_file = Bun.file(path.join(process.cwd(), 'package.json'));
-		const json = await config_file.json();
-
-		return json?.spooder ?? {};
-	} catch (e) {
-		return {};
-	}
-}
+import { load_config } from './config';
 
 function parse_command(command: string): string[] {
 	const args = [];

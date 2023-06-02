@@ -15,5 +15,8 @@
 	},
 	"bin": {
 		"spooder": "./src/cli.ts"
+	},
+	"dependencies": {
+		"@octokit/app": "^13.1.5"
 	}
 }
