@@ -91,6 +91,13 @@ export async function dispatch_report(report_title: string, report_body: object 
 	const canary_repostiory = config.canary.repository.toLowerCase();
 	const canary_labels = config.canary.labels;
 
+	const post_body = sanitize_string(JSON.stringify(report_body, null, 4), local_env);
+	const post_object = {
+		title: sanitize_string(report_title, local_env),
+		body: '```json\n' + post_body + '\n```\n\nℹ️ *This issue has been created automatically in response to a server panic or caution.*',
+		labels: canary_labels
+	};
+
 	for await (const { installation } of app.eachInstallation.iterator()) {
 		const login = (installation?.account as { login: string })?.login;
 		if (login?.toLowerCase() !== canary_account)
@@ -100,12 +107,7 @@ export async function dispatch_report(report_title: string, report_body: object 
 			if (repository.full_name.toLowerCase() !== canary_repostiory)
 				continue;
 
-			const body = sanitize_string(JSON.stringify(report_body, null, 4), local_env);
-			await octokit.request('POST /repos/' + canary_repostiory + '/issues', {
-				title: sanitize_string(report_title, local_env),
-				body: '```json\n' + body + '\n```\n\nℹ️ *This issue has been created automatically in response to a server panic or caution.*',
-				labels: canary_labels
-			});
+			await octokit.request('POST /repos/' + canary_repostiory + '/issues', post_object);
 		}
 	}
 }
