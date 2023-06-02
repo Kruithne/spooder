@@ -2,8 +2,6 @@ import { App } from '@octokit/app';
 import { get_config } from './config';
 import path from 'node:path';
 
-type JSONObject = Record<string, unknown>;
-
 async function load_local_env(): Promise<Map<string, string>> {
 	const env = new Map<string, string>();
 
@@ -67,7 +65,7 @@ function sanitize_string(input: string, local_env?: Map<string, string>): string
 // - Implement system information (CPU, memory) to reports.
 // - Update README documentation.
 
-export async function dispatch_report(report_title: string, report_body: JSONObject): Promise<void> {
+export async function dispatch_report(report_title: string, report_body: Record<string, unknown>): Promise<void> {
 	const config = await get_config();
 	const local_env = await load_local_env();
 
