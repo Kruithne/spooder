@@ -81,7 +81,8 @@ export async function dispatch_report(report_title: string, report_body: Record<
 	const canary_labels = config.canary.labels;
 
 	for await (const { installation } of app.eachInstallation.iterator()) {
-		if (installation?.account?.login?.toLowerCase() !== canary_account)
+		const login = (installation?.account as { login: string })?.login;
+		if (login?.toLowerCase() !== canary_account)
 			continue;
 
 		for await (const { octokit, repository } of app.eachRepository.iterator({ installationId: installation.id })) {
