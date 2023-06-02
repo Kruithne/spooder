@@ -1,27 +1,20 @@
 #!/usr/bin/env bun
-import { load_config } from './config';
+import { get_config } from './config';
 import { parse_command_line, log } from './utils';
-
-const config = await load_config();
-const config_run_command = config.run as string ?? 'bun run index.ts';
-const config_auto_restart_ms = config.autoRestart as number ?? 5000;
-
-let config_update_commands = [] as string[];
-if (config.update) {
-	if (typeof config.update === 'string')
-		config_update_commands = [config.update]
-	else if (Array.isArray(config.update))
-		config_update_commands = config.update;
-}
 
 async function start_server() {
 	log('start_server');
 
-	if (config_update_commands.length > 0) {
-		log('running %d update commands', config_update_commands.length);
+	const config = await get_config();
 
-		for (let i = 0; i < config_update_commands.length; i++) {
-			const config_update_command = config_update_commands[i];
+	const update_commands = config.update;
+	const n_update_commands = update_commands.length;
+
+	if (n_update_commands > 0) {
+		log('running %d update commands', n_update_commands);
+
+		for (let i = 0; i < n_update_commands; i++) {
+			const config_update_command = update_commands[i];
 
 			log('[%d] %s', i, config_update_command);
 
@@ -42,7 +35,7 @@ async function start_server() {
 		}
 	}
 
-	Bun.spawn(parse_command_line(config_run_command), {
+	Bun.spawn(parse_command_line(config.run), {
 		cwd: process.cwd(),
 		stdout: 'inherit',
 		stderr: 'inherit',
@@ -50,9 +43,10 @@ async function start_server() {
 		onExit: (proc, exitCode, signal) => {
 			log('server exited with code %d', exitCode);
 
-			if (config_auto_restart_ms > -1) {
-				log('restarting server in %dms', config_auto_restart_ms);
-				setTimeout(start_server, config_auto_restart_ms);
+			const auto_restart_ms = config.autoRestart;
+			if (auto_restart_ms > -1) {
+				log('restarting server in %dms', auto_restart_ms);
+				setTimeout(start_server, auto_restart_ms);
 			}
 		}
 	});
