@@ -58,13 +58,12 @@ function sanitize_string(input: string, local_env?: Map<string, string>): string
 }
 
 // TODO:
-// - Hook up dispatch_report() to panic()/caution() API functions.
 // - Hook up dispatch_report() to the spooder runner on crash (add restart mention?).
 // - Add a throttle to dispatch_report() to prevent spamming.
 // - Implement system information (CPU, memory) to reports.
 // - Update README documentation.
 
-export async function dispatch_report(report_title: string, report_body: Record<string, unknown>): Promise<void> {
+export async function dispatch_report(report_title: string, report_body: object | undefined): Promise<void> {
 	const config = await get_config();
 	const local_env = await load_local_env();
 
