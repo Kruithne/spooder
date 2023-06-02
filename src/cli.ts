@@ -1,45 +1,6 @@
 #!/usr/bin/env bun
 import { load_config } from './config';
-
-function parse_command(command: string): string[] {
-	const args = [];
-	let current_arg = '';
-	let in_quotes = false;
-	let in_escape = false;
-
-	for (let i = 0; i < command.length; i++) {
-		const char = command[i];
-
-		if (in_escape) {
-			current_arg += char;
-			in_escape = false;
-			continue;
-		}
-
-		if (char === '\\') {
-			in_escape = true;
-			continue;
-		}
-
-		if (char === '"') {
-			in_quotes = !in_quotes;
-			continue;
-		}
-
-		if (char === ' ' && !in_quotes) {
-			args.push(current_arg);
-			current_arg = '';
-			continue;
-		}
-
-		current_arg += char;
-	}
-
-	if (current_arg.length > 0)
-		args.push(current_arg);
-
-	return args;
-}
+import { parse_command_line } from './utils';
 
 function log(message: string, ...args: unknown[]): void {
 	console.log('[spooder] ' + message, ...args);
@@ -68,7 +29,7 @@ async function start_server() {
 
 			log('[%d] %s', i, config_update_command);
 
-			const update_proc = Bun.spawn(parse_command(config_update_command), {
+			const update_proc = Bun.spawn(parse_command_line(config_update_command), {
 				cwd: process.cwd(),
 				stdout: 'inherit',
 				stderr: 'inherit'
@@ -85,7 +46,7 @@ async function start_server() {
 		}
 	}
 
-	Bun.spawn(parse_command(config_run_command), {
+	Bun.spawn(parse_command_line(config_run_command), {
 		cwd: process.cwd(),
 		stdout: 'inherit',
 		stderr: 'inherit',
