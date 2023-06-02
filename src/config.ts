@@ -38,6 +38,8 @@ function validate_config_option(source: ConfigObject, target: ConfigObject, root
 						warn('ignoring invalid configuration value `%s` (expected array)', key_name);
 						continue;
 					}
+
+					source[key as keyof Config] = value as Config[keyof Config];
 				} else {
 					if (is_actual_array) {
 						warn('ignoring invalid configuration value `%s` (expected object)', key_name);
