@@ -80,8 +80,12 @@ export async function dispatch_report(report_title: string, report_body: object 
 	if (key_file.size === 0)
 		throw new Error('dispatch_report() failed to read canary private key file');
 
+	const app_id = parseInt(canary_app_id, 10);
+	if (isNaN(app_id))
+		throw new Error('dispatch_report() failed to parse SPOODER_CANARY_APP_ID environment variable as integer');
+
 	const app = new App({
-		appId: parseInt(canary_app_id, 10),
+		appId: app_id,
 		privateKey: await key_file.text(),
 	});
 
