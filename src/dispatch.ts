@@ -97,10 +97,6 @@ function sanitize_string(input: string, local_env?: Map<string, string>): string
 // - Implement system information (CPU, memory) to reports.
 // - Update README documentation.
 
-export async function is_reporting_enabled(): Promise<boolean> {
-	return false;
-}
-
 export async function dispatch_report(report_title: string, report_body: JSONObject): Promise<void> {
 	const canary_config = validate_canary_config(await load_config());
 	if (canary_config === null)
