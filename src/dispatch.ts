@@ -37,7 +37,7 @@ function validate_canary_config(config: JSONObject): CanaryConfig | null {
 async function load_local_env(): Promise<Map<string, string>> {
 	const env = new Map<string, string>();
 
-	const env_file = Bun.file('.env.local');
+	const env_file = Bun.file(path.join(process.cwd(), '.env.local'));
 
 	if (env_file.size > 0) {
 		const env_text = await env_file.text();
