@@ -1,10 +1,6 @@
 #!/usr/bin/env bun
 import { load_config } from './config';
-import { parse_command_line } from './utils';
-
-function log(message: string, ...args: unknown[]): void {
-	console.log('[spooder] ' + message, ...args);
-}
+import { parse_command_line, log } from './utils';
 
 const config = await load_config();
 const config_run_command = config.run as string ?? 'bun run index.ts';

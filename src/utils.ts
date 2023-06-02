@@ -1,3 +1,13 @@
+/** Logs a message to stdout with the prefix `[spooder] ` */
+export function log(message: string, ...args: unknown[]): void {
+	console.log('[spooder] ' + message, ...args);
+}
+
+/** Logs a message to stderr with the prefix `[spooder] ` */
+export function warn(message: string, ...args: unknown[]): void {
+	console.error('[spooder] ' + message, ...args);
+}
+
 export function parse_command_line(command: string): string[] {
 	const args = [];
 	let current_arg = '';
