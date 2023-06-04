@@ -2,11 +2,23 @@
 
 # Spooder &middot; ![typescript](https://img.shields.io/badge/language-typescript-blue) [![license badge](https://img.shields.io/github/license/Kruithne/spooder?color=yellow)](LICENSE) ![npm version](https://img.shields.io/npm/v/spooder?color=c53635) ![bun](https://img.shields.io/badge/runtime-bun-f9f1e1)
 
-`spooder` is a purpose-built web server solution written in [TypeScript](https://www.typescriptlang.org/) for [Bun](https://bun.sh/). It is designed to be highly opinionated with minimal configuration.
+`spooder` is a purpose-built server solution written using the [Bun](https://bun.sh/) runtime.
 
-> **Warning** - This project is built with specific use-cases in mind and is not intended to be a general-purpose web server. The authors of this project are not responsible for any damage caused by using this software.
+### What does it do?
 
-> **Warning** - This project is developed for [Bun](https://bun.sh/), which at the time of writing is still experimental. It is not recommended to use this project in production environments unless you understand the risks.
+`spooder` consists of a command-line tool which provides automatic updating/restarting and canary functionality, and a building-block API for creating servers.
+
+### Should I use it?
+
+Probably not. You are free to use `spooder` if you fully understand the risks and limitations of doing so, however here is a list of things you should consider before using it:
+
+⚠️ This is not a Node.js package. It is built using the [Bun](https://bun.sh/) runtime, which is still experimental as of writing.
+
+⚠️ It is designed to be highly opinionated and is not intended to be a general-purpose server, so configuration is limited.
+
+⚠️ It is not a full-featured web server and only provides the functionality as required for the projects it has been built for.
+
+⚠️ It has not been battle-tested and may contain bugs or security issues. The authors of this project are not responsible for any problems caused by using this software.
 
 # Installation
 
@@ -69,9 +81,7 @@ While `spooder` uses a `bun run` command by default, it is possible to use any c
 
 ## Auto Restart
 
-In the event that the server exits (regardless of exit code), `spooder` will automatically restart it after a short delay.
-
-This feature is disabled by default. To enable it, specify the restart delay in milliseconds as `autoRestart` in the configuration.
+In the event that the server exits (regardless of exit code), `spooder` can automatically restart it after a short delay. To enable this feature specify the restart delay in milliseconds as `autoRestart` in the configuration.
 
 ```json
 {
@@ -134,11 +144,11 @@ In addition to the **App ID** that is assigned automatically, you will also need
 
 > Note: The private keys provided by GitHub are in PKCS#1 format, but only PKCS#8 is supported. You can convert the key file with the following command.
 
-Each server that intends to use the canary feature will need to have the private key installed somewhere the server process can access it.
-
 ```bash
 openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in private-key.pem -out private-key-pkcs8.key
 ```
+
+Each server that intends to use the canary feature will need to have the private key installed somewhere the server process can access it.
 
 ### 2. Add package.json configuration
 
@@ -178,13 +188,13 @@ In addition, you can manually raise issues using the `spooder` API by calling `c
 
 # API
 
-`spooder` exposes a simple API which can be imported into your project for bootstrapping a server in Bun. The API is designed to be minimal to leave control in the hands of the developer and not add overhead for features you may not need.
+`spooder` exposes a build-block style API for developing servers. The API is designed to be minimal to leave control in the hands of the developer and not add overhead for features you may not need.
 
 ```ts
 import { ... } from 'spooder';
 ```
 
-### `caution(err_message: string, err?: object): Promise<void>`
+#### `caution(err_message: string, err?: object): Promise<void>`
 Raise a warning issue on GitHub. This is useful for non-fatal errors which you want to be notified about.
 
 To prevent spam, issues raised with `caution()` are rate limited to one unique issue per 24 hours. Issues are considered unique by the `err_message` parameter, so it is recommended that you do not include any dynamic information in this parameter that would prevent the issue from being unique.
@@ -202,7 +212,7 @@ await caution('Error with number', { some_important_value });
 ```
 It is not required that you `await` the `caution()`, and in situations where parallel processing is required, it is recommended that you do not.
 
-### `panic(err_message: string, err?: object): Promise<void>`
+#### `panic(err_message: string, err?: object): Promise<void>`
 This behaves the same as `caution()` with the difference that once `panic()` has raised the issue, it will exit the process with a non-zero exit code.
 
 This should only be called in worst-case scenarios where the server cannot continue to run. Since the process will exit, it is recommended that you `await` the `panic()` call.
