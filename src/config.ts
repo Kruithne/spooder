@@ -8,7 +8,8 @@ const internal_config = {
 	canary: {
 		account: '',
 		repository: '',
-		labels: []
+		labels: [],
+		throttle: 86400
 	}
 };
 

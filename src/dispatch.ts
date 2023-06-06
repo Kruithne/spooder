@@ -57,7 +57,7 @@ async function save_cache_table(table: Map<bigint, number>, cache_file_path: str
 	await Bun.write(cache_file_path, data);
 }
 
-async function check_cache_table(key: string, repository: string): Promise<boolean> {
+async function check_cache_table(key: string, repository: string, expiry: number): Promise<boolean> {
 	const [owner, repo] = repository.split('/');
 	const cache_file_path = path.join(os.tmpdir(), 'spooder_canary', owner, repo, 'cache.bin');
 
@@ -65,7 +65,7 @@ async function check_cache_table(key: string, repository: string): Promise<boole
 	const key_hash = BigInt(Bun.hash.wyhash(key));
 
 	const time_now = Math.floor(Date.now() / 1000);
-	const expiry_threshold = time_now - (24 * 60); // TODO: Make configurable.
+	const expiry_threshold = time_now - expiry;
 
 	let changed = false;
 	try {
@@ -143,7 +143,7 @@ export async function dispatch_report(report_title: string, report_body: object 
 
 	// TODO: Validate canary_account and canary_repository.
 
-	const is_cached = await check_cache_table(report_title, canary_repostiory);
+	const is_cached = await check_cache_table(report_title, canary_repostiory, config.canary.throttle);
 	if (is_cached) {
 		warn('Throttled canary report: ' + report_title);
 		return;
