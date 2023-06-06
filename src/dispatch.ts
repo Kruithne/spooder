@@ -1,6 +1,9 @@
 import { App } from '@octokit/app';
 import { get_config } from './config';
+import { warn } from './utils';
+import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 
 async function load_local_env(): Promise<Map<string, string>> {
 	const env = new Map<string, string>();
@@ -36,6 +39,77 @@ async function load_local_env(): Promise<Map<string, string>> {
 	return env;
 }
 
+async function save_cache_table(table: Map<bigint, number>, cache_file_path: string): Promise<void> {
+	const data = Buffer.alloc(4 + (table.size * 12));
+
+	let offset = 4;
+	data.writeUInt32LE(table.size, 0);
+
+	for (const [key, value] of table.entries()) {
+		data.writeBigUint64LE(key, offset);
+		offset += 8;
+
+		data.writeUInt32LE(value, offset);
+		offset += 4;
+	}
+
+	await new Promise(resolve => fs.mkdir(path.dirname(cache_file_path), { recursive: true }, resolve));
+	await Bun.write(cache_file_path, data);
+}
+
+async function check_cache_table(key: string, repository: string): Promise<boolean> {
+	const [owner, repo] = repository.split('/');
+	const cache_file_path = path.join(os.tmpdir(), 'spooder_canary', owner, repo, 'cache.bin');
+
+	const cache_table = new Map<bigint, number>();
+
+	const key_hash = BigInt(Bun.hash.wyhash(key));
+	console.log('check_cache_table %d', key_hash);
+
+	const time_now = Math.floor(Date.now() / 1000);
+	const expiry_threshold = time_now - (24 * 60); // TODO: Make configurable.
+
+	let changed = false;
+	try {
+		const cache_file = Bun.file(cache_file_path);
+		
+		if (cache_file.size > 0) {
+			const data = Buffer.from(await cache_file.arrayBuffer());
+			const entry_count = data.readUInt32LE(0);
+
+			let offset = 4;
+			for (let i = 0; i < entry_count; i++) {
+				const hash = data.readBigUInt64LE(offset);
+				offset += 8;
+
+				const expiry = data.readUInt32LE(offset);
+				offset += 4;
+			
+				if (expiry >= expiry_threshold)
+					cache_table.set(hash, expiry);
+				else
+					changed = true;
+			}
+		}
+	} catch (e) {
+		warn('Failed to read canary cache file ' + cache_file_path);
+		warn('Error: ' + (e as Error).message);
+		warn('You should resolve this issue to prevent spamming GitHub with canary reports.');
+	}
+
+	if (cache_table.has(key_hash)) {
+		if (changed)
+			await save_cache_table(cache_table, cache_file_path);
+
+		return true;
+	}
+
+	cache_table.set(key_hash, time_now);
+	await save_cache_table(cache_table, cache_file_path);
+
+	return false;
+}
+
 function sanitize_string(input: string, local_env?: Map<string, string>): string {
 	// Strip all potential e-mail addresses.
 	input = input.replaceAll(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/g, '[e-mail address]');
@@ -64,6 +138,19 @@ function sanitize_string(input: string, local_env?: Map<string, string>): string
 
 export async function dispatch_report(report_title: string, report_body: object | undefined): Promise<void> {
 	const config = await get_config();
+
+	const canary_account = config.canary.account.toLowerCase();
+	const canary_repostiory = config.canary.repository.toLowerCase();
+	const canary_labels = config.canary.labels;
+
+	// TODO: Validate canary_account and canary_repository.
+
+	const is_cached = await check_cache_table(report_title, canary_repostiory);
+	if (is_cached) {
+		warn('Throttled canary report: ' + report_title);
+		return;
+	}
+
 	const local_env = await load_local_env();
 
 	const canary_app_id = process.env.SPOODER_CANARY_APP_ID as string;
@@ -89,10 +176,6 @@ export async function dispatch_report(report_title: string, report_body: object 
 	});
 
 	await app.octokit.request('GET /app');
-
-	const canary_account = config.canary.account.toLowerCase();
-	const canary_repostiory = config.canary.repository.toLowerCase();
-	const canary_labels = config.canary.labels;
 
 	const post_body = sanitize_string(JSON.stringify(report_body, null, 4), local_env);
 	const post_object = {
