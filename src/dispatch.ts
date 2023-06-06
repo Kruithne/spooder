@@ -116,10 +116,10 @@ function sanitize_string(input: string, local_env?: Map<string, string>): string
 	input = input.replaceAll(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/g, '[e-mail address]');
 
 	// Strip IPv4 addresses.
-	input = input.replaceAll(/([0-9]{1,3}\.){3}[0-9]{1,3}/g, '[IPv4 Address]');
+	input = input.replaceAll(/([0-9]{1,3}\.){3}[0-9]{1,3}/g, '[IPv4 address]');
 
 	// Strip IPv6 addresses.
-	input = input.replaceAll(/([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}/g, '[IPv6 Address]');
+	input = input.replaceAll(/([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}/g, '[IPv6 address]');
 
 	// Strip local environment variables.
 	if (local_env !== undefined) {
