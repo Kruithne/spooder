@@ -62,9 +62,7 @@ async function check_cache_table(key: string, repository: string): Promise<boole
 	const cache_file_path = path.join(os.tmpdir(), 'spooder_canary', owner, repo, 'cache.bin');
 
 	const cache_table = new Map<bigint, number>();
-
 	const key_hash = BigInt(Bun.hash.wyhash(key));
-	console.log('check_cache_table %d', key_hash);
 
 	const time_now = Math.floor(Date.now() / 1000);
 	const expiry_threshold = time_now - (24 * 60); // TODO: Make configurable.
