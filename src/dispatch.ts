@@ -186,6 +186,8 @@ export async function dispatch_report(report_title: string, report_body: object 
 		const local_env = await load_local_env();
 		post_object.body = sanitize_string(JSON.stringify(report_body, null, 4), local_env);;
 		post_object.title = sanitize_string(report_title, local_env);
+	} else {
+		post_object.body = JSON.stringify(report_body, null, 4);
 	}
 
 	post_object.body = '```json\n' + post_object.body + '\n```\n\nℹ️ *This issue has been created automatically in response to a server panic or caution.*';
