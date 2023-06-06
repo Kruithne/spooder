@@ -58,6 +58,9 @@ async function save_cache_table(table: Map<bigint, number>, cache_file_path: str
 }
 
 async function check_cache_table(key: string, repository: string, expiry: number): Promise<boolean> {
+	if (expiry === 0)
+		return false;
+
 	const [owner, repo] = repository.split('/');
 	const cache_file_path = path.join(os.tmpdir(), 'spooder_canary', owner, repo, 'cache.bin');
 
