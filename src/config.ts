@@ -9,7 +9,8 @@ const internal_config = {
 		account: '',
 		repository: '',
 		labels: [],
-		throttle: 86400
+		throttle: 86400,
+		sanitize: true
 	}
 };
 
