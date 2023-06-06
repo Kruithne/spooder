@@ -169,8 +169,6 @@ export async function dispatch_report(report_title: string, report_body: object 
 	if (isNaN(app_id))
 		throw new Error('dispatch_report() failed to parse SPOODER_CANARY_APP_ID environment variable as integer');
 
-	const canary_sanitize = config.canary.sanitize;
-
 	const app = new App({
 		appId: app_id,
 		privateKey: await key_file.text(),
