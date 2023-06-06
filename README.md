@@ -197,7 +197,19 @@ import { ... } from 'spooder';
 #### `caution(err_message: string, err?: object): Promise<void>`
 Raise a warning issue on GitHub. This is useful for non-fatal errors which you want to be notified about.
 
-To prevent spam, issues raised with `caution()` are rate limited to one unique issue per 24 hours. Issues are considered unique by the `err_message` parameter, so it is recommended that you do not include any dynamic information in this parameter that would prevent the issue from being unique.
+To prevent spam, issues raised with `caution()` are rate-limited based on a configurable threshold in seconds. By default, the threshold is set to 24 hours per unique issue.
+
+```json
+{
+	"spooder": {
+		"canary": {
+			"expiry": 86400
+		}
+	}
+}
+```
+
+Issues are considered unique by the `err_message` parameter, so it is recommended that you do not include any dynamic information in this parameter that would prevent the issue from being unique.
 
 If you need to provide unique information, you can use the `err` parameter to provide an object which will be serialized to JSON and included in the issue body.
 
