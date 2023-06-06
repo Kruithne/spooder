@@ -203,7 +203,7 @@ To prevent spam, issues raised with `caution()` are rate-limited based on a conf
 {
 	"spooder": {
 		"canary": {
-			"expiry": 86400
+			"throttle": 86400
 		}
 	}
 }
