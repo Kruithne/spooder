@@ -132,11 +132,6 @@ function sanitize_string(input: string, local_env?: Map<string, string>): string
 	return input;
 }
 
-// TODO:
-// - Hook up dispatch_report() to the spooder runner on crash (add restart mention?).
-// - Add a throttle to dispatch_report() to prevent spamming.
-// - Implement system information (CPU, memory) to reports.
-
 export async function dispatch_report(report_title: string, report_body: object | undefined): Promise<void> {
 	const config = await get_config();
 
