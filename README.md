@@ -186,6 +186,53 @@ Once configured, `spooder` will automatically raise an issue when the server exi
 
 In addition, you can manually raise issues using the `spooder` API by calling `caution()` or `panic()`. More information about these functions can be found in the `API` section.
 
+## Sanitization
+
+All reports sent via the canary feature are sanitized to prevent sensitive information from being leaked. This includes:
+
+- Environment variables from `.env.local`
+- IPv4 / IPv6 addresses.
+- E-mail addresses.
+
+```bash
+# .env.local
+DB_PASSWORD=secret
+```
+
+```ts
+await panic({
+	a: 'foo',
+	b: process.env.DB_PASSWORD,
+	c: 'Hello person@place.net',
+	d: 'Client: 192.168.1.1'
+});
+```
+
+```json
+[
+	{
+		"a": "foo",
+		"b": "[redacted]",
+		"c": "Hello [e-mail address]",
+		"d": "Client: [IPv4 address]"
+	}
+]
+```
+
+The sanitization behavior can be disabled by setting `spooder.canary.sanitize` to `false` in the configuration. This is not recommended as it may leak sensitive information.
+
+```json
+{
+	"spooder": {
+		"canary": {
+			"sanitize": false
+		}
+	}
+}
+```
+
+While this sanitization adds a layer of protection against information leaking, it does not catch everything. You should pay special attention to messages and objects provided to the canary to not unintentionally leak sensitive information.
+
 # API
 
 `spooder` exposes a build-block style API for developing servers. The API is designed to be minimal to leave control in the hands of the developer and not add overhead for features you may not need.
