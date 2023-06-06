@@ -152,8 +152,6 @@ export async function dispatch_report(report_title: string, report_body: object 
 		return;
 	}
 
-	const local_env = await load_local_env();
-
 	const canary_app_id = process.env.SPOODER_CANARY_APP_ID as string;
 	const canary_app_key = process.env.SPOODER_CANARY_KEY as string;
 
@@ -180,15 +178,19 @@ export async function dispatch_report(report_title: string, report_body: object 
 
 	await app.octokit.request('GET /app');
 
-	let post_body = JSON.stringify(report_body, null, 4);
-	if (canary_sanitize)
-		post_body = sanitize_string(post_body, local_env);
-
 	const post_object = {
-		title: canary_sanitize ? sanitize_string(report_title, local_env) : report_title,
-		body: '```json\n' + post_body + '\n```\n\nℹ️ *This issue has been created automatically in response to a server panic or caution.*',
+		title: report_title,
+		body: '',
 		labels: canary_labels
 	};
+
+	if (config.canary.sanitize) {
+		const local_env = await load_local_env();
+		post_object.body = sanitize_string(JSON.stringify(report_body, null, 4), local_env);;
+		post_object.title = sanitize_string(report_title, local_env);
+	}
+
+	post_object.body = '```json\n' + post_object.body + '\n```\n\nℹ️ *This issue has been created automatically in response to a server panic or caution.*';
 
 	for await (const { installation } of app.eachInstallation.iterator()) {
 		const login = (installation?.account as { login: string })?.login;
