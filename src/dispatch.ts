@@ -184,7 +184,7 @@ export async function dispatch_report(report_title: string, report_body: object 
 
 	if (config.canary.sanitize) {
 		const local_env = await load_local_env();
-		post_object.body = sanitize_string(JSON.stringify(report_body, null, 4), local_env);;
+		post_object.body = sanitize_string(JSON.stringify(report_body, null, 4), local_env);
 		post_object.title = sanitize_string(report_title, local_env);
 	} else {
 		post_object.body = JSON.stringify(report_body, null, 4);
