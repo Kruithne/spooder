@@ -194,8 +194,24 @@ In addition, you can manually raise issues using the `spooder` API by calling `c
 import { ... } from 'spooder';
 ```
 
-#### `caution(err_message: string, err?: object): Promise<void>`
+#### `caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`
 Raise a warning issue on GitHub. This is useful for non-fatal errors which you want to be notified about.
+
+```ts
+try {
+	// connect to database
+} catch (e) {
+	await caution('Failed to connect to database', e);
+}
+```
+
+Providing a custom error message is optional and can be omitted. Additionally you can also provide additional error objects which will be serialized to JSON and included in the report.
+
+```ts
+caution(e); // provide just the error
+caution(e, { foo: 42 }); // additional data
+caution('Custom error', e, { foo: 42 }); // all
+```
 
 To prevent spam, issues raised with `caution()` are rate-limited based on a configurable threshold in seconds. By default, the threshold is set to 24 hours per unique issue.
 
@@ -224,7 +240,7 @@ await caution('Error with number', { some_important_value });
 ```
 It is not required that you `await` the `caution()`, and in situations where parallel processing is required, it is recommended that you do not.
 
-#### `panic(err_message: string, err?: object): Promise<void>`
+#### `panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`
 This behaves the same as `caution()` with the difference that once `panic()` has raised the issue, it will exit the process with a non-zero exit code.
 
 This should only be called in worst-case scenarios where the server cannot continue to run. Since the process will exit, it is recommended that you `await` the `panic()` call.
