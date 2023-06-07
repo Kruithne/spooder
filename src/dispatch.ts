@@ -139,7 +139,8 @@ export async function dispatch_report(report_title: string, report_body: object 
 	const canary_repostiory = config.canary.repository.toLowerCase();
 	const canary_labels = config.canary.labels;
 
-	// TODO: Validate canary_account and canary_repository.
+	if (canary_account.length === 0|| canary_repostiory.length === 0)
+		return;
 
 	const is_cached = await check_cache_table(report_title, canary_repostiory, config.canary.throttle);
 	if (is_cached) {
