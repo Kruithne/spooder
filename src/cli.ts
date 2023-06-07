@@ -44,15 +44,21 @@ async function start_server() {
 		onExit: (proc, exitCode, signal) => {
 			log('server exited with code %d', exitCode);
 
-			if (exitCode !== null && exitCode > 0 && proc.stderr !== undefined) {
-				const res = new Response(proc.stderr as ReadableStream);
+			if (exitCode !== null && exitCode > 0) {
+				if (proc.stderr !== undefined) {
+					const res = new Response(proc.stderr as ReadableStream);
 
-				res.text().then(async stderr => {
-					await dispatch_report('crash: service exited unexpectedly', {
-						exitCode,
-						stderr: strip_color_codes(stderr).split(/\r?\n/)
+					res.text().then(async stderr => {
+						await dispatch_report('crash: service exited unexpectedly', {
+							exitCode,
+							stderr: strip_color_codes(stderr).split(/\r?\n/)
+						});
 					});
-				});
+				} else {
+					dispatch_report('crash: service exited unexpectedly', {
+						exitCode
+					});
+				}
 			}
 
 			const auto_restart_ms = config.autoRestart;
