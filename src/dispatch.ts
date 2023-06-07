@@ -185,7 +185,7 @@ export async function dispatch_report(report_title: string, report_body: object 
 		post_object.body = JSON.stringify(report_body, null, 4);
 	}
 
-	post_object.body = '```json\n' + post_object.body + '\n```\n\nℹ️ *This issue has been created automatically in response to a server panic or caution.*';
+	post_object.body = '```json\n' + post_object.body + '\n```\n\nℹ️ *This issue has been created automatically in response to a server panic, caution or crash.*';
 
 	for await (const { installation } of app.eachInstallation.iterator()) {
 		const login = (installation?.account as { login: string })?.login;
