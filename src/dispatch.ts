@@ -132,7 +132,20 @@ function sanitize_string(input: string, local_env?: Map<string, string>): string
 	return input;
 }
 
-export async function dispatch_report(report_title: string, report_body: object | undefined): Promise<void> {
+function generate_diagnostics(): object {
+	return {
+		'loadavg': os.loadavg(),
+		'memory': {
+			'free': os.freemem(),
+			'total': os.totalmem(),
+		},
+		'platform': os.platform(),
+		'uptime': os.uptime(),
+		'versions': process.versions,
+	}
+}
+
+export async function dispatch_report(report_title: string, report_body: Array<unknown>): Promise<void> {
 	try {
 		const config = await get_config();
 
@@ -178,6 +191,8 @@ export async function dispatch_report(report_title: string, report_body: object 
 			body: '',
 			labels: canary_labels
 		};
+
+		report_body.push(generate_diagnostics());
 
 		if (config.canary.sanitize) {
 			const local_env = await load_local_env();

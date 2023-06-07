@@ -49,15 +49,15 @@ async function start_server() {
 					const res = new Response(proc.stderr as ReadableStream);
 
 					res.text().then(async stderr => {
-						await dispatch_report('crash: server exited unexpectedly', {
+						await dispatch_report('crash: server exited unexpectedly', [{
 							exitCode,
 							stderr: strip_color_codes(stderr).split(/\r?\n/)
-						});
+						}]);
 					});
 				} else {
-					dispatch_report('crash: service exited unexpectedly', {
+					dispatch_report('crash: service exited unexpectedly', [{
 						exitCode
-					});
+					}]);
 				}
 			}
 
