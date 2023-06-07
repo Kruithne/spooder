@@ -1,6 +1,6 @@
 import { App } from '@octokit/app';
 import { get_config } from './config';
-import { warn } from './utils';
+import { warn, log } from './utils';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -199,6 +199,7 @@ export async function dispatch_report(report_title: string, report_body: object 
 					continue;
 
 				await octokit.request('POST /repos/' + canary_repostiory + '/issues', post_object);
+				log('Dispatched canary report to %s: %s', canary_repostiory, report_title);
 			}
 		}
 	} catch (e) {
