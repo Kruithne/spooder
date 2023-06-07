@@ -186,6 +186,40 @@ Once configured, `spooder` will automatically raise an issue when the server exi
 
 In addition, you can manually raise issues using the `spooder` API by calling `caution()` or `panic()`. More information about these functions can be found in the `API` section.
 
+## Crash
+
+It is recommended that you harden your server code against unexpected exceptions and use `panic()` and `caution()` to raise issues with selected diagnostic information.
+
+In the event that the server does encounter an unexpected exception which causes it to exit with a non-zero exit code, `spooder` will automatically raise an issue on GitHub using the canary feature, if configured.
+
+Since this issue has been caught externally, `spooder` has no context of the exception which was raised. Instead, the canary report will contain the output from `stderr`.
+
+```json
+{
+	"exitCode": 1,
+	"stderr": [
+		"[2.48ms] \".env.local\"",
+		"Test output",
+		"Test output",
+		"4 | console.warn('Test output');",
+		"5 | ",
+		"6 | // Create custom error class.",
+		"7 | class TestError extends Error {",
+		"8 | 	constructor(message: string) {",
+		"9 | 		super(message);",
+		"     ^",
+		"TestError: Home is [IPv4 address]",
+		"      at new TestError (/mnt/i/spooder/test.ts:9:2)",
+		"      at /mnt/i/spooder/test.ts:13:6",
+		""
+	]
+}
+```
+
+This information is subject to sanitization, as described in the `Sanitization` section, however you should be aware that stack traces may contain sensitive information.
+
+Additionally, Bun includes a relevant code snippet from the source file where the exception was raised. This is intended to help you identify the source of the problem.
+
 ## Sanitization
 
 All reports sent via the canary feature are sanitized to prevent sensitive information from being leaked. This includes:
@@ -232,6 +266,46 @@ The sanitization behavior can be disabled by setting `spooder.canary.sanitize` t
 ```
 
 While this sanitization adds a layer of protection against information leaking, it does not catch everything. You should pay special attention to messages and objects provided to the canary to not unintentionally leak sensitive information.
+
+## System Information
+
+In addition to the information provided by the developer, `spooder` also includes some system information in the canary reports.
+
+```json
+{
+	"loadavg": [
+		0,
+		0,
+		0
+	],
+	"memory": {
+		"free": 7620907008,
+		"total": 8261840896
+	},
+	"platform": "linux",
+	"uptime": 7123,
+	"versions": {
+		"node": "18.15.0",
+		"bun": "0.6.5",
+		"webkit": "60d11703a533fd694cd1d6ddda04813eecb5d69f",
+		"boringssl": "b275c5ce1c88bc06f5a967026d3c0ce1df2be815",
+		"libarchive": "dc321febde83dd0f31158e1be61a7aedda65e7a2",
+		"mimalloc": "3c7079967a269027e438a2aac83197076d9fe09d",
+		"picohttpparser": "066d2b1e9ab820703db0837a7255d92d30f0c9f5",
+		"uwebsockets": "70b1b9fc1341e8b791b42c5447f90505c2abe156",
+		"zig": "0.11.0-dev.2571+31738de28",
+		"zlib": "885674026394870b7e7a05b7bf1ec5eb7bd8a9c0",
+		"tinycc": "2d3ad9e0d32194ad7fd867b66ebe218dcc8cb5cd",
+		"lolhtml": "2eed349dcdfa4ff5c19fe7c6e501cfd687601033",
+		"ares": "0e7a5dee0fbb04080750cf6eabbe89d8bae87faa",
+		"usockets": "fafc241e8664243fc0c51d69684d5d02b9805134",
+		"v8": "10.8.168.20-node.8",
+		"uv": "1.44.2",
+		"napi": "8",
+		"modules": "108"
+	}
+}
+```
 
 # API
 
