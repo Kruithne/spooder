@@ -8,6 +8,11 @@ export function warn(message: string, ...args: unknown[]): void {
 	console.error('[spooder] ' + message, ...args);
 }
 
+/** Strips ANSI color codes from a string */
+export function strip_color_codes(str: string): string {
+	return str.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
 /** Converts a command line string into an array of arguments */
 export function parse_command_line(command: string): string[] {
 	const args = [];

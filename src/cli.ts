@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { get_config } from './config';
-import { parse_command_line, log } from './utils';
+import { parse_command_line, log, strip_color_codes } from './utils';
+import { dispatch_report } from './dispatch';
 
 async function start_server() {
 	log('start_server');
@@ -38,10 +39,21 @@ async function start_server() {
 	Bun.spawn(parse_command_line(config.run), {
 		cwd: process.cwd(),
 		stdout: 'inherit',
-		stderr: 'inherit',
+		stderr: 'pipe',
 
 		onExit: (proc, exitCode, signal) => {
 			log('server exited with code %d', exitCode);
+
+			if (exitCode !== null && exitCode > 0 && proc.stderr !== undefined) {
+				const res = new Response(proc.stderr as ReadableStream);
+
+				res.text().then(async stderr => {
+					await dispatch_report('crash: service exited unexpectedly', {
+						exitCode,
+						stderr: strip_color_codes(stderr).split(/\r?\n/)
+					});
+				});
+			}
 
 			const auto_restart_ms = config.autoRestart;
 			if (auto_restart_ms > -1) {
