@@ -1,6 +1,6 @@
 import { dispatch_report } from './dispatch';
 
-async function handle_error(prefix: string, err_message_or_obj: string | object, ...err: unknown[]) {
+async function handle_error(prefix: string, err_message_or_obj: string | object, ...err: unknown[]): Promise<void> {
 	let error_message = 'unknown error';
 
 	if (typeof err_message_or_obj === 'string') {
@@ -29,11 +29,11 @@ async function handle_error(prefix: string, err_message_or_obj: string | object,
 	await dispatch_report(prefix + error_message, err);
 }
 
-export async function panic(err_message_or_obj: string | object, ...err: object[]) {
+export async function panic(err_message_or_obj: string | object, ...err: object[]): Promise<void> {
 	await handle_error('panic: ', err_message_or_obj, ...err);
 	process.exit(1);
 }
 
-export async function caution(err_message_or_obj: string | object, ...err: object[]) {
+export async function caution(err_message_or_obj: string | object, ...err: object[]): Promise<void> {
 	await handle_error('caution: ', err_message_or_obj, ...err);
 }
