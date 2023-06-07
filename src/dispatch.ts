@@ -133,71 +133,75 @@ function sanitize_string(input: string, local_env?: Map<string, string>): string
 }
 
 export async function dispatch_report(report_title: string, report_body: object | undefined): Promise<void> {
-	const config = await get_config();
+	try {
+		const config = await get_config();
 
-	const canary_account = config.canary.account.toLowerCase();
-	const canary_repostiory = config.canary.repository.toLowerCase();
-	const canary_labels = config.canary.labels;
+		const canary_account = config.canary.account.toLowerCase();
+		const canary_repostiory = config.canary.repository.toLowerCase();
+		const canary_labels = config.canary.labels;
 
-	if (canary_account.length === 0|| canary_repostiory.length === 0)
-		return;
+		if (canary_account.length === 0|| canary_repostiory.length === 0)
+			return;
 
-	const is_cached = await check_cache_table(report_title, canary_repostiory, config.canary.throttle);
-	if (is_cached) {
-		warn('Throttled canary report: ' + report_title);
-		return;
-	}
+		const is_cached = await check_cache_table(report_title, canary_repostiory, config.canary.throttle);
+		if (is_cached) {
+			warn('Throttled canary report: ' + report_title);
+			return;
+		}
 
-	const canary_app_id = process.env.SPOODER_CANARY_APP_ID as string;
-	const canary_app_key = process.env.SPOODER_CANARY_KEY as string;
+		const canary_app_id = process.env.SPOODER_CANARY_APP_ID as string;
+		const canary_app_key = process.env.SPOODER_CANARY_KEY as string;
 
-	if (canary_app_id === undefined)
-		throw new Error('dispatch_report() called without SPOODER_CANARY_APP_ID environment variable set');
+		if (canary_app_id === undefined)
+			throw new Error('dispatch_report() called without SPOODER_CANARY_APP_ID environment variable set');
 
-	if (canary_app_key === undefined)
-		throw new Error('dispatch_report() called without SPOODER_CANARY_KEY environment variable set');
+		if (canary_app_key === undefined)
+			throw new Error('dispatch_report() called without SPOODER_CANARY_KEY environment variable set');
 
-	const key_file = Bun.file(canary_app_key);
-	if (key_file.size === 0)
-		throw new Error('dispatch_report() failed to read canary private key file');
+		const key_file = Bun.file(canary_app_key);
+		if (key_file.size === 0)
+			throw new Error('dispatch_report() failed to read canary private key file');
 
-	const app_id = parseInt(canary_app_id, 10);
-	if (isNaN(app_id))
-		throw new Error('dispatch_report() failed to parse SPOODER_CANARY_APP_ID environment variable as integer');
+		const app_id = parseInt(canary_app_id, 10);
+		if (isNaN(app_id))
+			throw new Error('dispatch_report() failed to parse SPOODER_CANARY_APP_ID environment variable as integer');
 
-	const app = new App({
-		appId: app_id,
-		privateKey: await key_file.text(),
-	});
+		const app = new App({
+			appId: app_id,
+			privateKey: await key_file.text(),
+		});
 
-	await app.octokit.request('GET /app');
+		await app.octokit.request('GET /app');
 
-	const post_object = {
-		title: report_title,
-		body: '',
-		labels: canary_labels
-	};
+		const post_object = {
+			title: report_title,
+			body: '',
+			labels: canary_labels
+		};
 
-	if (config.canary.sanitize) {
-		const local_env = await load_local_env();
-		post_object.body = sanitize_string(JSON.stringify(report_body, null, 4), local_env);
-		post_object.title = sanitize_string(report_title, local_env);
-	} else {
-		post_object.body = JSON.stringify(report_body, null, 4);
-	}
+		if (config.canary.sanitize) {
+			const local_env = await load_local_env();
+			post_object.body = sanitize_string(JSON.stringify(report_body, null, 4), local_env);
+			post_object.title = sanitize_string(report_title, local_env);
+		} else {
+			post_object.body = JSON.stringify(report_body, null, 4);
+		}
 
-	post_object.body = '```json\n' + post_object.body + '\n```\n\nℹ️ *This issue has been created automatically in response to a server panic, caution or crash.*';
+		post_object.body = '```json\n' + post_object.body + '\n```\n\nℹ️ *This issue has been created automatically in response to a server panic, caution or crash.*';
 
-	for await (const { installation } of app.eachInstallation.iterator()) {
-		const login = (installation?.account as { login: string })?.login;
-		if (login?.toLowerCase() !== canary_account)
-			continue;
-
-		for await (const { octokit, repository } of app.eachRepository.iterator({ installationId: installation.id })) {
-			if (repository.full_name.toLowerCase() !== canary_repostiory)
+		for await (const { installation } of app.eachInstallation.iterator()) {
+			const login = (installation?.account as { login: string })?.login;
+			if (login?.toLowerCase() !== canary_account)
 				continue;
 
-			await octokit.request('POST /repos/' + canary_repostiory + '/issues', post_object);
+			for await (const { octokit, repository } of app.eachRepository.iterator({ installationId: installation.id })) {
+				if (repository.full_name.toLowerCase() !== canary_repostiory)
+					continue;
+
+				await octokit.request('POST /repos/' + canary_repostiory + '/issues', post_object);
+			}
 		}
+	} catch (e) {
+		warn('Failed to dispatch canary report: ' + (e as Error)?.message ?? 'unspecified error');
 	}
 }
