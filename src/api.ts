@@ -76,26 +76,33 @@ export function serve(port: number) {
 			const url = new URL(req.url);
 			const handler = routes.get(url.pathname);
 
-			let status_code = 404;
+			//let status_code = 404;
+			let response: Response | number = 404;
 
+			// Check for a handler for the route.
 			if (handler !== undefined) {
-				const response = resolve_handler(handler(req));
+				response = resolve_handler(handler(req));
 				if (response instanceof Response)
 					return response;
-
-				status_code = response;
 			}
 
-			if (default_handler !== undefined) {
-				const response = resolve_handler(default_handler(req, status_code));
+			// Fallback to checking for a handler for the status code.
+			const status_code_handler = handlers.get(response);
+			if (status_code_handler !== undefined) {
+				response = resolve_handler(status_code_handler(req));
 				if (response instanceof Response)
 					return response;
+			}
 
-				status_code = response;
+			// Fallback to the default handler, if any.
+			if (default_handler !== undefined) {
+				response = resolve_handler(default_handler(req, response));
+				if (response instanceof Response)
+					return response;
 			}
 
 			// Fallback to returning a basic response.
-			return new Response(http.STATUS_CODES[status_code], { status: status_code });
+			return new Response(http.STATUS_CODES[response], { status: response });
 		}
 	});
 
@@ -105,9 +112,14 @@ export function serve(port: number) {
 			routes.set(path, handler);
 		},
 
-		/** Register a default handler for a specific response code. */
+		/** Register a default handler for all status codes. */
 		default: (handler: DefaultHandler): void => {
 			default_handler = handler;
+		},
+
+		/** Register a handler for a specific status code. */
+		handle: (status_code: number, handler: RequestHandler): void => {
+			handlers.set(status_code, handler);
 		}
 	}
 }

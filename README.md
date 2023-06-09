@@ -408,6 +408,25 @@ Using your own default handler allows you to provide a custom response for unhan
 
 The return type from this handler can be any of the expected return types from a normal route handler with the exception of a `number` type. If a `number` is returned, it will be sent to the client as a plain text response.
 
+#### `server.handle(status_code: number, handler: RequestHandler)`
+
+The `handle` function allows you to register a handler for a specific status code. This handler will take priority over the default handler.
+
+```ts
+server.handle(500, (req) => {
+	return new Response('Custom Internal Server Error Message', { status: 500 });
+});
+```
+```http
+HTTP/1.1 500 Internal Server Error
+Content-Length: 36
+Content-Type: text/plain;charset=utf-8
+
+Custom Internal Server Error Message
+```
+
+The return type from this handler can be any of the expected return types from a normal route handler. If a `number` type is returned, that status code will be provided to the default handler.
+
 ---
 
 #### `caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`
