@@ -424,6 +424,21 @@ Content-Type: application/json;charset=utf-8
 {"name":"Bob","age":42}
 ```
 
+Any other type that is returned from a route handler will be converted to a string and sent as the response body with the appropriate length header and the content type `text/plain`.
+
+```ts
+server.route('test/route', (req) => {
+	return Symbol('foo');
+});
+```
+```http
+HTTP/1.1 200 OK
+Content-Length: 7
+Content-Type: text/plain;charset=utf-8
+
+Symbol(foo)
+```
+
 #### `server.default(handler: DefaultHandler)`
 
 The server uses a default handler which responds to requests for which there was no handler registered, or the registered handler returned a numeric status code.

@@ -39,7 +39,7 @@ export async function caution(err_message_or_obj: string | object, ...err: objec
 	await handle_error('caution: ', err_message_or_obj, ...err);
 }
 
-type HandlerReturnType = Response | number | Blob | object | string;
+type HandlerReturnType = any;
 type RequestHandler = (req: Request) => HandlerReturnType;
 type ErrorHandler = (err: Error) => HandlerReturnType;
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
@@ -68,8 +68,7 @@ export function serve(port: number) {
 		if (typeof response === 'object')
 			return new Response(JSON.stringify(response), { status: status_code, headers: { 'Content-Type': 'application/json' } });
 	
-		// TODO: Convert anything else to text?
-		return new Response('Oops', { status: status_code });
+		return new Response(String(response), { status: status_code })
 	}
 
 	const server = Bun.serve({
