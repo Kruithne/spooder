@@ -39,7 +39,7 @@ export async function caution(err_message_or_obj: string | object, ...err: objec
 	await handle_error('caution: ', err_message_or_obj, ...err);
 }
 
-type HandlerReturnType = Response | number | Blob;
+type HandlerReturnType = Response | number | Blob | object | string;
 type RequestHandler = (req: Request) => HandlerReturnType;
 type ErrorHandler = (err: Error) => HandlerReturnType;
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
@@ -63,9 +63,12 @@ export function serve(port: number) {
 		// Status codes can be returned from some handlers.
 		if (return_status_code && typeof response === 'number')
 			return response;
+
+		// This should cover objects, arrays, etc.
+		if (typeof response === 'object')
+			return new Response(JSON.stringify(response), { status: status_code, headers: { 'Content-Type': 'application/json' } });
 	
 		// TODO: Convert anything else to text?
-		// TODO: Handle objects?
 		return new Response('Oops', { status: status_code });
 	}
 

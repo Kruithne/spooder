@@ -383,6 +383,47 @@ Content-Type: image/png
 <binary data>
 ```
 
+Return an `object` type, such as an array or a plain object, will send the object as JSON with the appropriate content type and length headers.
+
+```ts
+server.route('test/route', (req) => {
+	return { message: 'Hello, world!' };
+});
+```
+```http
+HTTP/1.1 200 OK
+Content-Length: 25
+Content-Type: application/json;charset=utf-8
+
+{"message":"Hello, world!"}
+```
+
+Since custom classes are also objects, you can also return a custom class instance and it will be serialized to JSON. To control the serialization process, you can implement the `toJSON()` method on your class.
+
+```ts
+class User {
+	constructor(public name: string, public age: number) {}
+
+	toJSON() {
+		return {
+			name: this.name,
+			age: this.age,
+		};
+	}
+}
+
+server.route('test/route', (req) => {
+	return new User('Bob', 42);
+});
+```
+```http
+HTTP/1.1 200 OK
+Content-Length: 25
+Content-Type: application/json;charset=utf-8
+
+{"name":"Bob","age":42}
+```
+
 #### `server.default(handler: DefaultHandler)`
 
 The server uses a default handler which responds to requests for which there was no handler registered, or the registered handler returned a numeric status code.
