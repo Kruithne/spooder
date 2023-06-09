@@ -315,6 +315,101 @@ In addition to the information provided by the developer, `spooder` also include
 import { ... } from 'spooder';
 ```
 
+#### `serve(port: number): Server`
+
+The `serve` function simplifies the process of boostrapping a server. Setting up a functioning server is as simple as calling the function and passing a port number to listen on.
+
+```ts
+const server = serve(8080);
+```
+
+Without any additional configuration, this will create a server which listens on the specified port and responds to all requests with the following response.
+
+```http
+HTTP/1.1 404 Not Found
+Content-Length: 9
+Content-Type: text/plain;charset=utf-8
+
+Not Found
+```
+
+To build functionality on top of this, there are a number of functions that can be called from the `Server` object.
+
+#### `server.route(path: string, handler: RequestHandler)`
+
+The `route` function allows you to register a handler for a specific path. The handler will be called for all requests that exactly match the given path.
+
+```ts
+server.route('/test/route', (req) => {
+	return new Response('Hello, world!', { status: 200 });
+});
+```
+
+Using the standard Web API, the route handler above receives a [Request](https://developer.mozilla.org/en-US/docs/Web/API/Request) object and returns a [Response](https://developer.mozilla.org/en-US/docs/Web/API/Response) object, which is then sent to the client.
+
+To streamline this process, `spooder` allows a number of other return types to be used as shortcuts.
+
+Returning a `number` type treats the number as a status code and sends a relevant response. By default, this will be a plain text response with the appliacable status message as the body.
+
+```ts
+server.route('/test/route', (req) => {
+	return 500;
+});
+```
+```http
+HTTP/1.1 500 Internal Server Error
+Content-Length: 21
+Content-Type: text/plain;charset=utf-8
+
+Internal Server Error
+```
+
+Returning a `Blob` type, such as the `FileBlob` returned from the `Bun.file()` API, will send the blob as the response body with the appropriate content type and length headers.
+
+```ts
+server.route('test/route', (req) => {
+	// Note that calling Bun.file() does not immediately read
+	// the file from disk, it will be streamed with the response.
+	return Bun.file('test.png');
+});
+```
+```http
+HTTP/1.1 200 OK
+Content-Length: 12345
+Content-Type: image/png
+
+<binary data>
+```
+
+
+#### `server.default(handler: DefaultHandler)`
+
+The server uses a default handler which responds to requests for which there was no handler registered, or the registered handler returned a numeric status code.
+
+This default handler sends a simple response to the client with the status code and a body containing the status message.
+
+```http
+HTTP/1.1 404 Not Found
+Content-Length: 9
+Content-Type: text/plain;charset=utf-8
+
+Not Found
+```
+
+To customize the behavior of this handler, you can register a custom default handler using the `default` function.
+
+```ts
+server.default((req, status_code) => {
+	return new Response(`Custom error: ${status_code}`, { status: status_code });
+});
+```
+
+Using your own default handler allows you to provide a custom response for unhandled requests based on the status code.
+
+The return type from this handler can be any of the expected return types from a normal route handler with the exception of a `number` type. If a `number` is returned, it will be sent to the client as a plain text response.
+
+---
+
 #### `caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`
 Raise a warning issue on GitHub. This is useful for non-fatal errors which you want to be notified about.
 
