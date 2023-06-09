@@ -349,7 +349,9 @@ Using the standard Web API, the route handler above receives a [Request](https:/
 
 To streamline this process, `spooder` allows a number of other return types to be used as shortcuts.
 
-Returning a `number` type treats the number as a status code and sends a relevant response. By default, this will be a plain text response with the appliacable status message as the body.
+Returning a `number` type treats the number as a status code and sends a relevant response.
+
+By default, this will be a plain text response with the applicable status message as the body. This can be overridden with `server.handle()` or `server.default()`, which will be covered later.
 
 ```ts
 server.route('/test/route', (req) => {
@@ -381,7 +383,6 @@ Content-Type: image/png
 <binary data>
 ```
 
-
 #### `server.default(handler: DefaultHandler)`
 
 The server uses a default handler which responds to requests for which there was no handler registered, or the registered handler returned a numeric status code.
@@ -406,7 +407,24 @@ server.default((req, status_code) => {
 
 Using your own default handler allows you to provide a custom response for unhandled requests based on the status code.
 
-The return type from this handler can be any of the expected return types from a normal route handler. If a `number` is returned, it will fall down to a dedicated status code handle (if set with `.handle()`) or the default handler.
+The return type from this handler can be any of the expected return types from a normal route handler with the exception that returning a `number` type will not be treated as a status code and will instead be treated as a plain text response.
+
+If is worth noting that if you return a `Response` object from this handler, you must implicitly set the status code. If you do not, the status code will be set to `200` by default.
+
+```ts
+server.default((req, status_code) => {
+	return new Response(`Custom error: ${status_code}`);
+});
+```
+```http
+HTTP/1.1 200 OK
+Content-Length: 18
+Content-Type: text/plain;charset=utf-8
+
+Custom error: 404
+```
+
+Returning anything else, such as a `Blob`, `object` or `string`, the status code will automatically be set to `status_code`. To override this behavior you must provide a `Response` object.
 
 #### `server.handle(status_code: number, handler: RequestHandler)`
 
@@ -425,7 +443,24 @@ Content-Type: text/plain;charset=utf-8
 Custom Internal Server Error Message
 ```
 
-The return type from this handler can be any of the expected return types from a normal route handler. If a `number` type is returned, that status code will be provided to the default handler.
+The return type from this handler can be any of the expected return types from a normal route handler with the exception that returning a `number` type will not be treated as a status code and will instead be treated as a plain text response.
+
+If is worth noting that if you return a `Response` object from this handler, you must implicitly set the status code. If you do not, the status code will be set to `200` by default.
+
+```ts
+server.handle(500, (req) => {
+	return new Response('Custom Internal Server Error Message');
+});
+```
+```http
+HTTP/1.1 200 OK
+Content-Length: 36
+Content-Type: text/plain;charset=utf-8
+
+Custom Internal Server Error Message
+```
+
+Returning anything else, such as a `Blob`, `object` or `string`, the status code will automatically be set. To override this behavior you must provide a `Response` object.
 
 ---
 

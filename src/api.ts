@@ -51,21 +51,22 @@ export function serve(port: number) {
 	let error_handler: ErrorHandler | undefined;
 	let default_handler: DefaultHandler | undefined;
 
-	function resolve_handler(response: HandlerReturnType): Response | number {
+	function resolve_handler(response: HandlerReturnType, status_code: number, return_status_code = false): Response | number {
 		// Pre-assembled responses are returned as-is.
 		if (response instanceof Response)
 			return response;
 	
 		// Content-type/content-length are automatically set for blobs.
 		if (response instanceof Blob)
-			return new Response(response, { status: 200 });
-	
-		// Numbers are interpreted as status codes.
-		const response_type = typeof response;
-		if (response_type === 'number')
+			return new Response(response, { status: status_code });
+
+		// Status codes can be returned from some handlers.
+		if (return_status_code && typeof response === 'number')
 			return response;
 	
-		return 500; // TODO: Anything else should become plain text?
+		// TODO: Convert anything else to text?
+		// TODO: Handle objects?
+		return new Response('Oops', { status: status_code });
 	}
 
 	const server = Bun.serve({
@@ -76,33 +77,37 @@ export function serve(port: number) {
 			const url = new URL(req.url);
 			const handler = routes.get(url.pathname);
 
-			//let status_code = 404;
-			let response: Response | number = 404;
+			let status_code = 200;
 
 			// Check for a handler for the route.
 			if (handler !== undefined) {
-				response = resolve_handler(handler(req));
+				const response = resolve_handler(handler(req), status_code, true);
 				if (response instanceof Response)
 					return response;
+
+				// If the handler returned a status code, use that instead.
+				status_code = response;
+			} else {
+				status_code = 404;
 			}
 
 			// Fallback to checking for a handler for the status code.
-			const status_code_handler = handlers.get(response);
+			const status_code_handler = handlers.get(status_code);
 			if (status_code_handler !== undefined) {
-				response = resolve_handler(status_code_handler(req));
+				const response = resolve_handler(status_code_handler(req), status_code);
 				if (response instanceof Response)
 					return response;
 			}
 
 			// Fallback to the default handler, if any.
 			if (default_handler !== undefined) {
-				response = resolve_handler(default_handler(req, response));
+				const response = resolve_handler(default_handler(req, status_code), status_code);
 				if (response instanceof Response)
 					return response;
 			}
 
 			// Fallback to returning a basic response.
-			return new Response(http.STATUS_CODES[response], { status: response });
+			return new Response(http.STATUS_CODES[status_code], { status: status_code });
 		}
 	});
 
