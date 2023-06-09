@@ -345,7 +345,14 @@ server.route('/test/route', (req, url) => {
 });
 ```
 
-It's common in handlers to construct a URL object from the request [URL](https://developer.mozilla.org/en-US/docs/Web/API/URL). Since `spooder` does this internally for routing, it is provided as the second argument to the handler to avoid unnecessary duplication.
+Additionally, routes also support named parameters. These are defined by prefixing a path segment with a colon. These are added directly to the `searchParams` property of the `URL` object.
+
+```ts
+server.route('/test/:param', (req, url) => {
+	return new Response(url.searchParams.get('param'), { status: 200 });
+});
+```
+> Note: Named parameters will overwrite existing search parameters with the same name.
 
 Using the standard Web API, the route handler above receives a [Request](https://developer.mozilla.org/en-US/docs/Web/API/Request) object and returns a [Response](https://developer.mozilla.org/en-US/docs/Web/API/Response) object, which is then sent to the client.
 

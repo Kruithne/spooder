@@ -46,7 +46,7 @@ type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
 type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
 export function serve(port: number) {
-	const routes = new Map<string, RequestHandler>();
+	const routes = new Map<string[], RequestHandler>();
 	const handlers = new Map<number, StatusCodeHandler>();
 	
 	let error_handler: ErrorHandler | undefined;
@@ -78,9 +78,35 @@ export function serve(port: number) {
 
 		fetch(req: Request): Response {
 			const url = new URL(req.url);
-			const handler = routes.get(url.pathname);
-
 			let status_code = 200;
+
+			const route_array = url.pathname.split('/');
+			let handler: RequestHandler | undefined;
+
+			for (const [path, route_handler] of routes) {
+				if (path.length !== route_array.length)
+					continue;
+
+				let match = true;
+				for (let i = 0; i < path.length; i++) {
+					const path_part = path[i];
+
+					if (path_part.startsWith(':')) {
+						url.searchParams.append(path_part.slice(1), route_array[i]);
+						continue;
+					}
+
+					if (path_part !== route_array[i]) {
+						match = false;
+						break;
+					}
+				}
+
+				if (match) {
+					handler = route_handler;
+					break;
+				}
+			}
 
 			// Check for a handler for the route.
 			if (handler !== undefined) {
@@ -117,7 +143,7 @@ export function serve(port: number) {
 	return {
 		/** Register a handler for a specific route. */
 		route: (path: string, handler: RequestHandler): void => {
-			routes.set(path, handler);
+			routes.set(path.split('/'), handler);
 		},
 
 		/** Register a default handler for all status codes. */
