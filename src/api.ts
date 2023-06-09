@@ -40,13 +40,14 @@ export async function caution(err_message_or_obj: string | object, ...err: objec
 }
 
 type HandlerReturnType = any;
-type RequestHandler = (req: Request) => HandlerReturnType;
+type RequestHandler = (req: Request, url: URL) => HandlerReturnType;
 type ErrorHandler = (err: Error) => HandlerReturnType;
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
+type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
 export function serve(port: number) {
 	const routes = new Map<string, RequestHandler>();
-	const handlers = new Map<number, RequestHandler>();
+	const handlers = new Map<number, StatusCodeHandler>();
 	
 	let error_handler: ErrorHandler | undefined;
 	let default_handler: DefaultHandler | undefined;
@@ -83,7 +84,7 @@ export function serve(port: number) {
 
 			// Check for a handler for the route.
 			if (handler !== undefined) {
-				const response = resolve_handler(handler(req), status_code, true);
+				const response = resolve_handler(handler(req, url), status_code, true);
 				if (response instanceof Response)
 					return response;
 
@@ -125,7 +126,7 @@ export function serve(port: number) {
 		},
 
 		/** Register a handler for a specific status code. */
-		handle: (status_code: number, handler: RequestHandler): void => {
+		handle: (status_code: number, handler: StatusCodeHandler): void => {
 			handlers.set(status_code, handler);
 		}
 	}

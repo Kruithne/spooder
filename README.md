@@ -340,10 +340,12 @@ To build functionality on top of this, there are a number of functions that can 
 The `route` function allows you to register a handler for a specific path. The handler will be called for all requests that exactly match the given path.
 
 ```ts
-server.route('/test/route', (req) => {
+server.route('/test/route', (req, url) => {
 	return new Response('Hello, world!', { status: 200 });
 });
 ```
+
+It's common in handlers to construct a URL object from the request [URL](https://developer.mozilla.org/en-US/docs/Web/API/URL). Since `spooder` does this internally for routing, it is provided as the second argument to the handler to avoid unnecessary duplication.
 
 Using the standard Web API, the route handler above receives a [Request](https://developer.mozilla.org/en-US/docs/Web/API/Request) object and returns a [Response](https://developer.mozilla.org/en-US/docs/Web/API/Response) object, which is then sent to the client.
 
