@@ -406,7 +406,7 @@ server.default((req, status_code) => {
 
 Using your own default handler allows you to provide a custom response for unhandled requests based on the status code.
 
-The return type from this handler can be any of the expected return types from a normal route handler with the exception of a `number` type. If a `number` is returned, it will be sent to the client as a plain text response.
+The return type from this handler can be any of the expected return types from a normal route handler. If a `number` is returned, it will fall down to a dedicated status code handle (if set with `.handle()`) or the default handler.
 
 #### `server.handle(status_code: number, handler: RequestHandler)`
 
