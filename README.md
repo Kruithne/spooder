@@ -597,6 +597,14 @@ The above example will serve all files from `./public/content` to any requests m
 - Requesting a file that does not exist will return a 404 response (subject to your configured handlers).
 - Requesting a file that is not readable will return a 500 response (subject to your configured handlers).
 
+By default, hidden files (files prefixed with `.`) will not be served. To serve hidden files, you must set `ignoreHidden` to `false` in the `options` parameter.
+
+```ts
+server.dir('/content', './public/content', { ignoreHidden: false });
+```
+
+If `ignoreHidden` is set to `true` (default) then requesting a hidden file will return a 404 response (subject to your configured handlers).
+
 ---
 
 #### `route_location(redirect_url: string)`

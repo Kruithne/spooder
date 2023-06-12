@@ -47,6 +47,10 @@ type ErrorHandler = (err: Error) => Response;
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
 type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
+type DirOptions = {
+	ignoreHidden?: boolean;
+};
+
 /** Built-in route handler for redirecting to a different URL. */
 export function route_location(redirect_url: string) {
 	return (req: Request, url: URL) => {
@@ -59,9 +63,13 @@ export function route_location(redirect_url: string) {
 	};
 }
 
-function route_directory(route_path: string, dir: string): RequestHandler {
+function route_directory(route_path: string, dir: string, options: DirOptions): RequestHandler {
+	const ignore_hidden = options.ignoreHidden ?? true;
 	return async (req: Request, url: URL) => {
 		const file_path = path.join(dir, url.pathname.slice(route_path.length));
+
+		if (ignore_hidden && path.basename(file_path).startsWith('.'))
+			return 404;
 
 		try {
 			const file_stat = await fs.stat(file_path);
@@ -203,11 +211,11 @@ export function serve(port: number) {
 		},
 
 		/** Serve a directory for a specific route. */
-		dir: (path: string, dir: string): void => {
+		dir: (path: string, dir: string, options?: DirOptions): void => {
 			if (path.endsWith('/'))
 				path = path.slice(0, -1);
 
-			routes.set([...path.split('/'), '*'], route_directory(path, dir));
+			routes.set([...path.split('/'), '*'], route_directory(path, dir, options ?? {}));
 		},
 
 		/** Register a default handler for all status codes. */
