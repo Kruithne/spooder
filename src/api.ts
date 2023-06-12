@@ -64,7 +64,10 @@ export function serve(port: number) {
 	let error_handler: ErrorHandler | undefined;
 	let default_handler: DefaultHandler | undefined;
 
-	function resolve_handler(response: HandlerReturnType, status_code: number, return_status_code = false): Response | number {
+	async function resolve_handler(response: HandlerReturnType | Promise<HandlerReturnType>, status_code: number, return_status_code = false): Promise<Response | number> {
+		if (response instanceof Promise)
+			response = await response;
+
 		// Pre-assembled responses are returned as-is.
 		if (response instanceof Response)
 			return response;
@@ -88,7 +91,7 @@ export function serve(port: number) {
 		port,
 		development: false,
 
-		fetch(req: Request): Response {
+		async fetch(req: Request): Promise<Response> {
 			const url = new URL(req.url);
 			let status_code = 200;
 
@@ -122,7 +125,7 @@ export function serve(port: number) {
 
 			// Check for a handler for the route.
 			if (handler !== undefined) {
-				const response = resolve_handler(handler(req, url), status_code, true);
+				const response = await resolve_handler(handler(req, url), status_code, true);
 				if (response instanceof Response)
 					return response;
 
@@ -135,14 +138,14 @@ export function serve(port: number) {
 			// Fallback to checking for a handler for the status code.
 			const status_code_handler = handlers.get(status_code);
 			if (status_code_handler !== undefined) {
-				const response = resolve_handler(status_code_handler(req), status_code);
+				const response = await resolve_handler(status_code_handler(req), status_code);
 				if (response instanceof Response)
 					return response;
 			}
 
 			// Fallback to the default handler, if any.
 			if (default_handler !== undefined) {
-				const response = resolve_handler(default_handler(req, status_code), status_code);
+				const response = await resolve_handler(default_handler(req, status_code), status_code);
 				if (response instanceof Response)
 					return response;
 			}

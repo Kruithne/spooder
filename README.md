@@ -356,6 +356,15 @@ server.route('/test/:param', (req, url) => {
 
 Using the standard Web API, the route handler above receives a [Request](https://developer.mozilla.org/en-US/docs/Web/API/Request) object and returns a [Response](https://developer.mozilla.org/en-US/docs/Web/API/Response) object, which is then sent to the client.
 
+All handle registration functions in `spooder` support registering async functions which will be awaited before sending the response.
+
+```ts
+server.route('/test/route', async (req, url) => {
+	await new Promise((resolve) => setTimeout(resolve, 1000));
+	return new Response('Hello, world!', { status: 200 });
+});
+```
+
 To streamline this process, `spooder` allows a number of other return types to be used as shortcuts.
 
 Returning a `number` type treats the number as a status code and sends a relevant response.
