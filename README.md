@@ -605,6 +605,14 @@ server.dir('/content', './public/content', { ignoreHidden: false });
 
 If `ignoreHidden` is set to `true` (default) then requesting a hidden file will return a 404 response (subject to your configured handlers).
 
+Additionally, the `index` property can be set to a filename such as `index.html` to serve a default file when a directory is requested.
+
+```ts
+server.dir('/content', './public/content', { index: 'index.html' });
+```
+
+The above will serve `./public/content/index.html` when `/content` is requested.
+
 ---
 
 #### `route_location(redirect_url: string)`

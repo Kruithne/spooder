@@ -49,6 +49,7 @@ type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
 type DirOptions = {
 	ignoreHidden?: boolean;
+	index?: string;
 };
 
 /** Built-in route handler for redirecting to a different URL. */
@@ -65,6 +66,7 @@ export function route_location(redirect_url: string) {
 
 function route_directory(route_path: string, dir: string, options: DirOptions): RequestHandler {
 	const ignore_hidden = options.ignoreHidden ?? true;
+
 	return async (req: Request, url: URL) => {
 		const file_path = path.join(dir, url.pathname.slice(route_path.length));
 
@@ -74,8 +76,16 @@ function route_directory(route_path: string, dir: string, options: DirOptions): 
 		try {
 			const file_stat = await fs.stat(file_path);
 
-			if (file_stat.isDirectory())
+			if (file_stat.isDirectory()) {
+				if (options.index !== undefined) {
+					const index_path = path.join(file_path, options.index);
+					const index = Bun.file(index_path);
+
+					if (index.size !== 0)
+						return index;
+				}
 				return 401;
+			}
 
 			return Bun.file(file_path);
 		} catch (e) {
