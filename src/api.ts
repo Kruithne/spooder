@@ -1,5 +1,7 @@
 import { dispatch_report } from './dispatch';
 import http from 'node:http';
+import path from 'node:path';
+import fs from 'node:fs/promises';
 
 async function handle_error(prefix: string, err_message_or_obj: string | object, ...err: unknown[]): Promise<void> {
 	let error_message = 'unknown error';
@@ -57,6 +59,27 @@ export function route_location(redirect_url: string) {
 	};
 }
 
+function route_directory(route_path: string, dir: string): RequestHandler {
+	return async (req: Request, url: URL) => {
+		const file_path = path.join(dir, url.pathname.slice(route_path.length));
+
+		try {
+			const file_stat = await fs.stat(file_path);
+
+			if (file_stat.isDirectory())
+				return 401;
+
+			return Bun.file(file_path);
+		} catch (e) {
+			const err = e as NodeJS.ErrnoException;
+			if (err?.code === 'ENOENT')
+				return 404;
+
+			return 500;
+		}
+	};
+}
+
 export function serve(port: number) {
 	const routes = new Map<string[], RequestHandler>();
 	const handlers = new Map<number, StatusCodeHandler>();
@@ -97,16 +120,23 @@ export function serve(port: number) {
 
 			console.log(`${req.method} ${url.pathname}`);
 
-			const route_array = url.pathname.split('/');
+			const route_array = url.pathname.split('/').filter(e => !(e === '..' || e === '.'));
 			let handler: RequestHandler | undefined;
 
 			for (const [path, route_handler] of routes) {
-				if (path.length !== route_array.length)
+				if (path.length > route_array.length)
+					continue;
+
+				const is_trailing_wildcard = path[path.length - 1] === '*';
+				if (!is_trailing_wildcard && path.length !== route_array.length)
 					continue;
 
 				let match = true;
 				for (let i = 0; i < path.length; i++) {
 					const path_part = path[i];
+
+					if (path_part === '*')
+						continue;
 
 					if (path_part.startsWith(':')) {
 						url.searchParams.append(path_part.slice(1), route_array[i]);
@@ -170,6 +200,14 @@ export function serve(port: number) {
 		/** Register a handler for a specific route. */
 		route: (path: string, handler: RequestHandler): void => {
 			routes.set(path.split('/'), handler);
+		},
+
+		/** Serve a directory for a specific route. */
+		dir: (path: string, dir: string): void => {
+			if (path.endsWith('/'))
+				path = path.slice(0, -1);
+
+			routes.set([...path.split('/'), '*'], route_directory(path, dir));
 		},
 
 		/** Register a default handler for all status codes. */

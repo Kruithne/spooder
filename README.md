@@ -354,6 +354,32 @@ server.route('/test/:param', (req, url) => {
 ```
 > Note: Named parameters will overwrite existing search parameters with the same name.
 
+By default routes are matched exactly, but you can also use a wildcard to match any path that starts with a given path.
+
+```ts
+server.route('/test/*', (req, url) => {
+	return new Response('Hello, world!', { status: 200 });
+});
+```
+
+The above will match any path the starts with `/test`, such as:
+- `/test`
+- `/test/`
+- `/test/route`
+- `/test/route/foo.txt`
+
+If you intend to use this for directory serving, you may be better suited looking at the `server.dir()` function.
+
+Wildcards can also be placed anywhere in the path, allowing anything to be placed in a given single segment - it does not span multiple segments.
+
+```ts
+server.route('/test/*/route', (req, url) => {
+	return new Response('Hello, world!', { status: 200 });
+});
+```
+
+The above would allow anything to be placed in the middle segment. This behavior is documented for clarity as it is a byproduct of wildcard implementation for directories, but it is recommended you use the named parameters feature instead.
+
 Using the standard Web API, the route handler above receives a [Request](https://developer.mozilla.org/en-US/docs/Web/API/Request) object and returns a [Response](https://developer.mozilla.org/en-US/docs/Web/API/Response) object, which is then sent to the client.
 
 All handle registration functions in `spooder` support registering async functions which will be awaited before sending the response.
@@ -555,6 +581,21 @@ Content-Type: text/plain;charset=utf-8
 Custom Internal Server Error Message
 ```
 This should be used as a last resort to catch unintended errors and should not be part of your normal request handling process. Generally speaking, this handler should only be called if you have a bug in your code.
+
+#### `server.dir(path: string, dir: string)`
+
+The `dir` function allows you to serve static files from a directory on your file system. 
+
+```ts
+server.dir('/content', './public/content');
+```
+
+The above example will serve all files from `./public/content` to any requests made to `/content`. For example `/content/test.txt` will serve the file `./public/content/test.txt`.
+
+- This function is recursive and will serve all files from the specified directory and any subdirectories.
+- Requesting a directory will return a 401 response (subject to your configured handlers).
+- Requesting a file that does not exist will return a 404 response (subject to your configured handlers).
+- Requesting a file that is not readable will return a 500 response (subject to your configured handlers).
 
 ---
 
