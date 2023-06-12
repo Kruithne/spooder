@@ -41,7 +41,7 @@ export async function caution(err_message_or_obj: string | object, ...err: objec
 
 type HandlerReturnType = any;
 type RequestHandler = (req: Request, url: URL) => HandlerReturnType;
-type ErrorHandler = (err: Error) => HandlerReturnType;
+type ErrorHandler = (err: Error) => Response;
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
 type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
@@ -152,6 +152,13 @@ export function serve(port: number) {
 
 			// Fallback to returning a basic response.
 			return new Response(http.STATUS_CODES[status_code], { status: status_code });
+		},
+
+		error(err: Error): Response {
+			if (error_handler !== undefined)
+				return error_handler(err);
+
+			return new Response(http.STATUS_CODES[500], { status: 500 });
 		}
 	});
 
@@ -169,6 +176,11 @@ export function serve(port: number) {
 		/** Register a handler for a specific status code. */
 		handle: (status_code: number, handler: StatusCodeHandler): void => {
 			handlers.set(status_code, handler);
+		},
+
+		/** Register a handler for uncaught errors. */
+		error: (handler: ErrorHandler): void => {
+			error_handler = handler;
 		}
 	}
 }

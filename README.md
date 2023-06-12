@@ -536,6 +536,26 @@ Custom Internal Server Error Message
 
 Returning anything else, such as a `Blob`, `object` or `string`, the status code will automatically be set. To override this behavior you must provide a `Response` object.
 
+#### `server.error(handler: ErrorHandler)`
+
+The `error` function allows you to register a handler for any uncaught errors that occur during the request handling process. 
+
+Unlike other handlers, it does not accept asynchronous functions and it must return a `Response` object.
+
+```ts
+server.error((req, err) => {
+	return new Response('Custom Internal Server Error Message', { status: 500 });
+});
+```
+```http
+HTTP/1.1 500 Internal Server Error
+Content-Length: 36
+Content-Type: text/plain;charset=utf-8
+
+Custom Internal Server Error Message
+```
+This should be used as a last resort to catch unintended errors and should not be part of your normal request handling process. Generally speaking, this handler should only be called if you have a bug in your code.
+
 ---
 
 #### `route_location(redirect_url: string)`
