@@ -529,6 +529,28 @@ Returning anything else, such as a `Blob`, `object` or `string`, the status code
 
 ---
 
+#### `route_location(redirect_url: string)`
+
+The `route_location` is a built-in request handler that redirects the client to a specified URL with the status code `301 Moved Permanently`.
+
+```ts
+server.route('test/route', route_location('https://example.com');
+```
+
+The above is a much shorter equivalent to the following:
+
+```ts
+server.route('test/route', (req, url) => {
+	return new Response(null, {
+		status: 301,
+		headers: {
+			Location: 'https://example.com',
+		},
+	});
+});
+```
+---
+
 #### `caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`
 Raise a warning issue on GitHub. This is useful for non-fatal errors which you want to be notified about.
 

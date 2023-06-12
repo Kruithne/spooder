@@ -45,6 +45,18 @@ type ErrorHandler = (err: Error) => HandlerReturnType;
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
 type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
+/** Built-in route handler for redirecting to a different URL. */
+export function route_location(redirect_url: string) {
+	return (req: Request, url: URL) => {
+		return new Response(null, {
+			status: 301,
+			headers: {
+				Location: redirect_url
+			}
+		});
+	};
+}
+
 export function serve(port: number) {
 	const routes = new Map<string[], RequestHandler>();
 	const handlers = new Map<number, StatusCodeHandler>();
