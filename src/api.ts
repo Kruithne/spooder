@@ -95,6 +95,8 @@ export function serve(port: number) {
 			const url = new URL(req.url);
 			let status_code = 200;
 
+			console.log(`${req.method} ${url.pathname}`);
+
 			const route_array = url.pathname.split('/');
 			let handler: RequestHandler | undefined;
 
@@ -161,6 +163,8 @@ export function serve(port: number) {
 			return new Response(http.STATUS_CODES[500], { status: 500 });
 		}
 	});
+
+	console.log(`Server started on port ${port}`);
 
 	return {
 		/** Register a handler for a specific route. */
