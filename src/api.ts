@@ -132,9 +132,6 @@ export function serve(port: number) {
 			let handler: RequestHandler | undefined;
 
 			for (const [path, route_handler] of routes) {
-				if (path.length > route_array.length)
-					continue;
-
 				const is_trailing_wildcard = path[path.length - 1] === '*';
 				if (!is_trailing_wildcard && path.length !== route_array.length)
 					continue;
