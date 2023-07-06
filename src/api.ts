@@ -98,6 +98,16 @@ function route_directory(route_path: string, dir: string, options: DirOptions): 
 	};
 }
 
+export const ServerStop = {
+	/** Stops the server immediately, terminating in-flight requests. */
+	IMMEDIATE: 0,
+
+	/** Stops the server after all in-flight requests have completed. */
+	GRACEFUL: 1
+};
+
+type ServerStop = typeof ServerStop[keyof typeof ServerStop];
+
 export function serve(port: number) {
 	const routes = new Map<string[], RequestHandler>();
 	const handlers = new Map<number, StatusCodeHandler>();
@@ -238,6 +248,11 @@ export function serve(port: number) {
 		/** Register a handler for uncaught errors. */
 		error: (handler: ErrorHandler): void => {
 			error_handler = handler;
+		},
+
+		/** Stops the server. */
+		stop: (method: ServerStop = ServerStop.GRACEFUL): void => {
+			server.stop(method === ServerStop.IMMEDIATE);
 		}
 	}
 }

@@ -613,6 +613,14 @@ server.dir('/content', './public/content', { index: 'index.html' });
 
 The above will serve `./public/content/index.html` when `/content` is requested.
 
+#### `server.stop(method: ServerStop)`
+
+The `stop` function allows you to stop the server. `method` is one of `ServerStop.IMMEDIATE` or `ServerStop.GRACEFUL`.
+
+`ServerStop.GRACEFUL` will stop accepting new requests and wait for all in-flight requests to complete before stopping the server. This is the default behavior.
+
+`ServerStop.IMMEDIATE` will immediately stop the server, terminating all in-flight requests.
+
 ---
 
 #### `route_location(redirect_url: string)`
