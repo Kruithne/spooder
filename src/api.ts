@@ -108,6 +108,11 @@ export const ServerStop = {
 
 type ServerStop = typeof ServerStop[keyof typeof ServerStop];
 
+function print_request_info(req: Request, res: Response, url: URL): Response {
+	console.log(`[${res.status}] ${req.method} ${url.pathname}`);
+	return res;
+}
+
 export function serve(port: number) {
 	const routes = new Map<string[], RequestHandler>();
 	const handlers = new Map<number, StatusCodeHandler>();
@@ -146,76 +151,74 @@ export function serve(port: number) {
 			const url = new URL(req.url);
 			let status_code = 200;
 
-			console.log(`${req.method} ${url.pathname}`);
+			try {
+				const route_array = url.pathname.split('/').filter(e => !(e === '..' || e === '.'));
+				let handler: RequestHandler | undefined;
 
-			const route_array = url.pathname.split('/').filter(e => !(e === '..' || e === '.'));
-			let handler: RequestHandler | undefined;
-
-			for (const [path, route_handler] of routes) {
-				const is_trailing_wildcard = path[path.length - 1] === '*';
-				if (!is_trailing_wildcard && path.length !== route_array.length)
-					continue;
-
-				let match = true;
-				for (let i = 0; i < path.length; i++) {
-					const path_part = path[i];
-
-					if (path_part === '*')
+				for (const [path, route_handler] of routes) {
+					const is_trailing_wildcard = path[path.length - 1] === '*';
+					if (!is_trailing_wildcard && path.length !== route_array.length)
 						continue;
 
-					if (path_part.startsWith(':')) {
-						url.searchParams.append(path_part.slice(1), route_array[i]);
-						continue;
+					let match = true;
+					for (let i = 0; i < path.length; i++) {
+						const path_part = path[i];
+
+						if (path_part === '*')
+							continue;
+
+						if (path_part.startsWith(':')) {
+							url.searchParams.append(path_part.slice(1), route_array[i]);
+							continue;
+						}
+
+						if (path_part !== route_array[i]) {
+							match = false;
+							break;
+						}
 					}
 
-					if (path_part !== route_array[i]) {
-						match = false;
+					if (match) {
+						handler = route_handler;
 						break;
 					}
 				}
 
-				if (match) {
-					handler = route_handler;
-					break;
+				// Check for a handler for the route.
+				if (handler !== undefined) {
+					const response = await resolve_handler(handler(req, url), status_code, true);
+					if (response instanceof Response)
+						return print_request_info(req, response, url);
+
+					// If the handler returned a status code, use that instead.
+					status_code = response;
+				} else {
+					status_code = 404;
 				}
+
+				// Fallback to checking for a handler for the status code.
+				const status_code_handler = handlers.get(status_code);
+				if (status_code_handler !== undefined) {
+					const response = await resolve_handler(status_code_handler(req), status_code);
+					if (response instanceof Response)
+						return print_request_info(req, response, url);
+				}
+
+				// Fallback to the default handler, if any.
+				if (default_handler !== undefined) {
+					const response = await resolve_handler(default_handler(req, status_code), status_code);
+					if (response instanceof Response)
+						return print_request_info(req, response, url);
+				}
+
+				// Fallback to returning a basic response.
+				return print_request_info(req, new Response(http.STATUS_CODES[status_code], { status: status_code }), url);
+			} catch (e) {
+				if (error_handler !== undefined)
+					return print_request_info(req, error_handler(e as Error), url);
+
+				return print_request_info(req, new Response(http.STATUS_CODES[500], { status: 500 }), url);
 			}
-
-			// Check for a handler for the route.
-			if (handler !== undefined) {
-				const response = await resolve_handler(handler(req, url), status_code, true);
-				if (response instanceof Response)
-					return response;
-
-				// If the handler returned a status code, use that instead.
-				status_code = response;
-			} else {
-				status_code = 404;
-			}
-
-			// Fallback to checking for a handler for the status code.
-			const status_code_handler = handlers.get(status_code);
-			if (status_code_handler !== undefined) {
-				const response = await resolve_handler(status_code_handler(req), status_code);
-				if (response instanceof Response)
-					return response;
-			}
-
-			// Fallback to the default handler, if any.
-			if (default_handler !== undefined) {
-				const response = await resolve_handler(default_handler(req, status_code), status_code);
-				if (response instanceof Response)
-					return response;
-			}
-
-			// Fallback to returning a basic response.
-			return new Response(http.STATUS_CODES[status_code], { status: status_code });
-		},
-
-		error(err: Error): Response {
-			if (error_handler !== undefined)
-				return error_handler(err);
-
-			return new Response(http.STATUS_CODES[500], { status: 500 });
 		}
 	});
 
