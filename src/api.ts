@@ -51,6 +51,8 @@ async function handle_error(prefix: string, err_message_or_obj: string | object,
 				report.metadata = await e.resolve_metadata();
 
 			final_err[i] = report;
+		} else {
+			final_err[i] = e;
 		}
 	}
 
