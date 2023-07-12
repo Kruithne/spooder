@@ -3,6 +3,26 @@ import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 
+export class ErrorWithMetadata extends Error {
+	constructor(message: string, public metadata: Record<string, unknown>) {
+		super(message);
+	}
+
+	async resolve_metadata(): Promise<object> {
+		const metadata = Object.assign({}, this.metadata);
+		for (const [key, value] of Object.entries(metadata)) {
+			if (value instanceof Promise)
+				metadata[key] = await value;
+			else if (typeof value === 'function')
+				metadata[key] = value();
+			else if (value instanceof ReadableStream)
+				metadata[key] = await new Response(value).text();
+		}
+
+		return metadata;
+	}
+}
+
 async function handle_error(prefix: string, err_message_or_obj: string | object, ...err: unknown[]): Promise<void> {
 	let error_message = 'unknown error';
 
@@ -16,20 +36,25 @@ async function handle_error(prefix: string, err_message_or_obj: string | object,
 		err.push(err_message_or_obj);
 	}
 
-	// Serialize error objects.
-	err = err.map(e => {
+	const final_err = Array(err.length);
+	for (let i = 0; i < err.length; i++) {
+		const e = err[i];
+
 		if (e instanceof Error) {
-			return {
+			const report = {
 				name: e.name,
 				message: e.message,
 				stack: e.stack?.split('\n') ?? []
-			}
+			} as Record<string, unknown>;
+
+			if (e instanceof ErrorWithMetadata)
+				report.metadata = await e.resolve_metadata();
+
+			final_err[i] = report;
 		}
+	}
 
-		return e;
-	})
-
-	await dispatch_report(prefix + error_message, err);
+	await dispatch_report(prefix + error_message, final_err);
 }
 
 export async function panic(err_message_or_obj: string | object, ...err: object[]): Promise<void> {

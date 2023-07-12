@@ -623,6 +623,22 @@ The `stop` function allows you to stop the server. `method` is one of `ServerSto
 
 ---
 
+#### `ErrorWithMetadata(message: string, metadata: object)`
+
+The `ErrorWithMetadata` class is a thin wrapper around the built-in `Error` class that allows you to attach metadata to the error.
+
+Providing additional information to errors can be used for debugging purposes when errors are dispatched to the canary.
+
+```ts
+throw new ErrorWithMetadata('Something went wrong', { foo: 'bar' });
+```
+
+For convinience, if any of the values in the `metadata` are functions, they will be called and the return value will be used instead.
+
+Additionally, promises will be resolved and readable streams will be converted to strings.
+
+---
+
 #### `route_location(redirect_url: string)`
 
 The `route_location` is a built-in request handler that redirects the client to a specified URL with the status code `301 Moved Permanently`.
