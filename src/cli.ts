@@ -42,7 +42,7 @@ async function start_server() {
 		stderr: 'pipe',
 
 		onExit: (proc, exitCode, signal) => {
-			log('server exited with code %d', exitCode);
+			log('server exited with code %s', exitCode);
 
 			if (exitCode !== null && exitCode > 0) {
 				if (proc.stderr !== undefined) {
