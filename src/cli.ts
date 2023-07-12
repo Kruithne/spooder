@@ -36,38 +36,39 @@ async function start_server() {
 		}
 	}
 
-	Bun.spawn(parse_command_line(config.run), {
+	const proc = Bun.spawn(parse_command_line(config.run), {
 		cwd: process.cwd(),
 		stdout: 'inherit',
-		stderr: 'pipe',
-
-		onExit: (proc, exitCode, signal) => {
-			log('server exited with code %s', exitCode);
-
-			if (exitCode !== null && exitCode > 0) {
-				if (proc.stderr !== undefined) {
-					const res = new Response(proc.stderr as ReadableStream);
-
-					res.text().then(async stderr => {
-						await dispatch_report('crash: server exited unexpectedly', [{
-							exitCode,
-							stderr: strip_color_codes(stderr).split(/\r?\n/)
-						}]);
-					});
-				} else {
-					dispatch_report('crash: service exited unexpectedly', [{
-						exitCode
-					}]);
-				}
-			}
-
-			const auto_restart_ms = config.autoRestart;
-			if (auto_restart_ms > -1) {
-				log('restarting server in %dms', auto_restart_ms);
-				setTimeout(start_server, auto_restart_ms);
-			}
-		}
+		stderr: 'pipe'
 	});
+
+	await proc.exited;
+
+	const proc_exit_code = proc.exitCode;
+	log('server exited with code %s', proc_exit_code);
+
+	if (proc_exit_code !== 0) {
+		if (proc.stderr !== undefined) {
+			const res = new Response(proc.stderr as ReadableStream);
+
+			res.text().then(async stderr => {
+				await dispatch_report('crash: server exited unexpectedly', [{
+					proc_exit_code,
+					stderr: strip_color_codes(stderr).split(/\r?\n/)
+				}]);
+			});
+		} else {
+			dispatch_report('crash: service exited unexpectedly', [{
+				proc_exit_code
+			}]);
+		}
+	}
+
+	const auto_restart_ms = config.autoRestart;
+	if (auto_restart_ms > -1) {
+		log('restarting server in %dms', auto_restart_ms);
+		setTimeout(start_server, auto_restart_ms);
+	}
 }
 
 await start_server();
