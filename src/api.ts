@@ -6,6 +6,9 @@ import fs from 'node:fs/promises';
 export class ErrorWithMetadata extends Error {
 	constructor(message: string, public metadata: Record<string, unknown>) {
 		super(message);
+		
+		if (this.stack)
+			this.stack = this.stack.split('\n').slice(1).join('\n');
 	}
 
 	async resolve_metadata(): Promise<object> {
