@@ -5,7 +5,7 @@ export function log(message: string, ...args: unknown[]): void {
 
 /** Logs a message to stderr with the prefix `[spooder] ` */
 export function warn(message: string, ...args: unknown[]): void {
-	console.error('[spooder] ' + message, ...args);
+	console.log('[spooder] ' + message, ...args);
 }
 
 /** Strips ANSI color codes from a string */
