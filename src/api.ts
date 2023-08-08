@@ -14,12 +14,19 @@ export class ErrorWithMetadata extends Error {
 	async resolve_metadata(): Promise<object> {
 		const metadata = Object.assign({}, this.metadata);
 		for (const [key, value] of Object.entries(metadata)) {
+			let resolved_value = value;
+
 			if (value instanceof Promise)
-				metadata[key] = await value;
+				resolved_value = await value;
 			else if (typeof value === 'function')
-				metadata[key] = value();
+				resolved_value = value();
 			else if (value instanceof ReadableStream)
-				metadata[key] = await new Response(value).text();
+				resolved_value = await new Response(value).text();
+
+			if (typeof resolved_value === 'string' && resolved_value.includes('\n'))
+				resolved_value = resolved_value.split(/\r?\n/);
+
+			metadata[key] = resolved_value;
 		}
 
 		return metadata;
