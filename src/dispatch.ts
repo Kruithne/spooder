@@ -1,6 +1,6 @@
 import { App } from '@octokit/app';
 import { get_config } from './config';
-import { warn, log } from './utils';
+import { log } from './utils';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -93,9 +93,9 @@ async function check_cache_table(key: string, repository: string, expiry: number
 			}
 		}
 	} catch (e) {
-		warn('Failed to read canary cache file ' + cache_file_path);
-		warn('Error: ' + (e as Error).message);
-		warn('You should resolve this issue to prevent spamming GitHub with canary reports.');
+		log('Failed to read canary cache file ' + cache_file_path);
+		log('Error: ' + (e as Error).message);
+		log('You should resolve this issue to prevent spamming GitHub with canary reports.');
 	}
 
 	if (cache_table.has(key_hash)) {
@@ -158,7 +158,7 @@ export async function dispatch_report(report_title: string, report_body: Array<u
 
 		const is_cached = await check_cache_table(report_title, canary_repostiory, config.canary.throttle);
 		if (is_cached) {
-			warn('Throttled canary report: ' + report_title);
+			log('Throttled canary report: ' + report_title);
 			return;
 		}
 
@@ -218,6 +218,6 @@ export async function dispatch_report(report_title: string, report_body: Array<u
 			}
 		}
 	} catch (e) {
-		warn('Failed to dispatch canary report: ' + (e as Error)?.message ?? 'unspecified error');
+		log('Failed to dispatch canary report: ' + (e as Error)?.message ?? 'unspecified error');
 	}
 }

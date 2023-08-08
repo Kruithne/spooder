@@ -3,11 +3,6 @@ export function log(message: string, ...args: unknown[]): void {
 	console.log('[spooder] ' + message, ...args);
 }
 
-/** Logs a message to stderr with the prefix `[spooder] ` */
-export function warn(message: string, ...args: unknown[]): void {
-	console.log('[spooder] ' + message, ...args);
-}
-
 /** Strips ANSI color codes from a string */
 export function strip_color_codes(str: string): string {
 	return str.replace(/\x1b\[[0-9;]*m/g, '');
