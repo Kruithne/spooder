@@ -303,6 +303,10 @@ In addition to the information provided by the developer, `spooder` also include
 		"uv": "1.44.2",
 		"napi": "8",
 		"modules": "108"
+	},
+	"bun": {
+		"version": "0.6.4",
+		"rev": "f02561530fda1ee9396f51c8bc99b38716e38296"
 	}
 }
 ```

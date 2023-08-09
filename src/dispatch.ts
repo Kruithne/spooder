@@ -142,6 +142,10 @@ function generate_diagnostics(): object {
 		'platform': os.platform(),
 		'uptime': os.uptime(),
 		'versions': process.versions,
+		'bun': {
+			'version': Bun.version,
+			'rev': Bun.revision,
+		}
 	}
 }
 
