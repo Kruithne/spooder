@@ -21,7 +21,7 @@ export class ErrorWithMetadata extends Error {
 			else if (typeof value === 'function')
 				resolved_value = value();
 			else if (value instanceof ReadableStream)
-				resolved_value = await new Response(value).text();
+				resolved_value = await Bun.readableStreamToText(value);
 
 			if (typeof resolved_value === 'string' && resolved_value.includes('\n'))
 				resolved_value = resolved_value.split(/\r?\n/);
