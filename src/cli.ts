@@ -3,6 +3,8 @@ import { get_config } from './config';
 import { parse_command_line, log, strip_color_codes } from './utils';
 import { dispatch_report } from './dispatch';
 
+const MAX_CONSOLE_HISTORY = 64;
+
 async function start_server() {
 	log('start_server');
 
@@ -38,31 +40,46 @@ async function start_server() {
 
 	const proc = Bun.spawn(parse_command_line(config.run), {
 		cwd: process.cwd(),
-		stdout: 'inherit',
+		stdout: 'pipe',
 		stderr: 'pipe'
 	});
 
-	await proc.exited;
+	const stream_history = new Array<string>();
+	const text_decoder = new TextDecoder();
 
+	function capture_stream(stream: ReadableStream, output: NodeJS.WritableStream) {
+		const reader = stream.getReader();
+
+		reader.read().then(function read_chunk(chunk: ReadableStreamDefaultReadResult<Uint8Array>) {
+			if (chunk.done)
+				return;
+
+			const chunk_str = text_decoder.decode(chunk.value);
+			stream_history.push(...chunk_str.split(/\r?\n/));
+
+			if (stream_history.length > MAX_CONSOLE_HISTORY)
+				stream_history.splice(0, stream_history.length - MAX_CONSOLE_HISTORY);
+
+			output.write(chunk.value);
+			reader.read().then(read_chunk);
+		});
+	}
+
+	capture_stream(proc.stdout as ReadableStream, process.stdout);
+	capture_stream(proc.stderr as ReadableStream, process.stderr);
+	
+	await proc.exited;
+	
 	const proc_exit_code = proc.exitCode;
 	log('server exited with code %s', proc_exit_code);
-
+	
 	if (proc_exit_code !== 0) {
-		if (proc.stderr !== undefined) {
-			const res = new Response(proc.stderr as ReadableStream);
-
-			res.text().then(async stderr => {
-				await dispatch_report('crash: server exited unexpectedly', [{
-					proc_exit_code,
-					stderr: strip_color_codes(stderr).split(/\r?\n/)
-				}]);
-			});
-		} else {
-			dispatch_report('crash: service exited unexpectedly', [{
-				proc_exit_code
-			}]);
-		}
+		dispatch_report('crash: server exited unexpectedly', [{
+			proc_exit_code,
+			output: strip_color_codes(stream_history.join('\n'))
+		}]);
 	}
+	  
 
 	const auto_restart_ms = config.autoRestart;
 	if (auto_restart_ms > -1) {
