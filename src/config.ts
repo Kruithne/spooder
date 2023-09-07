@@ -3,7 +3,7 @@ import { log } from './utils';
 
 const internal_config = {
 	run: 'bun run index.ts',
-	autoRestart: -1,
+	auto_restart: -1,
 	update: [],
 	canary: {
 		account: '',

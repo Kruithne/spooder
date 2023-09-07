@@ -81,7 +81,7 @@ async function start_server() {
 	}
 	  
 
-	const auto_restart_ms = config.autoRestart;
+	const auto_restart_ms = config.auto_restart;
 	if (auto_restart_ms > -1) {
 		log('restarting server in %dms', auto_restart_ms);
 		setTimeout(start_server, auto_restart_ms);

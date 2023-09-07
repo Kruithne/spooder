@@ -37,7 +37,7 @@ Both the runner and the API are configured in the same way by providing a `spood
 ```json
 {
 	"spooder": {
-		"autoRestart": 5000,
+		"auto_restart": 5000,
 		"run": "bun run index.ts",
 		"update": [
 			"git pull",
@@ -81,12 +81,12 @@ While `spooder` uses a `bun run` command by default, it is possible to use any c
 
 ## Auto Restart
 
-In the event that the server exits (regardless of exit code), `spooder` can automatically restart it after a short delay. To enable this feature specify the restart delay in milliseconds as `autoRestart` in the configuration.
+In the event that the server exits (regardless of exit code), `spooder` can automatically restart it after a short delay. To enable this feature specify the restart delay in milliseconds as `auto_restart` in the configuration.
 
 ```json
 {
 	"spooder": {
-		"autoRestart": 5000
+		"auto_restart": 5000
 	}
 }
 ```
