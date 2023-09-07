@@ -36,36 +36,41 @@ async function start_server() {
 		}
 	}
 
+	const crash_console_history = config.canary.crash_console_history;
+	const include_crash_history = crash_console_history > 0;
+
+	const std_mode = include_crash_history ? 'pipe' : 'inherit';
 	const proc = Bun.spawn(parse_command_line(config.run), {
 		cwd: process.cwd(),
-		stdout: 'pipe',
-		stderr: 'pipe'
+		stdout: std_mode,
+		stderr: std_mode
 	});
 
-	const crash_console_history = config.canary.crash_console_history;
 	const stream_history = new Array<string>();
-	const text_decoder = new TextDecoder();
+	if (include_crash_history) {
+		const text_decoder = new TextDecoder();
 
-	function capture_stream(stream: ReadableStream, output: NodeJS.WritableStream) {
-		const reader = stream.getReader();
+		function capture_stream(stream: ReadableStream, output: NodeJS.WritableStream) {
+			const reader = stream.getReader();
 
-		reader.read().then(function read_chunk(chunk: ReadableStreamDefaultReadResult<Uint8Array>) {
-			if (chunk.done)
-				return;
+			reader.read().then(function read_chunk(chunk: ReadableStreamDefaultReadResult<Uint8Array>) {
+				if (chunk.done)
+					return;
 
-			const chunk_str = text_decoder.decode(chunk.value);
-			stream_history.push(...chunk_str.split(/\r?\n/));
+				const chunk_str = text_decoder.decode(chunk.value);
+				stream_history.push(...chunk_str.split(/\r?\n/));
 
-			if (stream_history.length > crash_console_history)
-				stream_history.splice(0, stream_history.length - crash_console_history);
+				if (stream_history.length > crash_console_history)
+					stream_history.splice(0, stream_history.length - crash_console_history);
 
-			output.write(chunk.value);
-			reader.read().then(read_chunk);
-		});
+				output.write(chunk.value);
+				reader.read().then(read_chunk);
+			});
+		}
+
+		capture_stream(proc.stdout as ReadableStream, process.stdout);
+		capture_stream(proc.stderr as ReadableStream, process.stderr);
 	}
-
-	capture_stream(proc.stdout as ReadableStream, process.stdout);
-	capture_stream(proc.stderr as ReadableStream, process.stderr);
 	
 	await proc.exited;
 	
@@ -73,9 +78,9 @@ async function start_server() {
 	log('server exited with code %s', proc_exit_code);
 	
 	if (proc_exit_code !== 0) {
+		const console_output = include_crash_history ? strip_color_codes(stream_history.join('\n')) : undefined;
 		dispatch_report('crash: server exited unexpectedly', [{
-			proc_exit_code,
-			console_output: strip_color_codes(stream_history.join('\n'))
+			proc_exit_code, console_output
 		}]);
 	}
 	  
