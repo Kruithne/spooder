@@ -75,7 +75,7 @@ async function start_server() {
 	if (proc_exit_code !== 0) {
 		dispatch_report('crash: server exited unexpectedly', [{
 			proc_exit_code,
-			output: strip_color_codes(stream_history.join('\n'))
+			console: strip_color_codes(stream_history.join('\n'))
 		}]);
 	}
 	  
