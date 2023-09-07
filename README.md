@@ -192,12 +192,12 @@ It is recommended that you harden your server code against unexpected exceptions
 
 In the event that the server does encounter an unexpected exception which causes it to exit with a non-zero exit code, `spooder` will automatically raise an issue on GitHub using the canary feature, if configured.
 
-Since this issue has been caught externally, `spooder` has no context of the exception which was raised. Instead, the canary report will contain the output from `stderr`.
+Since this issue has been caught externally, `spooder` has no context of the exception which was raised. Instead, the canary report will contain the output from both `stdout` and `stderr`.
 
 ```json
 {
-	"exitCode": 1,
-	"stderr": [
+	"proc_exit_code": 1,
+	"console_output": [
 		"[2.48ms] \".env.local\"",
 		"Test output",
 		"Test output",
@@ -216,9 +216,25 @@ Since this issue has been caught externally, `spooder` has no context of the exc
 }
 ```
 
+The `proc_exit_code` property contains the exit code that the server exited with.
+
+The `console_output` will contain the last `64` lines of output from `stdout` and `stderr` combined. This can be configured by setting the `spooder.canary.crash_console_history` property.
+
+```json
+{
+	"spooder": {
+		"canary": {
+			"crash_console_history": 128
+		}
+	}
+}
+```
+
 This information is subject to sanitization, as described in the `Sanitization` section, however you should be aware that stack traces may contain sensitive information.
 
 Additionally, Bun includes a relevant code snippet from the source file where the exception was raised. This is intended to help you identify the source of the problem.
+
+Setting `spooder.canary.crash_console_history` to `0` will omit the `console_output` property from the report entirely, which may make it harder to diagnose the problem but will ensure that no sensitive information is leaked.
 
 ## Sanitization
 
