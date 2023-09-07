@@ -313,7 +313,7 @@ In addition to the information provided by the developer, `spooder` also include
 
 # API
 
-`spooder` exposes a build-block style API for developing servers. The API is designed to be minimal to leave control in the hands of the developer and not add overhead for features you may not need.
+`spooder` exposes a building-block style API for developing servers. The API is designed to be minimal to leave control in the hands of the developer and not add overhead for features you may not need.
 
 ```ts
 import { ... } from 'spooder';
