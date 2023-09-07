@@ -9,6 +9,7 @@ const internal_config = {
 		account: '',
 		repository: '',
 		labels: [],
+		crash_console_history: 64,
 		throttle: 86400,
 		sanitize: true
 	}

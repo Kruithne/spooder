@@ -3,8 +3,6 @@ import { get_config } from './config';
 import { parse_command_line, log, strip_color_codes } from './utils';
 import { dispatch_report } from './dispatch';
 
-const MAX_CONSOLE_HISTORY = 64;
-
 async function start_server() {
 	log('start_server');
 
@@ -44,6 +42,7 @@ async function start_server() {
 		stderr: 'pipe'
 	});
 
+	const crash_console_history = config.canary.crash_console_history;
 	const stream_history = new Array<string>();
 	const text_decoder = new TextDecoder();
 
@@ -57,8 +56,8 @@ async function start_server() {
 			const chunk_str = text_decoder.decode(chunk.value);
 			stream_history.push(...chunk_str.split(/\r?\n/));
 
-			if (stream_history.length > MAX_CONSOLE_HISTORY)
-				stream_history.splice(0, stream_history.length - MAX_CONSOLE_HISTORY);
+			if (stream_history.length > crash_console_history)
+				stream_history.splice(0, stream_history.length - crash_console_history);
 
 			output.write(chunk.value);
 			reader.read().then(read_chunk);
