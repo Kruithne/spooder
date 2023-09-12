@@ -8,17 +8,17 @@
 
 `spooder` consists of a command-line tool which provides automatic updating/restarting and canary functionality, and a building-block API for creating servers.
 
+### Why does it exist?
+
+`spooder` was created originally as a hobby project for my own personal projects and work. It is not intended to be a full-featured web server, but rather a simple solution for my own needs.
+
 ### Should I use it?
 
-Probably not. You are free to use `spooder` if you fully understand the risks and limitations of doing so, however here is a list of things you should consider before using it:
+Use at your own risk. You are free to use `spooder` if you fully understand the risks and limitations of doing so, however here is a list of things you should consider before using it:
 
-⚠️ This is not a Node.js package. It is built using the [Bun](https://bun.sh/) runtime, which is still experimental as of writing.
-
-⚠️ It is designed to be highly opinionated and is not intended to be a general-purpose server, so configuration is limited.
-
-⚠️ It is not a full-featured web server and only provides the functionality as required for the projects it has been built for.
-
-⚠️ It has not been battle-tested and may contain bugs or security issues. The authors of this project are not responsible for any problems caused by using this software.
+- ⚠️ It is built using the [Bun](https://bun.sh/) runtime and not designed to be compatible with Node.js or other runtimes.
+- ⚠️ It is not a full-featured web server and only provides the functionality as required for the projects it has been built for.
+- ⚠️ The authors of this project are not responsible for any problems caused by using this software.
 
 # Installation
 
