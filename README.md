@@ -1,13 +1,11 @@
 <p align="center"><img src="docs/project-logo.png"/></p>
 
-# Spooder &middot; ![typescript](https://img.shields.io/badge/language-typescript-blue) [![license badge](https://img.shields.io/github/license/Kruithne/spooder?color=yellow)](LICENSE) ![npm version](https://img.shields.io/npm/v/spooder?color=c53635) ![bun](https://img.shields.io/badge/runtime-bun-f9f1e1)
+# spooder &middot; ![typescript](https://img.shields.io/badge/language-typescript-blue) [![license badge](https://img.shields.io/github/license/Kruithne/spooder?color=yellow)](LICENSE) ![npm version](https://img.shields.io/npm/v/spooder?color=c53635) ![bun](https://img.shields.io/badge/runtime-bun-f9f1e1)
 
-`spooder` is a purpose-built server solution written using the [Bun](https://bun.sh/) runtime.
-
-`spooder` shifts away from the dependency hell of the Node.js ecosystem, with a focus on stability and performance, which is why:
+`spooder` is a purpose-built server solution that shifts away from the dependency hell of the Node.js ecosystem, with a focus on stability and performance, which is why:
 - It is built using the [Bun](https://bun.sh/) runtime and not designed to be compatible with Node.js or other runtimes.
 - It uses zero dependencies and only relies on code written explicitly for `spooder` or APIs provided by the Bun runtime, often implemented in native code.
-- It is not a full-featured web server and only provides the functionality as required for the projects it has been built for.
+- It provides streamlined APIs for common server tasks in a minimalistic way, without the overhead of a full-featured web framework.
 - It does not aim to cover every use-case and is opinionated in its design to reduce complexity and overhead.
 
 It consists of two components, the `CLI` and the `API`. 
@@ -26,7 +24,7 @@ bun add spooder
 
 # Configuration
 
-Both the runner and the API are configured in the same way by providing a `spooder` object in your `package.json` file.
+Both the `CLI` and the API are configured in the same way by providing a `spooder` object in your `package.json` file.
 
 ```json
 {
@@ -137,7 +135,7 @@ events.on('receive-webhook', () => {
 
 `canary` is a feature in `spooder` which allows server problems to be raised as issues in your repository on GitHub.
 
-To enable this feature, there are a couple of steps you need to take.
+To enable this feature, you will need to configure a GitHub App and configure it:
 
 ### 1. Create a GitHub App
 
@@ -189,7 +187,7 @@ SPOODER_CANARY_KEY=/home/bond/.ssh/id_007_pcks8.key
 
 `SPOODER_CANARY_KEY` is the path to the private key file in PKCS#8 format.
 
-> ℹ️ Since `spooder` uses the Bun runtime, you can use the `.env.local` file to set these environment variables per-project.
+> ℹ️ Since `spooder` uses the Bun runtime, you can use the `.env.local` file in the project root directory to set these environment variables per-project.
 
 ### 4. Use canary
 
@@ -197,7 +195,9 @@ Once configured, `spooder` will automatically raise an issue when the server exi
 
 In addition, you can manually raise issues using the `spooder` API by calling `caution()` or `panic()`. More information about these functions can be found in the `API` section.
 
-If `canary` has not been configured correctly, `spooder` will only print warnings to the console when it attempts to raise an issue. Considering testing the canary feature with the `caution()` function before relying on it for critical issues.
+If `canary` has not been configured correctly, `spooder` will only print warnings to the console when it attempts to raise an issue.
+
+> ❗ Consider testing the canary feature with the `caution()` function before relying on it for critical issues.
 
 ## CLI > Canary > Crash
 
@@ -244,8 +244,6 @@ The `console_output` will contain the last `64` lines of output from `stdout` an
 ```
 
 This information is subject to sanitization, as described in the `CLI > Canary > Sanitization` section, however you should be aware that stack traces may contain sensitive information.
-
-Additionally, Bun includes a relevant code snippet from the source file where the exception was raised. This is intended to help you identify the source of the problem.
 
 Setting `spooder.canary.crash_console_history` to `0` will omit the `console_output` property from the report entirely, which may make it harder to diagnose the problem but will ensure that no sensitive information is leaked.
 
