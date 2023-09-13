@@ -1,5 +1,5 @@
-import { App } from '@octokit/app';
 import { get_config } from './config';
+import { create_github_issue } from './github';
 import { log } from './utils';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -153,16 +153,15 @@ export async function dispatch_report(report_title: string, report_body: Array<u
 	try {
 		const config = await get_config();
 
-		const canary_account = config.canary.account.toLowerCase();
-		const canary_repostiory = config.canary.repository.toLowerCase();
-		const canary_labels = config.canary.labels;
+		const canary_account = config.canary.account;
+		const canary_repostiory = config.canary.repository;
 
 		if (canary_account.length === 0|| canary_repostiory.length === 0)
 			return;
 
 		const is_cached = await check_cache_table(report_title, canary_repostiory, config.canary.throttle);
 		if (is_cached) {
-			log('Throttled canary report: ' + report_title);
+			log('[canary] Throttled canary report: ' + report_title);
 			return;
 		}
 
@@ -170,58 +169,44 @@ export async function dispatch_report(report_title: string, report_body: Array<u
 		const canary_app_key = process.env.SPOODER_CANARY_KEY as string;
 
 		if (canary_app_id === undefined)
-			throw new Error('dispatch_report() called without SPOODER_CANARY_APP_ID environment variable set');
+			throw new Error('SPOODER_CANARY_APP_ID environment variable is not set');
 
 		if (canary_app_key === undefined)
-			throw new Error('dispatch_report() called without SPOODER_CANARY_KEY environment variable set');
+			throw new Error('SPOODER_CANARY_KEY environment variable is not set');
 
 		const key_file = Bun.file(canary_app_key);
 		if (key_file.size === 0)
-			throw new Error('dispatch_report() failed to read canary private key file');
+			throw new Error('Unable to read private key file defined by SPOODER_CANARY_KEY environment variable');
 
 		const app_id = parseInt(canary_app_id, 10);
 		if (isNaN(app_id))
-			throw new Error('dispatch_report() failed to parse SPOODER_CANARY_APP_ID environment variable as integer');
+			throw new Error('Invalid app ID defined by SPOODER_CANARY_APP_ID environment variable');
 
-		const app = new App({
-			appId: app_id,
-			privateKey: await key_file.text(),
-		});
-
-		await app.octokit.request('GET /app');
-
-		const post_object = {
-			title: report_title,
-			body: '',
-			labels: canary_labels
-		};
+		let issue_title = report_title;
+		let issue_body = '';
 
 		report_body.push(generate_diagnostics());
 
 		if (config.canary.sanitize) {
 			const local_env = await load_local_env();
-			post_object.body = sanitize_string(JSON.stringify(report_body, null, 4), local_env);
-			post_object.title = sanitize_string(report_title, local_env);
+			issue_body = sanitize_string(JSON.stringify(report_body, null, 4), local_env);
+			issue_title = sanitize_string(report_title, local_env);
 		} else {
-			post_object.body = JSON.stringify(report_body, null, 4);
+			issue_body = JSON.stringify(report_body, null, 4);
 		}
 
-		post_object.body = '```json\n' + post_object.body + '\n```\n\nℹ️ *This issue has been created automatically in response to a server panic, caution or crash.*';
+		issue_body = '```json\n' + issue_body + '\n```\n\nℹ️ *This issue has been created automatically in response to a server panic, caution or crash.*';
 
-		for await (const { installation } of app.eachInstallation.iterator()) {
-			const login = (installation?.account as { login: string })?.login;
-			if (login?.toLowerCase() !== canary_account)
-				continue;
-
-			for await (const { octokit, repository } of app.eachRepository.iterator({ installationId: installation.id })) {
-				if (repository.full_name.toLowerCase() !== canary_repostiory)
-					continue;
-
-				await octokit.request('POST /repos/' + canary_repostiory + '/issues', post_object);
-				log('Dispatched canary report to %s: %s', canary_repostiory, report_title);
-			}
-		}
+		await create_github_issue({
+			app_id,
+			private_key: await key_file.text(),
+			repository_name: canary_repostiory,
+			login_name: canary_account,
+			issue_title,
+			issue_body,
+			issue_labels: config.canary.labels
+		});
 	} catch (e) {
-		log('Failed to dispatch canary report: ' + (e as Error)?.message ?? 'unspecified error');
+		log('[canary error] ' + (e as Error)?.message ?? 'unspecified error');
 	}
 }
