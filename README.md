@@ -346,13 +346,13 @@ In addition to the information provided by the developer, `spooder` also include
 	- [`serve(port: number): Server`](#serveport-number-server)
 - [API > Routing](#api--routing)
 	- [`server.route(path: string, handler: RequestHandler)`](#serverroutepath-string-handler-requesthandler)
+	- [`server.redirect(path: string, redirect_url: string)`](#serverredirectpath-string-redirect_url-string)
 	- [`server.handle(status_code: number, handler: RequestHandler)`](#serverhandlestatus_code-number-handler-requesthandler)
 	- [`server.default(handler: DefaultHandler)`](#serverdefaulthandler-defaulthandler)
 	- [`server.error(handler: ErrorHandler)`](#servererrorhandler-errorhandler)
 	- [`server.dir(path: string, dir: string)`](#serverdirpath-string-dir-string)
 - [API > Server Control](#api--server-control)
 	- [`server.stop(method: ServerStop)`](#serverstopmethod-serverstop)
-	- [`route_location(redirect_url: string)`](#route_locationredirect_url-string)
 - [API > Error Handling](#api--error-handling)
 	- [`ErrorWithMetadata(message: string, metadata: object)`](#errorwithmetadatamessage-string-metadata-object)
 	- [`caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#cautionerr_message_or_obj-string--object-err-object-promisevoid)
@@ -493,6 +493,12 @@ Content-Type: application/json;charset=utf-8
 {"name":"Bob","age":42}
 ```
 
+### 🔧 `server.redirect(path: string, redirect_url: string)`
+Redirect clients to a specified URL with the status code `301 Moved Permanently`.
+```ts
+server.route('/test/route', redirect('https://www.google.co.uk/'));
+```
+
 ### 🔧 `server.handle(status_code: number, handler: RequestHandler)`
 Register a custom handler for a specific status code.
 ```ts
@@ -540,14 +546,6 @@ server.dir('/content', './public/content', { ignore_hidden: false });
 Serve an index file when a directory is requested.
 ```ts
 server.dir('/content', './public/content', { index: 'index.html' });
-```
-
-### 🔧 `route_location(redirect_url: string)`
-
-Redirect clients to a specified URL with the status code `301 Moved Permanently`.
-
-```ts
-server.route('test/route', route_location('https://example.com');
 ```
 
 ## API > Server Control

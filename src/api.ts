@@ -89,18 +89,6 @@ type DirOptions = {
 	index?: string;
 };
 
-/** Built-in route handler for redirecting to a different URL. */
-export function route_location(redirect_url: string) {
-	return (req: Request, url: URL) => {
-		return new Response(null, {
-			status: 301,
-			headers: {
-				Location: redirect_url
-			}
-		});
-	};
-}
-
 function route_directory(route_path: string, dir: string, options: DirOptions): RequestHandler {
 	const ignore_hidden = options.ignore_hidden ?? true;
 
@@ -265,6 +253,18 @@ export function serve(port: number) {
 		/** Register a handler for a specific route. */
 		route: (path: string, handler: RequestHandler): void => {
 			routes.set(path.split('/'), handler);
+		},
+
+		/** Register a redirect for a specific route. */
+		redirect: (path: string, redirect_url: string): void => {
+			routes.set(path.split('/'), (req: Request, url: URL) => {
+				return new Response(null, {
+					status: 301,
+					headers: {
+						Location: redirect_url
+					}
+				});
+			});
 		},
 
 		/** Serve a directory for a specific route. */
