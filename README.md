@@ -440,7 +440,7 @@ Returning a `Blob` such as `BunFile` directly from the handler will be treated a
 > ℹ️ Returning `Bun.file()` directly is the most efficient way to serve static files as it uses system calls to stream the file directly to the client without loading into user-space.
 
 ```ts
-server.route('test/route', (req, url) => {
+server.route('/test/route', (req, url) => {
 	return Bun.file('test.png');
 });
 ```
@@ -455,7 +455,7 @@ Content-Type: image/png
 Returning an `object` type such as an array or a plain object will be treated as JSON and will send the object as JSON with the appropriate content type and length headers.
 
 ```ts
-server.route('test/route', (req, url) => {
+server.route('/test/route', (req, url) => {
 	return { message: 'Hello, world!' };
 });
 ```
@@ -481,7 +481,7 @@ class User {
 	}
 }
 
-server.route('test/route', (req, url) => {
+server.route('/test/route', (req, url) => {
 	return new User('Bob', 42);
 });
 ```
