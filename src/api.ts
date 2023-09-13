@@ -133,8 +133,18 @@ export const ServerStop = {
 
 type ServerStop = typeof ServerStop[keyof typeof ServerStop];
 
+function format_query_parameters(search_params: URLSearchParams): string {
+	let result_parts = [];
+
+	for (let [key, value] of search_params)
+		result_parts.push(`${key}: ${value}`);
+
+	return '{ ' + result_parts.join(', ') + ' }';
+}
+
 function print_request_info(req: Request, res: Response, url: URL): Response {
-	console.log(`[${res.status}] ${req.method} ${url.pathname}`);
+	const search_params = url.search.length > 0 ? format_query_parameters(url.searchParams) : '';
+	console.log(`[${res.status}] ${req.method} ${url.pathname} ${search_params}`);
 	return res;
 }
 
