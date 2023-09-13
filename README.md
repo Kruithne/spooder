@@ -4,21 +4,15 @@
 
 `spooder` is a purpose-built server solution written using the [Bun](https://bun.sh/) runtime.
 
-### What does it do?
+`spooder` shifts away from the dependency hell of the Node.js ecosystem, with a focus on stability and performance, which is why:
+- It is built using the [Bun](https://bun.sh/) runtime and not designed to be compatible with Node.js or other runtimes.
+- It uses zero dependencies and only relies on code written explicitly for `spooder` or APIs provided by the Bun runtime, often implemented in native code.
+- It is not a full-featured web server and only provides the functionality as required for the projects it has been built for.
+- It does not aim to cover every use-case and is opinionated in its design to reduce complexity and overhead.
 
-`spooder` consists of a command-line tool which provides automatic updating/restarting and canary functionality, and a building-block API for creating servers.
-
-### Why does it exist?
-
-`spooder` was created originally as a hobby project for my own personal projects and work. It is not intended to be a full-featured web server, but rather a simple solution for my own needs.
-
-### Should I use it?
-
-Use at your own risk. You are free to use `spooder` if you fully understand the risks and limitations of doing so, however here is a list of things you should consider before using it:
-
-- ⚠️ It is built using the [Bun](https://bun.sh/) runtime and not designed to be compatible with Node.js or other runtimes.
-- ⚠️ It is not a full-featured web server and only provides the functionality as required for the projects it has been built for.
-- ⚠️ The authors of this project are not responsible for any problems caused by using this software.
+It consists of two components, the `CLI` and the `API`. 
+- The `CLI` is responsible for keeping the server process running, applying updates in response to source control changes, and automatically raising issues on GitHub via the canary feature.
+- The `API` provides a minimal building-block style API for developing servers, with a focus on simplicity and performance.
 
 # Installation
 
@@ -36,38 +30,40 @@ Both the runner and the API are configured in the same way by providing a `spood
 
 ```json
 {
+	// The rest of your package.json file.
 	"spooder": {
 		"auto_restart": 5000,
-		"run": "bun run index.ts",
 		"update": [
 			"git pull",
 			"bun install"
-		]
+		],
+		"canary": {
+			"account": '',
+			"repository": '',
+			"labels": [],
+			"crash_console_history": 64,
+			"throttle": 86400,
+			"sanitize": true
+		}
 	}
 }
 ```
 
 If there are any issues with the provided configuration, a warning will be printed to the console but will not halt execution. `spooder` will always fall back to default values where invalid configuration is provided.
 
-Configuration warnings **do not** raise `caution` events with the `spooder` canary functionality.
+> ℹ️ Configuration warnings **do not** raise `caution` events with the `spooder` canary functionality.
 
-# Runner
+# CLI
 
-`spooder` includes a global command-line tool for running servers. It is recommended that you run this in a `screen` session.
+The `CLI` component of `spooder` is a global command-line tool for running server processes. For convenience, it is recommended that you run this in a `screen` session.
 
 ```bash
-screen -S spooder # Create a new screen session
-cd /var/www/my_server/
+screen -S my-website-about-fish.net
+cd /var/www/my-website-about-fish.net/
 spooder
 ```
 
-While the intended use of this runner is for web servers, it can be used to run anything. It provides two primary features: automatic updating and automatic restarting.
-
-## Entry Point
-
-`spooder` will attempt to launch the server from the current working directory using the command `bun run index.ts` as a default.
-
-To customize this, provide an alternative command via the `run` configuration.
+`spooder` will launch your server either by executing the `run` command provided in the configuration, or by executing `bun run index.ts` by default.
 
 ```json
 {
@@ -77,11 +73,21 @@ To customize this, provide an alternative command via the `run` configuration.
 }
 ```
 
-While `spooder` uses a `bun run` command by default, it is possible to use any command string.
+While `spooder` uses a `bun run` command by default, it is possible to use any command string. For example if you wanted to launch a server using `node` instead of `bun`, you could do the following.
 
-## Auto Restart
+```json
+{
+	"spooder": {
+		"run": "node my_server.js"
+	}
+}
+```
 
-In the event that the server exits (regardless of exit code), `spooder` can automatically restart it after a short delay. To enable this feature specify the restart delay in milliseconds as `auto_restart` in the configuration.
+## CLI > Auto Restart
+
+> ℹ️ This feature is not enabled by default.
+
+In the event that the server process exits, regardless of exit code, `spooder` can automatically restart it after a short delay. To enable this feature specify the restart delay in milliseconds as `auto_restart` in the configuration.
 
 ```json
 {
@@ -93,9 +99,11 @@ In the event that the server exits (regardless of exit code), `spooder` can auto
 
 If set to `0`, the server will be restarted immediately without delay. If set to `-1`, the server will not be restarted at all.
 
-## Auto Update
+## CLI > Auto Update
 
-When starting your server, `spooder` can automatically update the source code in the working directory. To enable this feature, the necessary update commands can be provided in the configuration as an array of strings.
+> ℹ️ This feature is not enabled by default.
+
+When starting or restarting a server process, `spooder` can automatically update the source code in the working directory. To enable this feature, the necessary update commands can be provided in the configuration as an array of strings.
 
 ```json
 {
@@ -108,24 +116,25 @@ When starting your server, `spooder` can automatically update the source code in
 }
 ```
 
-Commands will be executed in sequence, and the server will not be started until after the commands have resolved.
+Each command should be a separate entry in the array and will be executed in sequence. The server process will be started once all commands have resolved.
 
-Each command should be a separate item in the array. Chaining commands in a single string using the `&&` or `||` operators will not work.
+> ℹ️ Chainging commands using `&&` or `||` operators does not work.
 
 If a command in the sequence fails, the remaining commands will not be executed, however the server will still be started. This is preferred over entering a restart loop or failing to start the server at all.
-
-As well as being executed when the server is first started, the `update` commands are also run when `spooder` automatically restarts the server after it exits.
 
 You can utilize this to automatically update your server in response to a webhook or other event by simply exiting the process.
 
 ```ts
+// This is a psuedo-example, you will need to implement webhook handling yourself.
 events.on('receive-webhook', () => {
 	// <- Gracefully finish processing here.
 	process.exit(0);
 });
 ```
 
-## Canary
+## CLI > Canary
+
+> ℹ️ This feature is not enabled by default.
 
 `canary` is a feature in `spooder` which allows server problems to be raised as issues in your repository on GitHub.
 
@@ -164,7 +173,7 @@ Each server that intends to use the canary feature will need to have the private
 
 Replace `<GITHUB_ACCOUNT_NAME>` with the account name you have installed the GitHub App to, and `<GITHUB_REPOSITORY>` with the repository name you want to use for issues.
 
-The repository name must in the format `owner/repo` (e.g. `facebook/react`).
+The repository name must in the full-name format `owner/repo` (e.g. `facebook/react`).
 
 The `labels` property can be used to provide a list of labels to automatically add to the issue. This property is optional and can be omitted.
 
@@ -178,7 +187,10 @@ SPOODER_CANARY_KEY=/home/bond/.ssh/id_007_pcks8.key
 ```
 
 `SPOODER_CANARY_APP_ID` is the **App ID** as shown on the GitHub App page.
+
 `SPOODER_CANARY_KEY` is the path to the private key file in PKCS#8 format.
+
+> ℹ️ Since `spooder` uses the Bun runtime, you can use the `.env.local` file to set these environment variables per-project.
 
 ### 4. Use canary
 
@@ -186,11 +198,13 @@ Once configured, `spooder` will automatically raise an issue when the server exi
 
 In addition, you can manually raise issues using the `spooder` API by calling `caution()` or `panic()`. More information about these functions can be found in the `API` section.
 
-## Crash
+If `canary` has not been configured correctly, `spooder` will only print warnings to the console when it attempts to raise an issue. Considering testing the canary feature with the `caution()` function before relying on it for critical issues.
+
+## CLI > Canary > Crash
 
 It is recommended that you harden your server code against unexpected exceptions and use `panic()` and `caution()` to raise issues with selected diagnostic information.
 
-In the event that the server does encounter an unexpected exception which causes it to exit with a non-zero exit code, `spooder` will automatically raise an issue on GitHub using the canary feature, if configured.
+In the event that the server does encounter an unexpected exception which causes it to exit with a non-zero exit code, `spooder` will provide some diagnostic information in the canary report.
 
 Since this issue has been caught externally, `spooder` has no context of the exception which was raised. Instead, the canary report will contain the output from both `stdout` and `stderr`.
 
@@ -218,25 +232,25 @@ Since this issue has been caught externally, `spooder` has no context of the exc
 
 The `proc_exit_code` property contains the exit code that the server exited with.
 
-The `console_output` will contain the last `64` lines of output from `stdout` and `stderr` combined. This can be configured by setting the `spooder.canary.crash_console_history` property.
+The `console_output` will contain the last `64` lines of output from `stdout` and `stderr` combined. This can be configured by setting the `spooder.canary.crash_console_history` property to a length of your choice.
 
 ```json
 {
 	"spooder": {
 		"canary": {
-			"crash_console_history": 128
+			"crash_console_history": 128 // Include 128 lines of console history.
 		}
 	}
 }
 ```
 
-This information is subject to sanitization, as described in the `Sanitization` section, however you should be aware that stack traces may contain sensitive information.
+This information is subject to sanitization, as described in the `CLI > Canary > Sanitization` section, however you should be aware that stack traces may contain sensitive information.
 
 Additionally, Bun includes a relevant code snippet from the source file where the exception was raised. This is intended to help you identify the source of the problem.
 
 Setting `spooder.canary.crash_console_history` to `0` will omit the `console_output` property from the report entirely, which may make it harder to diagnose the problem but will ensure that no sensitive information is leaked.
 
-## Sanitization
+## CLI > Canary > Sanitization
 
 All reports sent via the canary feature are sanitized to prevent sensitive information from being leaked. This includes:
 
@@ -283,7 +297,7 @@ The sanitization behavior can be disabled by setting `spooder.canary.sanitize` t
 
 While this sanitization adds a layer of protection against information leaking, it does not catch everything. You should pay special attention to messages and objects provided to the canary to not unintentionally leak sensitive information.
 
-## System Information
+## CLI > Canary > System Information
 
 In addition to the information provided by the developer, `spooder` also includes some system information in the canary reports.
 
@@ -329,21 +343,37 @@ In addition to the information provided by the developer, `spooder` also include
 
 # API
 
-`spooder` exposes a building-block style API for developing servers. The API is designed to be minimal to leave control in the hands of the developer and not add overhead for features you may not need.
+`spooder` exposes a simple yet powerful API for developing servers. The API is designed to be minimal to leave control in the hands of the developer and not add overhead for features you may not need.
+
+- [API > Serving](#api--serving)
+	- [`serve(port: number): Server`](#serveport-number-server)
+- [API > Routing](#api--routing)
+	- [`server.route(path: string, handler: RequestHandler)`](#serverroutepath-string-handler-requesthandler)
+	- [`server.handle(status_code: number, handler: RequestHandler)`](#serverhandlestatus_code-number-handler-requesthandler)
+	- [`server.default(handler: DefaultHandler)`](#serverdefaulthandler-defaulthandler)
+	- [`server.error(handler: ErrorHandler)`](#servererrorhandler-errorhandler)
+	- [`server.dir(path: string, dir: string)`](#serverdirpath-string-dir-string)
+- [API > Server Control](#api--server-control)
+	- [`server.stop(method: ServerStop)`](#serverstopmethod-serverstop)
+	- [`route_location(redirect_url: string)`](#route_locationredirect_url-string)
+- [API > Error Handling](#api--error-handling)
+	- [`ErrorWithMetadata(message: string, metadata: object)`](#errorwithmetadatamessage-string-metadata-object)
+	- [`caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#cautionerr_message_or_obj-string--object-err-object-promisevoid)
+	- [`panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#panicerr_message_or_obj-string--object-err-object-promisevoid)
+
+## API > Serving
+
+### `serve(port: number): Server`
+
+Bootstrap a server on the specified port.
 
 ```ts
-import { ... } from 'spooder';
-```
+import { serve } from 'spooder';
 
-#### `serve(port: number): Server`
-
-The `serve` function simplifies the process of boostrapping a server. Setting up a functioning server is as simple as calling the function and passing a port number to listen on.
-
-```ts
 const server = serve(8080);
 ```
 
-Without any additional configuration, this will create a server which listens on the specified port and responds to all requests with the following response.
+By default, the server responds with:
 
 ```http
 HTTP/1.1 404 Not Found
@@ -353,11 +383,11 @@ Content-Type: text/plain;charset=utf-8
 Not Found
 ```
 
-To build functionality on top of this, there are a number of functions that can be called from the `Server` object.
+## API > Routing
 
-#### `server.route(path: string, handler: RequestHandler)`
+### 🔧 `server.route(path: string, handler: RequestHandler)`
 
-The `route` function allows you to register a handler for a specific path. The handler will be called for all requests that exactly match the given path.
+Register a handler for a specific path.
 
 ```ts
 server.route('/test/route', (req, url) => {
@@ -365,16 +395,19 @@ server.route('/test/route', (req, url) => {
 });
 ```
 
-Additionally, routes also support named parameters. These are defined by prefixing a path segment with a colon. These are added directly to the `searchParams` property of the `URL` object.
+Named parameters can be used in paths by prefixing a path segment with a colon.
+
+> ℹ️ Named parameters will overwrite existing query parameters with the same name.
 
 ```ts
 server.route('/test/:param', (req, url) => {
 	return new Response(url.searchParams.get('param'), { status: 200 });
 });
 ```
-> Note: Named parameters will overwrite existing search parameters with the same name.
 
-By default routes are matched exactly, but you can also use a wildcard to match any path that starts with a given path.
+Wildcards can be used to match any path that starts with a given path.
+
+> ℹ️ If you intend to use this for directory serving, you may be better suited looking at the `server.dir()` function.
 
 ```ts
 server.route('/test/*', (req, url) => {
@@ -382,43 +415,18 @@ server.route('/test/*', (req, url) => {
 });
 ```
 
-The above will match any path the starts with `/test`, such as:
-- `/test`
-- `/test/`
-- `/test/route`
-- `/test/route/foo.txt`
-
-If you intend to use this for directory serving, you may be better suited looking at the `server.dir()` function.
-
-Wildcards can also be placed anywhere in the path, allowing anything to be placed in a given single segment - it does not span multiple segments.
-
-```ts
-server.route('/test/*/route', (req, url) => {
-	return new Response('Hello, world!', { status: 200 });
-});
-```
-
-The above would allow anything to be placed in the middle segment. This behavior is documented for clarity as it is a byproduct of wildcard implementation for directories, but it is recommended you use the named parameters feature instead.
-
-Using the standard Web API, the route handler above receives a [Request](https://developer.mozilla.org/en-US/docs/Web/API/Request) object and returns a [Response](https://developer.mozilla.org/en-US/docs/Web/API/Response) object, which is then sent to the client.
-
-All handle registration functions in `spooder` support registering async functions which will be awaited before sending the response.
+Asynchronous handlers are supported by returning a `Promise` from the handler.
 
 ```ts
 server.route('/test/route', async (req, url) => {
-	await new Promise((resolve) => setTimeout(resolve, 1000));
 	return new Response('Hello, world!', { status: 200 });
 });
 ```
 
-To streamline this process, `spooder` allows a number of other return types to be used as shortcuts.
-
-Returning a `number` type treats the number as a status code and sends a relevant response.
-
-By default, this will be a plain text response with the applicable status message as the body. This can be overridden with `server.handle()` or `server.default()`, which will be covered later.
+Returning a `number` directly from the handler will be treated as a status code and will send a plain text response with the status message as the body.
 
 ```ts
-server.route('/test/route', (req) => {
+server.route('/test/route', (req, url) => {
 	return 500;
 });
 ```
@@ -430,12 +438,12 @@ Content-Type: text/plain;charset=utf-8
 Internal Server Error
 ```
 
-Returning a `Blob` type, such as the `FileBlob` returned from the `Bun.file()` API, will send the blob as the response body with the appropriate content type and length headers.
+Returning a `Blob` such as `BunFile` directly from the handler will be treated as a file and will send the blob as the response body with the appropriate content type and length headers.
+
+> ℹ️ Returning `Bun.file()` directly is the most efficient way to serve static files as it uses system calls to stream the file directly to the client without loading into user-space.
 
 ```ts
-server.route('test/route', (req) => {
-	// Note that calling Bun.file() does not immediately read
-	// the file from disk, it will be streamed with the response.
+server.route('test/route', (req, url) => {
 	return Bun.file('test.png');
 });
 ```
@@ -447,10 +455,10 @@ Content-Type: image/png
 <binary data>
 ```
 
-Return an `object` type, such as an array or a plain object, will send the object as JSON with the appropriate content type and length headers.
+Returning an `object` type such as an array or a plain object will be treated as JSON and will send the object as JSON with the appropriate content type and length headers.
 
 ```ts
-server.route('test/route', (req) => {
+server.route('test/route', (req, url) => {
 	return { message: 'Hello, world!' };
 });
 ```
@@ -462,7 +470,7 @@ Content-Type: application/json;charset=utf-8
 {"message":"Hello, world!"}
 ```
 
-Since custom classes are also objects, you can also return a custom class instance and it will be serialized to JSON. To control the serialization process, you can implement the `toJSON()` method on your class.
+Since custom classes are also objects, you can also return a custom class instance and it will be serialized to JSON. To control the serialization process, you can implement the [`toJSON()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify) method on your class.
 
 ```ts
 class User {
@@ -476,7 +484,7 @@ class User {
 	}
 }
 
-server.route('test/route', (req) => {
+server.route('test/route', (req, url) => {
 	return new User('Bob', 42);
 });
 ```
@@ -488,219 +496,126 @@ Content-Type: application/json;charset=utf-8
 {"name":"Bob","age":42}
 ```
 
-Any other type that is returned from a route handler will be converted to a string and sent as the response body with the appropriate length header and the content type `text/plain`.
-
-```ts
-server.route('test/route', (req) => {
-	return Symbol('foo');
-});
-```
-```http
-HTTP/1.1 200 OK
-Content-Length: 7
-Content-Type: text/plain;charset=utf-8
-
-Symbol(foo)
-```
-
-#### `server.default(handler: DefaultHandler)`
-
-The server uses a default handler which responds to requests for which there was no handler registered, or the registered handler returned a numeric status code.
-
-This default handler sends a simple response to the client with the status code and a body containing the status message.
-
-```http
-HTTP/1.1 404 Not Found
-Content-Length: 9
-Content-Type: text/plain;charset=utf-8
-
-Not Found
-```
-
-To customize the behavior of this handler, you can register a custom default handler using the `default` function.
-
-```ts
-server.default((req, status_code) => {
-	return new Response(`Custom error: ${status_code}`, { status: status_code });
-});
-```
-
-Using your own default handler allows you to provide a custom response for unhandled requests based on the status code.
-
-The return type from this handler can be any of the expected return types from a normal route handler with the exception that returning a `number` type will not be treated as a status code and will instead be treated as a plain text response.
-
-If is worth noting that if you return a `Response` object from this handler, you must implicitly set the status code. If you do not, the status code will be set to `200` by default.
-
-```ts
-server.default((req, status_code) => {
-	return new Response(`Custom error: ${status_code}`);
-});
-```
-```http
-HTTP/1.1 200 OK
-Content-Length: 18
-Content-Type: text/plain;charset=utf-8
-
-Custom error: 404
-```
-
-Returning anything else, such as a `Blob`, `object` or `string`, the status code will automatically be set to `status_code`. To override this behavior you must provide a `Response` object.
-
-#### `server.handle(status_code: number, handler: RequestHandler)`
-
-The `handle` function allows you to register a handler for a specific status code. This handler will take priority over the default handler.
-
+### 🔧 `server.handle(status_code: number, handler: RequestHandler)`
+Register a custom handler for a specific status code.
 ```ts
 server.handle(500, (req) => {
 	return new Response('Custom Internal Server Error Message', { status: 500 });
 });
 ```
-```http
-HTTP/1.1 500 Internal Server Error
-Content-Length: 36
-Content-Type: text/plain;charset=utf-8
 
-Custom Internal Server Error Message
-```
-
-The return type from this handler can be any of the expected return types from a normal route handler with the exception that returning a `number` type will not be treated as a status code and will instead be treated as a plain text response.
-
-If is worth noting that if you return a `Response` object from this handler, you must implicitly set the status code. If you do not, the status code will be set to `200` by default.
-
+### 🔧 `server.default(handler: DefaultHandler)`
+Register a handler for all unhandled response codes.
+> ℹ️ If you return a `Response` object from here, you must explicitly set the status code.
 ```ts
-server.handle(500, (req) => {
-	return new Response('Custom Internal Server Error Message');
+server.default((req, status_code) => {
+	return new Response(`Custom handler for: ${status_code}`, { status: status_code });
 });
 ```
-```http
-HTTP/1.1 200 OK
-Content-Length: 36
-Content-Type: text/plain;charset=utf-8
 
-Custom Internal Server Error Message
-```
-
-Returning anything else, such as a `Blob`, `object` or `string`, the status code will automatically be set. To override this behavior you must provide a `Response` object.
-
-#### `server.error(handler: ErrorHandler)`
-
-The `error` function allows you to register a handler for any uncaught errors that occur during the request handling process. 
-
-Unlike other handlers, it does not accept asynchronous functions and it must return a `Response` object.
-
+### 🔧 `server.error(handler: ErrorHandler)`
+Register a handler for uncaught errors.
+> ℹ️ This handler does not accept asynchronous functions and must return a `Response` object.
 ```ts
 server.error((req, err) => {
 	return new Response('Custom Internal Server Error Message', { status: 500 });
 });
 ```
-```http
-HTTP/1.1 500 Internal Server Error
-Content-Length: 36
-Content-Type: text/plain;charset=utf-8
 
-Custom Internal Server Error Message
-```
-This should be used as a last resort to catch unintended errors and should not be part of your normal request handling process. Generally speaking, this handler should only be called if you have a bug in your code.
-
-#### `server.dir(path: string, dir: string)`
-
-The `dir` function allows you to serve static files from a directory on your file system. 
-
+### 🔧 `server.dir(path: string, dir: string)`
+Serve static files from a directory.
 ```ts
 server.dir('/content', './public/content');
 ```
 
-The above example will serve all files from `./public/content` to any requests made to `/content`. For example `/content/test.txt` will serve the file `./public/content/test.txt`.
+| Action | Status Code |
+| --- | --- |
+| Accessing a directory | 401 Unauthorized |
+| File does not exist | 404 Not Found |
+| File is not readable | 500 Internal Server Error |
+| Hidden file (default) | 404 Not Found |
 
-- This function is recursive and will serve all files from the specified directory and any subdirectories.
-- Requesting a directory will return a 401 response (subject to your configured handlers).
-- Requesting a file that does not exist will return a 404 response (subject to your configured handlers).
-- Requesting a file that is not readable will return a 500 response (subject to your configured handlers).
-
-By default, hidden files (files prefixed with `.`) will not be served. To serve hidden files, you must set `ignoreHidden` to `false` in the `options` parameter.
-
+Hidden files are not served by default.
 ```ts
-server.dir('/content', './public/content', { ignoreHidden: false });
+server.dir('/content', './public/content', { ignore_hidden: false });
 ```
 
-If `ignoreHidden` is set to `true` (default) then requesting a hidden file will return a 404 response (subject to your configured handlers).
-
-Additionally, the `index` property can be set to a filename such as `index.html` to serve a default file when a directory is requested.
-
+Serve an index file when a directory is requested.
 ```ts
 server.dir('/content', './public/content', { index: 'index.html' });
 ```
 
-The above will serve `./public/content/index.html` when `/content` is requested.
+### 🔧 `route_location(redirect_url: string)`
 
-#### `server.stop(method: ServerStop)`
-
-The `stop` function allows you to stop the server. `method` is one of `ServerStop.IMMEDIATE` or `ServerStop.GRACEFUL`.
-
-`ServerStop.GRACEFUL` will stop accepting new requests and wait for all in-flight requests to complete before stopping the server. This is the default behavior.
-
-`ServerStop.IMMEDIATE` will immediately stop the server, terminating all in-flight requests.
-
----
-
-#### `ErrorWithMetadata(message: string, metadata: object)`
-
-The `ErrorWithMetadata` class is a thin wrapper around the built-in `Error` class that allows you to attach metadata to the error.
-
-Providing additional information to errors can be used for debugging purposes when errors are dispatched to the canary.
-
-```ts
-throw new ErrorWithMetadata('Something went wrong', { foo: 'bar' });
-```
-
-For convinience, if any of the values in the `metadata` are functions, they will be called and the return value will be used instead.
-
-Additionally, promises will be resolved and readable streams will be converted to strings.
-
----
-
-#### `route_location(redirect_url: string)`
-
-The `route_location` is a built-in request handler that redirects the client to a specified URL with the status code `301 Moved Permanently`.
+Redirect clients to a specified URL with the status code `301 Moved Permanently`.
 
 ```ts
 server.route('test/route', route_location('https://example.com');
 ```
 
-The above is a much shorter equivalent to the following:
+## API > Server Control
+
+### 🔧 `server.stop(method: ServerStop)`
+
+Stop the server process immediately, terminating all in-flight requests.
 
 ```ts
-server.route('test/route', (req, url) => {
-	return new Response(null, {
-		status: 301,
-		headers: {
-			Location: 'https://example.com',
-		},
-	});
-});
+server.stop(ServerStop.IMMEDIATE);
 ```
----
 
-#### `caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`
-Raise a warning issue on GitHub. This is useful for non-fatal errors which you want to be notified about.
+Stop the server process gracefully, waiting for all in-flight requests to complete.
+
+```ts
+server.stop(ServerStop.GRACEFUL);
+```
+
+## API > Error Handling
+
+### 🔧 `ErrorWithMetadata(message: string, metadata: object)`
+
+The `ErrorWithMetadata` class allows you to attach metadata to errors, which can be used for debugging purposes when errors are dispatched to the canary.
+
+```ts
+throw new ErrorWithMetadata('Something went wrong', { foo: 'bar' });
+```
+
+Functions and promises contained in the metadata will be resolved and the return value will be used instead.
+
+```ts
+throw new ErrorWithMetadata('Something went wrong', { foo: () => 'bar' });
+```
+
+### 🔧 `caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`
+
+Raise a warning issue on GitHub. This is useful for non-fatal issues which you want to be notified about.
+
+> ℹ️ This function is only available if the canary feature is enabled.
 
 ```ts
 try {
-	// connect to database
+	// Perform a non-critical action, such as analytics.
+	// ...
 } catch (e) {
-	await caution('Failed to connect to database', e);
+	// `caution` is async, you can use it without awaiting.
+	caution(e);
 }
 ```
 
-Providing a custom error message is optional and can be omitted. Additionally you can also provide additional error objects which will be serialized to JSON and included in the report.
+Additional data can be provided as objects which will be serialized to JSON and included in the report.
 
 ```ts
-caution(e); // provide just the error
-caution(e, { foo: 42 }); // additional data
-caution('Custom error', e, { foo: 42 }); // all
+caution(e, { foo: 42 });
 ```
 
-To prevent spam, issues raised with `caution()` are rate-limited based on a configurable threshold in seconds. By default, the threshold is set to 24 hours per unique issue.
+A custom error message can be provided as the first parameter
+
+> ℹ️ Avoid including dynamic information in the title that would prevent the issue from being unique.
+
+```ts
+caution('Custom error', e, { foo: 42 });
+```
+
+Issues raised with `caution()` are rate-limited. By default, the rate limit is `86400` seconds (24 hours), however this can be configured in the `spooder.canary.throttle` property.
 
 ```json
 {
@@ -712,7 +627,7 @@ To prevent spam, issues raised with `caution()` are rate-limited based on a conf
 }
 ```
 
-Issues are considered unique by the `err_message` parameter, so it is recommended that you do not include any dynamic information in this parameter that would prevent the issue from being unique.
+Issues are considered unique by the `err_message` parameter, so avoid using dynamic information that would prevent this from being unique.
 
 If you need to provide unique information, you can use the `err` parameter to provide an object which will be serialized to JSON and included in the issue body.
 
@@ -725,12 +640,26 @@ await caution('Error with number ' + some_important_value);
 // Good: Use err parameter to provide dynamic information.
 await caution('Error with number', { some_important_value });
 ```
-It is not required that you `await` the `caution()`, and in situations where parallel processing is required, it is recommended that you do not.
 
-#### `panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`
+### 🔧 `panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`
+
 This behaves the same as `caution()` with the difference that once `panic()` has raised the issue, it will exit the process with a non-zero exit code.
 
-This should only be called in worst-case scenarios where the server cannot continue to run. Since the process will exit, it is recommended that you `await` the `panic()` call.
+> ℹ️ This function is only available if the canary feature is enabled.
 
-## License
+This should only be used as an absolute last resort when the server cannot continue to run and will be unable to respond to requests.
+
+```ts
+try {
+	// Perform a critical action.
+	// ...
+} catch (e) {
+	// You should await `panic` since the process will exit.
+	await panic(e);
+}
+```
+
+## Legal
+This software is provided as-is with no warranty or guarantee. The authors of this project are not responsible or liable for any problems caused by using this software or any part thereof. Use of this software does not entitle you to any support or assistance from the authors of this project.
+
 The code in this repository is licensed under the ISC license. See the [LICENSE](LICENSE) file for more information.

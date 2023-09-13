@@ -85,7 +85,7 @@ type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
 type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
 type DirOptions = {
-	ignoreHidden?: boolean;
+	ignore_hidden?: boolean;
 	index?: string;
 };
 
@@ -102,7 +102,7 @@ export function route_location(redirect_url: string) {
 }
 
 function route_directory(route_path: string, dir: string, options: DirOptions): RequestHandler {
-	const ignore_hidden = options.ignoreHidden ?? true;
+	const ignore_hidden = options.ignore_hidden ?? true;
 
 	return async (req: Request, url: URL) => {
 		const file_path = path.join(dir, url.pathname.slice(route_path.length));
