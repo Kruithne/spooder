@@ -30,7 +30,6 @@ Both the runner and the API are configured in the same way by providing a `spood
 
 ```json
 {
-	// The rest of your package.json file.
 	"spooder": {
 		"auto_restart": 5000,
 		"update": [
@@ -38,8 +37,8 @@ Both the runner and the API are configured in the same way by providing a `spood
 			"bun install"
 		],
 		"canary": {
-			"account": '',
-			"repository": '',
+			"account": "",
+			"repository": "",
 			"labels": [],
 			"crash_console_history": 64,
 			"throttle": 86400,
