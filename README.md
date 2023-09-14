@@ -237,7 +237,7 @@ The `console_output` will contain the last `64` lines of output from `stdout` an
 {
 	"spooder": {
 		"canary": {
-			"crash_console_history": 128 // Include 128 lines of console history.
+			"crash_console_history": 128
 		}
 	}
 }
