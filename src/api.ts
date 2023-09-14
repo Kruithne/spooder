@@ -2,6 +2,7 @@ import { dispatch_report } from './dispatch';
 import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import { log } from './utils';
 
 export class ErrorWithMetadata extends Error {
 	constructor(message: string, public metadata: Record<string, unknown>) {
@@ -142,9 +143,10 @@ function format_query_parameters(search_params: URLSearchParams): string {
 	return '{ ' + result_parts.join(', ') + ' }';
 }
 
-function print_request_info(req: Request, res: Response, url: URL): Response {
+function print_request_info(req: Request, res: Response, url: URL, request_start: number): Response {
+	const request_time = Date.now() - request_start;
 	const search_params = url.search.length > 0 ? format_query_parameters(url.searchParams) : '';
-	console.log(`[${res.status}] ${req.method} ${url.pathname} ${search_params}`);
+	console.log(`[${res.status}] ${req.method} ${url.pathname} ${search_params} [${request_time}ms]`);
 	return res;
 }
 
@@ -178,86 +180,95 @@ export function serve(port: number) {
 		return new Response(String(response), { status: status_code })
 	}
 
+	async function generate_response(req: Request, url: URL): Promise<Response> {
+		let status_code = 200;
+
+		try {
+			const route_array = url.pathname.split('/').filter(e => !(e === '..' || e === '.'));
+			let handler: RequestHandler | undefined;
+
+			for (const [path, route_handler] of routes) {
+				const is_trailing_wildcard = path[path.length - 1] === '*';
+				if (!is_trailing_wildcard && path.length !== route_array.length)
+					continue;
+
+				let match = true;
+				for (let i = 0; i < path.length; i++) {
+					const path_part = path[i];
+
+					if (path_part === '*')
+						continue;
+
+					if (path_part.startsWith(':')) {
+						url.searchParams.append(path_part.slice(1), route_array[i]);
+						continue;
+					}
+
+					if (path_part !== route_array[i]) {
+						match = false;
+						break;
+					}
+				}
+
+				if (match) {
+					handler = route_handler;
+					break;
+				}
+			}
+
+			// Check for a handler for the route.
+			if (handler !== undefined) {
+				const response = await resolve_handler(handler(req, url), status_code, true);
+				if (response instanceof Response)
+					return response;
+
+				// If the handler returned a status code, use that instead.
+				status_code = response;
+			} else {
+				status_code = 404;
+			}
+
+			// Fallback to checking for a handler for the status code.
+			const status_code_handler = handlers.get(status_code);
+			if (status_code_handler !== undefined) {
+				const response = await resolve_handler(status_code_handler(req), status_code);
+				if (response instanceof Response)
+					return response;
+			}
+
+			// Fallback to the default handler, if any.
+			if (default_handler !== undefined) {
+				const response = await resolve_handler(default_handler(req, status_code), status_code);
+				if (response instanceof Response)
+					return response;
+			}
+
+			// Fallback to returning a basic response.
+			return new Response(http.STATUS_CODES[status_code], { status: status_code });
+		} catch (e) {
+			if (error_handler !== undefined)
+				return error_handler(e as Error);
+
+			return new Response(http.STATUS_CODES[500], { status: 500 });
+		}
+	}
+
 	const server = Bun.serve({
 		port,
 		development: false,
 
 		async fetch(req: Request): Promise<Response> {
 			const url = new URL(req.url);
-			let status_code = 200;
+			const request_start = Date.now();
 
-			try {
-				const route_array = url.pathname.split('/').filter(e => !(e === '..' || e === '.'));
-				let handler: RequestHandler | undefined;
+			const response = await generate_response(req, url);
+			print_request_info(req, response, url, request_start);
 
-				for (const [path, route_handler] of routes) {
-					const is_trailing_wildcard = path[path.length - 1] === '*';
-					if (!is_trailing_wildcard && path.length !== route_array.length)
-						continue;
-
-					let match = true;
-					for (let i = 0; i < path.length; i++) {
-						const path_part = path[i];
-
-						if (path_part === '*')
-							continue;
-
-						if (path_part.startsWith(':')) {
-							url.searchParams.append(path_part.slice(1), route_array[i]);
-							continue;
-						}
-
-						if (path_part !== route_array[i]) {
-							match = false;
-							break;
-						}
-					}
-
-					if (match) {
-						handler = route_handler;
-						break;
-					}
-				}
-
-				// Check for a handler for the route.
-				if (handler !== undefined) {
-					const response = await resolve_handler(handler(req, url), status_code, true);
-					if (response instanceof Response)
-						return print_request_info(req, response, url);
-
-					// If the handler returned a status code, use that instead.
-					status_code = response;
-				} else {
-					status_code = 404;
-				}
-
-				// Fallback to checking for a handler for the status code.
-				const status_code_handler = handlers.get(status_code);
-				if (status_code_handler !== undefined) {
-					const response = await resolve_handler(status_code_handler(req), status_code);
-					if (response instanceof Response)
-						return print_request_info(req, response, url);
-				}
-
-				// Fallback to the default handler, if any.
-				if (default_handler !== undefined) {
-					const response = await resolve_handler(default_handler(req, status_code), status_code);
-					if (response instanceof Response)
-						return print_request_info(req, response, url);
-				}
-
-				// Fallback to returning a basic response.
-				return print_request_info(req, new Response(http.STATUS_CODES[status_code], { status: status_code }), url);
-			} catch (e) {
-				if (error_handler !== undefined)
-					return print_request_info(req, error_handler(e as Error), url);
-
-				return print_request_info(req, new Response(http.STATUS_CODES[500], { status: 500 }), url);
-			}
+			return response;
 		}
 	});
 
-	console.log(`Server started on port ${port}`);
+	log('Server started on port ' + port);
 
 	return {
 		/** Register a handler for a specific route. */
