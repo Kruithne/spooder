@@ -177,7 +177,7 @@ export function serve(port: number) {
 		if (typeof response === 'object')
 			return new Response(JSON.stringify(response), { status: status_code, headers: { 'Content-Type': 'application/json' } });
 	
-		return new Response(String(response), { status: status_code })
+		return new Response(String(response), { status: status_code });
 	}
 
 	async function generate_response(req: Request, url: URL): Promise<Response> {
