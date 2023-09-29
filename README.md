@@ -546,7 +546,7 @@ function default_directory_handler(file_path: string, file: DirFile, stat: DirSt
 }
 ```
 
-[!NOTE]
+> [!NOTE]
 > Uncaught `ENOENT` errors throw from the directory handler will return a `404` response, other errors will return a `500` response.
 
 Provide your own directory handler for fine-grained control.
@@ -566,7 +566,7 @@ server.dir('/static', '/static', (file_path, file, stat, request, url) => {
 });
 ```
 
-[!NOTE]
+> [!NOTE]
 > The directory handler function is only called for files that exist on disk - including directories.
 
 ## API > Server Control
