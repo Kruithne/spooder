@@ -48,7 +48,8 @@ Both the `CLI` and the API are configured in the same way by providing a `spoode
 
 If there are any issues with the provided configuration, a warning will be printed to the console but will not halt execution. `spooder` will always fall back to default values where invalid configuration is provided.
 
-> ℹ️ Configuration warnings **do not** raise `caution` events with the `spooder` canary functionality.
+> [!NOTE]
+> Configuration warnings **do not** raise `caution` events with the `spooder` canary functionality.
 
 # CLI
 
@@ -82,7 +83,8 @@ While `spooder` uses a `bun run` command by default, it is possible to use any c
 
 ## CLI > Auto Restart
 
-> ℹ️ This feature is not enabled by default.
+> [!NOTE]
+> This feature is not enabled by default.
 
 In the event that the server process exits, regardless of exit code, `spooder` can automatically restart it after a short delay. To enable this feature specify the restart delay in milliseconds as `auto_restart` in the configuration.
 
@@ -98,7 +100,8 @@ If set to `0`, the server will be restarted immediately without delay. If set to
 
 ## CLI > Auto Update
 
-> ℹ️ This feature is not enabled by default.
+> [!NOTE]
+> This feature is not enabled by default.
 
 When starting or restarting a server process, `spooder` can automatically update the source code in the working directory. To enable this feature, the necessary update commands can be provided in the configuration as an array of strings.
 
@@ -115,7 +118,8 @@ When starting or restarting a server process, `spooder` can automatically update
 
 Each command should be a separate entry in the array and will be executed in sequence. The server process will be started once all commands have resolved.
 
-> ℹ️ Chainging commands using `&&` or `||` operators does not work.
+> [!IMPORTANT]
+> Chainging commands using `&&` or `||` operators does not work.
 
 If a command in the sequence fails, the remaining commands will not be executed, however the server will still be started. This is preferred over entering a restart loop or failing to start the server at all.
 
@@ -131,7 +135,8 @@ events.on('receive-webhook', () => {
 
 ## CLI > Canary
 
-> ℹ️ This feature is not enabled by default.
+> [!NOTE]
+> This feature is not enabled by default.
 
 `canary` is a feature in `spooder` which allows server problems to be raised as issues in your repository on GitHub.
 
@@ -148,7 +153,8 @@ Once created, install the GitHub App to your account. The app will need to be gi
 
 In addition to the **App ID** that is assigned automatically, you will also need to generate a **Private Key** for the app. This can be done by clicking the **Generate a private key** button on the app page.
 
-> Note: The private keys provided by GitHub are in PKCS#1 format, but only PKCS#8 is supported. You can convert the key file with the following command.
+> [!NOTE]
+> The private keys provided by GitHub are in PKCS#1 format, but only PKCS#8 is supported. You can convert the key file with the following command.
 
 ```bash
 openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in private-key.pem -out private-key-pkcs8.key
@@ -187,7 +193,8 @@ SPOODER_CANARY_KEY=/home/bond/.ssh/id_007_pcks8.key
 
 `SPOODER_CANARY_KEY` is the path to the private key file in PKCS#8 format.
 
-> ℹ️ Since `spooder` uses the Bun runtime, you can use the `.env.local` file in the project root directory to set these environment variables per-project.
+> [!NOTE]
+> Since `spooder` uses the Bun runtime, you can use the `.env.local` file in the project root directory to set these environment variables per-project.
 
 ### 4. Use canary
 
@@ -197,7 +204,8 @@ In addition, you can manually raise issues using the `spooder` API by calling `c
 
 If `canary` has not been configured correctly, `spooder` will only print warnings to the console when it attempts to raise an issue.
 
-> ❗ Consider testing the canary feature with the `caution()` function before relying on it for critical issues.
+> [!WARNING]
+> Consider testing the canary feature with the `caution()` function before relying on it for critical issues.
 
 ## CLI > Canary > Crash
 
@@ -292,7 +300,8 @@ The sanitization behavior can be disabled by setting `spooder.canary.sanitize` t
 }
 ```
 
-While this sanitization adds a layer of protection against information leaking, it does not catch everything. You should pay special attention to messages and objects provided to the canary to not unintentionally leak sensitive information.
+> [!WARNING]
+> While this sanitization adds a layer of protection against information leaking, it does not catch everything. You should pay special attention to messages and objects provided to the canary to not unintentionally leak sensitive information.
 
 ## CLI > Canary > System Information
 
@@ -394,7 +403,8 @@ server.route('/test/route', (req, url) => {
 
 Named parameters can be used in paths by prefixing a path segment with a colon.
 
-> ℹ️ Named parameters will overwrite existing query parameters with the same name.
+> [!NOTE]
+> Named parameters will overwrite existing query parameters with the same name.
 
 ```ts
 server.route('/test/:param', (req, url) => {
@@ -404,7 +414,8 @@ server.route('/test/:param', (req, url) => {
 
 Wildcards can be used to match any path that starts with a given path.
 
-> ℹ️ If you intend to use this for directory serving, you may be better suited looking at the `server.dir()` function.
+> [!NOTE]
+> If you intend to use this for directory serving, you may be better suited looking at the `server.dir()` function.
 
 ```ts
 server.route('/test/*', (req, url) => {
@@ -437,7 +448,8 @@ Internal Server Error
 
 Returning a `Blob` such as `BunFile` directly from the handler will be treated as a file and will send the blob as the response body with the appropriate content type and length headers.
 
-> ℹ️ Returning `Bun.file()` directly is the most efficient way to serve static files as it uses system calls to stream the file directly to the client without loading into user-space.
+> [!NOTE]
+> Returning `Bun.file()` directly is the most efficient way to serve static files as it uses system calls to stream the file directly to the client without loading into user-space.
 
 ```ts
 server.route('/test/route', (req, url) => {
@@ -509,7 +521,8 @@ server.handle(500, (req) => {
 
 ### 🔧 `server.default(handler: DefaultHandler)`
 Register a handler for all unhandled response codes.
-> ℹ️ If you return a `Response` object from here, you must explicitly set the status code.
+> [!NOTE]
+> If you return a `Response` object from here, you must explicitly set the status code.
 ```ts
 server.default((req, status_code) => {
 	return new Response(`Custom handler for: ${status_code}`, { status: status_code });
@@ -518,7 +531,9 @@ server.default((req, status_code) => {
 
 ### 🔧 `server.error(handler: ErrorHandler)`
 Register a handler for uncaught errors.
-> ℹ️ This handler does not accept asynchronous functions and must return a `Response` object.
+
+> [!NOTE]
+> This handler does not accept asynchronous functions and must return a `Response` object.
 ```ts
 server.error((req, err) => {
 	return new Response('Custom Internal Server Error Message', { status: 500 });
@@ -605,7 +620,8 @@ throw new ErrorWithMetadata('Something went wrong', { foo: () => 'bar' });
 
 Raise a warning issue on GitHub. This is useful for non-fatal issues which you want to be notified about.
 
-> ℹ️ This function is only available if the canary feature is enabled.
+> [!NOTE]
+> This function is only available if the canary feature is enabled.
 
 ```ts
 try {
@@ -625,7 +641,8 @@ caution(e, { foo: 42 });
 
 A custom error message can be provided as the first parameter
 
-> ℹ️ Avoid including dynamic information in the title that would prevent the issue from being unique.
+> [!NOTE]
+> Avoid including dynamic information in the title that would prevent the issue from being unique.
 
 ```ts
 caution('Custom error', e, { foo: 42 });
@@ -661,7 +678,8 @@ await caution('Error with number', { some_important_value });
 
 This behaves the same as `caution()` with the difference that once `panic()` has raised the issue, it will exit the process with a non-zero exit code.
 
-> ℹ️ This function is only available if the canary feature is enabled.
+> [!NOTE]
+> This function is only available if the canary feature is enabled.
 
 This should only be used as an absolute last resort when the server cannot continue to run and will be unable to respond to requests.
 
