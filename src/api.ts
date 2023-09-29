@@ -85,41 +85,38 @@ type ErrorHandler = (err: Error) => Response;
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
 type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
-type DirOptions = {
-	ignore_hidden?: boolean;
-	index?: string;
-};
+type PromiseType<T extends Promise<any>> = T extends Promise<infer U> ? U : never;
+type DirFile = ReturnType<typeof Bun.file>;
+type DirStat = PromiseType<ReturnType<typeof fs.stat>>;
 
-function route_directory(route_path: string, dir: string, options: DirOptions): RequestHandler {
-	const ignore_hidden = options.ignore_hidden ?? true;
+type DirHandler = (file_path: string, file: DirFile, stat: DirStat, request: Request, url: URL) => HandlerReturnType;
 
+function default_directory_handler(file_path: string, file: DirFile, stat: DirStat): HandlerReturnType {
+	// ignore hidden files by default, return 404 to prevent file sniffing
+	if (path.basename(file_path).startsWith('.'))
+		return 404; // Not Found
+
+	if (stat.isDirectory())
+		return 401; // Unauthorized
+
+	return file;
+}
+
+function route_directory(route_path: string, dir: string, handler: DirHandler): RequestHandler {
 	return async (req: Request, url: URL) => {
 		const file_path = path.join(dir, url.pathname.slice(route_path.length));
 
-		if (ignore_hidden && path.basename(file_path).startsWith('.'))
-			return 404;
-
 		try {
 			const file_stat = await fs.stat(file_path);
+			const bun_file = Bun.file(file_path);
 
-			if (file_stat.isDirectory()) {
-				if (options.index !== undefined) {
-					const index_path = path.join(file_path, options.index);
-					const index = Bun.file(index_path);
-
-					if (index.size !== 0)
-						return index;
-				}
-				return 401;
-			}
-
-			return Bun.file(file_path);
+			return handler(file_path, bun_file, file_stat, req, url);
 		} catch (e) {
 			const err = e as NodeJS.ErrnoException;
 			if (err?.code === 'ENOENT')
-				return 404;
+				return 404; // Not Found
 
-			return 500;
+			return 500; // Internal Server Error
 		}
 	};
 }
@@ -262,9 +259,7 @@ export function serve(port: number) {
 			const request_start = Date.now();
 
 			const response = await generate_response(req, url);
-			print_request_info(req, response, url, request_start);
-
-			return response;
+			return print_request_info(req, response, url, request_start);
 		}
 	});
 
@@ -289,11 +284,11 @@ export function serve(port: number) {
 		},
 
 		/** Serve a directory for a specific route. */
-		dir: (path: string, dir: string, options?: DirOptions): void => {
+		dir: (path: string, dir: string, handler?: DirHandler): void => {
 			if (path.endsWith('/'))
 				path = path.slice(0, -1);
 
-			routes.set([...path.split('/'), '*'], route_directory(path, dir, options ?? {}));
+			routes.set([...path.split('/'), '*'], route_directory(path, dir, handler ?? default_directory_handler));
 		},
 
 		/** Register a default handler for all status codes. */

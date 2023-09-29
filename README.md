@@ -531,22 +531,43 @@ Serve static files from a directory.
 server.dir('/content', './public/content');
 ```
 
-| Action | Status Code |
-| --- | --- |
-| Accessing a directory | 401 Unauthorized |
-| File does not exist | 404 Not Found |
-| File is not readable | 500 Internal Server Error |
-| Hidden file (default) | 404 Not Found |
+By default, spooder will use the following default handler for serving directories.
 
-Hidden files are not served by default.
 ```ts
-server.dir('/content', './public/content', { ignore_hidden: false });
+function default_directory_handler(file_path: string, file: DirFile, stat: DirStat): HandlerReturnType {
+	// ignore hidden files by default, return 404 to prevent file sniffing
+	if (path.basename(file_path).startsWith('.'))
+		return 404; // Not Found
+
+	if (stat.isDirectory())
+		return 401; // Unauthorized
+
+	return file;
+}
 ```
 
-Serve an index file when a directory is requested.
+[!NOTE]
+> Uncaught `ENOENT` errors throw from the directory handler will return a `404` response, other errors will return a `500` response.
+
+Provide your own directory handler for fine-grained control.
+
+| Parameter | Type | Reference |
+| --- | --- | --- |
+| `file_path` | `string` | The path to the file on disk. |
+| `file` | `BunFile` | https://bun.sh/docs/api/file-io |
+| `stat` | `fs.Stats` | https://nodejs.org/api/fs.html#class-fsstats |
+| `request` | `Request` | https://developer.mozilla.org/en-US/docs/Web/API/Request |
+| `url` | `URL` | https://developer.mozilla.org/en-US/docs/Web/API/URL |
+
 ```ts
-server.dir('/content', './public/content', { index: 'index.html' });
+server.dir('/static', '/static', (file_path, file, stat, request, url) => {
+	// Implement custom logic.
+	return file; // HandlerReturnType
+});
 ```
+
+[!NOTE]
+> The directory handler function is only called for files that exist on disk - including directories.
 
 ## API > Server Control
 
