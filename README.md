@@ -53,7 +53,21 @@ If there are any issues with the provided configuration, a warning will be print
 
 # CLI
 
-The `CLI` component of `spooder` is a global command-line tool for running server processes. For convenience, it is recommended that you run this in a `screen` session.
+The `CLI` component of `spooder` is a global command-line tool for running server processes.
+
+- [CLI > Usage](#cli-usage)
+- [CLI > Auto Restart](#cli-auto-restart)
+- [CLI > Auto Update](#cli-auto-update)
+- [CLI > Canary](#cli-canary)
+	- [CLI > Canary > Crash](#cli-canary-crash)
+	- [CLI > Canary > Sanitization](#cli-canary-sanitization)
+	- [CLI > Canary > System Information](#cli-canary-system-information)
+
+
+<a id="cli-usage"></a>
+## CLI > Usage
+
+For convenience, it is recommended that you run this in a `screen` session.
 
 ```bash
 screen -S my-website-about-fish.net
@@ -80,7 +94,7 @@ While `spooder` uses a `bun run` command by default, it is possible to use any c
 	}
 }
 ```
-
+<a id="cli-auto-restart"></a>
 ## CLI > Auto Restart
 
 > [!NOTE]
@@ -98,6 +112,7 @@ In the event that the server process exits, regardless of exit code, `spooder` c
 
 If set to `0`, the server will be restarted immediately without delay. If set to `-1`, the server will not be restarted at all.
 
+<a id="cli-auto-update"></a>
 ## CLI > Auto Update
 
 > [!NOTE]
@@ -133,6 +148,7 @@ events.on('receive-webhook', () => {
 });
 ```
 
+<a id="cli-canary"></a>
 ## CLI > Canary
 
 > [!NOTE]
@@ -207,6 +223,7 @@ If `canary` has not been configured correctly, `spooder` will only print warning
 > [!WARNING]
 > Consider testing the canary feature with the `caution()` function before relying on it for critical issues.
 
+<a id="cli-canary-crash"></a>
 ## CLI > Canary > Crash
 
 It is recommended that you harden your server code against unexpected exceptions and use `panic()` and `caution()` to raise issues with selected diagnostic information.
@@ -255,6 +272,7 @@ This information is subject to sanitization, as described in the `CLI > Canary >
 
 Setting `spooder.canary.crash_console_history` to `0` will omit the `console_output` property from the report entirely, which may make it harder to diagnose the problem but will ensure that no sensitive information is leaked.
 
+<a id="cli-canary-sanitization"></a>
 ## CLI > Canary > Sanitization
 
 All reports sent via the canary feature are sanitized to prevent sensitive information from being leaked. This includes:
@@ -303,6 +321,7 @@ The sanitization behavior can be disabled by setting `spooder.canary.sanitize` t
 > [!WARNING]
 > While this sanitization adds a layer of protection against information leaking, it does not catch everything. You should pay special attention to messages and objects provided to the canary to not unintentionally leak sensitive information.
 
+<a id="cli-canary-system-information"></a>
 ## CLI > Canary > System Information
 
 In addition to the information provided by the developer, `spooder` also includes some system information in the canary reports.
