@@ -177,6 +177,9 @@ export function serve(port: number) {
 		if (response instanceof Promise)
 			response = await response;
 
+		if (response === undefined || response === null)
+			throw new Error('HandlerReturnType cannot resolve to undefined or null');
+
 		// Pre-assembled responses are returned as-is.
 		if (response instanceof Response)
 			return response;
