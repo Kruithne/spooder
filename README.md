@@ -370,24 +370,26 @@ In addition to the information provided by the developer, `spooder` also include
 
 `spooder` exposes a simple yet powerful API for developing servers. The API is designed to be minimal to leave control in the hands of the developer and not add overhead for features you may not need.
 
-- [API > Serving](#api--serving)
-	- [`serve(port: number): Server`](#serveport-number-server)
-- [API > Routing](#api--routing)
-	- [`server.route(path: string, handler: RequestHandler)`](#serverroutepath-string-handler-requesthandler)
-	- [`server.redirect(path: string, redirect_url: string)`](#serverredirectpath-string-redirect_url-string)
-	- [`server.handle(status_code: number, handler: RequestHandler)`](#serverhandlestatus_code-number-handler-requesthandler)
-	- [`server.default(handler: DefaultHandler)`](#serverdefaulthandler-defaulthandler)
-	- [`server.error(handler: ErrorHandler)`](#servererrorhandler-errorhandler)
-	- [`server.dir(path: string, dir: string, options?: DirOptions)`](#serverdirpath-string-dir-string-options-diroptions)
-- [API > Server Control](#api--server-control)
-	- [`server.stop(method: ServerStop)`](#serverstopmethod-serverstop)
-- [API > Error Handling](#api--error-handling)
-	- [`ErrorWithMetadata(message: string, metadata: object)`](#errorwithmetadatamessage-string-metadata-object)
-	- [`caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#cautionerr_message_or_obj-string--object-err-object-promisevoid)
-	- [`panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#panicerr_message_or_obj-string--object-err-object-promisevoid)
+- [API > Serving](#api-serving)
+	- [`serve(port: number): Server`](#api-serving-serve)
+- [API > Routing](#api-routing)
+	- [`server.route(path: string, handler: RequestHandler)`](#api-routing-server-route)
+	- [`server.redirect(path: string, redirect_url: string)`](#api-routing-server-redirect)
+	- [`server.handle(status_code: number, handler: RequestHandler)`](#api-routing-server-handle)
+	- [`server.default(handler: DefaultHandler)`](#api-routing-server-default)
+	- [`server.error(handler: ErrorHandler)`](#api-routing-server-error)
+	- [`server.dir(path: string, dir: string, options?: DirOptions)`](#api-routing-server-dir)
+- [API > Server Control](#api-server-control)
+	- [`server.stop(method: ServerStop)`](#api-server-control-server-stop)
+- [API > Error Handling](#api-error-handling)
+	- [`ErrorWithMetadata(message: string, metadata: object)`](#api-error-handling-error-with-metadata)
+	- [`caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-caution)
+	- [`panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-panic)
 
+<a id="api-serving"></a>
 ## API > Serving
 
+<a id="api-serving-serve"></a>
 ### `serve(port: number): Server`
 
 Bootstrap a server on the specified port.
@@ -408,8 +410,10 @@ Content-Type: text/plain;charset=utf-8
 Not Found
 ```
 
+<a id="api-routing"></a>
 ## API > Routing
 
+<a id="api-routing-server-route"></a>
 ### 🔧 `server.route(path: string, handler: RequestHandler)`
 
 Register a handler for a specific path.
@@ -524,12 +528,14 @@ Content-Type: application/json;charset=utf-8
 {"name":"Bob","age":42}
 ```
 
+<a id="api-routing-server-redirect"></a>
 ### 🔧 `server.redirect(path: string, redirect_url: string)`
 Redirect clients to a specified URL with the status code `301 Moved Permanently`.
 ```ts
 server.route('/test/route', redirect('https://www.google.co.uk/'));
 ```
 
+<a id="api-routing-server-handle"></a>
 ### 🔧 `server.handle(status_code: number, handler: RequestHandler)`
 Register a custom handler for a specific status code.
 ```ts
@@ -538,6 +544,7 @@ server.handle(500, (req) => {
 });
 ```
 
+<a id="api-routing-server-default"></a>
 ### 🔧 `server.default(handler: DefaultHandler)`
 Register a handler for all unhandled response codes.
 > [!NOTE]
@@ -548,6 +555,7 @@ server.default((req, status_code) => {
 });
 ```
 
+<a id="api-routing-server-error"></a>
 ### 🔧 `server.error(handler: ErrorHandler)`
 Register a handler for uncaught errors.
 
@@ -559,6 +567,7 @@ server.error((req, err) => {
 });
 ```
 
+<a id="api-routing-server-dir"></a>
 ### 🔧 `server.dir(path: string, dir: string, options?: DirOptions)`
 Serve static files from a directory.
 ```ts
@@ -603,8 +612,10 @@ server.dir('/static', '/static', (file_path, file, stat, request, url) => {
 > [!NOTE]
 > The directory handler function is only called for files that exist on disk - including directories.
 
+<a id="api-server-control"></a>
 ## API > Server Control
 
+<a id="api-server-control-stop"></a>
 ### 🔧 `server.stop(method: ServerStop)`
 
 Stop the server process immediately, terminating all in-flight requests.
@@ -619,8 +630,10 @@ Stop the server process gracefully, waiting for all in-flight requests to comple
 server.stop(ServerStop.GRACEFUL);
 ```
 
+<a id="api-error-handling"></a>
 ## API > Error Handling
 
+<a id="api-error-handling-error-with-metadata"></a>
 ### 🔧 `ErrorWithMetadata(message: string, metadata: object)`
 
 The `ErrorWithMetadata` class allows you to attach metadata to errors, which can be used for debugging purposes when errors are dispatched to the canary.
@@ -635,6 +648,7 @@ Functions and promises contained in the metadata will be resolved and the return
 throw new ErrorWithMetadata('Something went wrong', { foo: () => 'bar' });
 ```
 
+<a id="api-error-handling-caution"></a>
 ### 🔧 `caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`
 
 Raise a warning issue on GitHub. This is useful for non-fatal issues which you want to be notified about.
@@ -693,6 +707,7 @@ await caution('Error with number ' + some_important_value);
 await caution('Error with number', { some_important_value });
 ```
 
+<a id="api-error-handling-panic"></a>
 ### 🔧 `panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`
 
 This behaves the same as `caution()` with the difference that once `panic()` has raised the issue, it will exit the process with a non-zero exit code.
