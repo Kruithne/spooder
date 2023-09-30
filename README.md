@@ -537,7 +537,7 @@ Register a handler for uncaught errors.
 > [!NOTE]
 > This handler does not accept asynchronous functions and must return a `Response` object.
 ```ts
-server.error((req, err) => {
+server.error((err, req, url) => {
 	return new Response('Custom Internal Server Error Message', { status: 500 });
 });
 ```
@@ -546,9 +546,9 @@ server.error((req, err) => {
 > It is highly recommended to use `caution()` or some form of reporting to notify you when this handler is called, as it means an error went entirely uncaught.
 
 ```ts
-server.error((req, err) => {
+server.error((err, req, url) => {
 	// Notify yourself of the error.
-	caution(err);
+	caution({ err, url });
 
 	// Return a response to the client.
 	return new Response('Custom Internal Server Error Message', { status: 500 });
