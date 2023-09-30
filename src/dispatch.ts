@@ -156,8 +156,10 @@ export async function dispatch_report(report_title: string, report_body: Array<u
 		const canary_account = config.canary.account;
 		const canary_repostiory = config.canary.repository;
 
-		if (canary_account.length === 0|| canary_repostiory.length === 0)
+		if (canary_account.length === 0|| canary_repostiory.length === 0) {
+			log('[canary] Report dispatch failed; no account/repository configured.');
 			return;
+		}
 
 		const is_cached = await check_cache_table(report_title, canary_repostiory, config.canary.throttle);
 		if (is_cached) {
