@@ -148,7 +148,7 @@ function print_request_info(req: Request, res: Response, url: URL, request_start
 }
 
 export function serve(port: number) {
-	const routes = new Map<string[], RequestHandler>();
+	const routes = new Array<[string[], RequestHandler]>();
 	const handlers = new Map<number, StatusCodeHandler>();
 	
 	let error_handler: ErrorHandler | undefined;
@@ -268,19 +268,19 @@ export function serve(port: number) {
 	return {
 		/** Register a handler for a specific route. */
 		route: (path: string, handler: RequestHandler): void => {
-			routes.set(path.split('/'), handler);
+			routes.push([path.split('/'), handler]);
 		},
 
 		/** Register a redirect for a specific route. */
 		redirect: (path: string, redirect_url: string): void => {
-			routes.set(path.split('/'), (req: Request, url: URL) => {
+			routes.push([path.split('/'), (req: Request, url: URL) => {
 				return new Response(null, {
 					status: 301,
 					headers: {
 						Location: redirect_url
 					}
 				});
-			});
+			}]);
 		},
 
 		/** Serve a directory for a specific route. */
@@ -288,7 +288,7 @@ export function serve(port: number) {
 			if (path.endsWith('/'))
 				path = path.slice(0, -1);
 
-			routes.set([...path.split('/'), '*'], route_directory(path, dir, handler ?? default_directory_handler));
+			routes.push([[...path.split('/'), '*'], route_directory(path, dir, handler ?? default_directory_handler)]);
 		},
 
 		/** Register a default handler for all status codes. */
