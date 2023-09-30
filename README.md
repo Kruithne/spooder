@@ -361,7 +361,18 @@ In addition to the information provided by the developer, `spooder` also include
 	},
 	"bun": {
 		"version": "0.6.4",
-		"rev": "f02561530fda1ee9396f51c8bc99b38716e38296"
+		"rev": "f02561530fda1ee9396f51c8bc99b38716e38296",
+		"memory_usage": {
+			"rss": 99672064,
+			"heapTotal": 3039232,
+			"heapUsed": 2332783,
+			"external": 0,
+			"arrayBuffers": 0
+		},
+		"cpu_usage": {
+			"user": 50469,
+			"system": 0
+		}
 	}
 }
 ```

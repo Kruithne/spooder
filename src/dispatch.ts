@@ -145,6 +145,8 @@ function generate_diagnostics(): object {
 		'bun': {
 			'version': Bun.version,
 			'rev': Bun.revision,
+			'memory_usage': process.memoryUsage(),
+			'cpu_usage': process.cpuUsage()
 		}
 	}
 }
