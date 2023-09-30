@@ -79,13 +79,32 @@ export async function caution(err_message_or_obj: string | object, ...err: objec
 	await handle_error('caution: ', err_message_or_obj, ...err);
 }
 
-type HandlerReturnType = any;
+// Resolvable represents T that is both T or a promise resolving to T.
+type Resolvable<T> = T | Promise<T>;
+
+// PromiseType infers the resolved type of a promise (T) or just T if not a promise.
+type PromiseType<T extends Promise<any>> = T extends Promise<infer U> ? U : never;
+
+// The following types cover JSON serializable objects/classes.
+type JsonPrimitive = string | number | boolean | null;
+type JsonArray = JsonSerializable[];
+
+interface JsonObject {
+	[key: string]: JsonSerializable;
+}
+
+interface ToJson {
+	toJSON(): any;
+}
+
+type JsonSerializable = JsonPrimitive | JsonObject | JsonArray | ToJson;
+
+type HandlerReturnType = Resolvable<string | number | ReturnType<typeof Bun.file> | Response | JsonSerializable>;
 type RequestHandler = (req: Request, url: URL) => HandlerReturnType;
 type ErrorHandler = (err: Error) => Response;
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
 type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
-type PromiseType<T extends Promise<any>> = T extends Promise<infer U> ? U : never;
 type DirFile = ReturnType<typeof Bun.file>;
 type DirStat = PromiseType<ReturnType<typeof fs.stat>>;
 
