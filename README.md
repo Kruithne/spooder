@@ -378,7 +378,7 @@ In addition to the information provided by the developer, `spooder` also include
 	- [`server.handle(status_code: number, handler: RequestHandler)`](#api-routing-server-handle)
 	- [`server.default(handler: DefaultHandler)`](#api-routing-server-default)
 	- [`server.error(handler: ErrorHandler)`](#api-routing-server-error)
-	- [`server.dir(path: string, dir: string, options?: DirOptions)`](#api-routing-server-dir)
+	- [`server.dir(path: string, dir: string, handler?: DirHandler)`](#api-routing-server-dir)
 - [API > Server Control](#api-server-control)
 	- [`server.stop(method: ServerStop)`](#api-server-control-server-stop)
 - [API > Error Handling](#api-error-handling)
@@ -568,7 +568,7 @@ server.error((req, err) => {
 ```
 
 <a id="api-routing-server-dir"></a>
-### 🔧 `server.dir(path: string, dir: string, options?: DirOptions)`
+### 🔧 `server.dir(path: string, dir: string, handler?: DirHandler)`
 Serve static files from a directory.
 ```ts
 server.dir('/content', './public/content');
