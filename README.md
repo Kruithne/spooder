@@ -446,6 +446,16 @@ server.route('/test/*', (req, url) => {
 });
 ```
 
+> [!IMPORTANT]
+> Routes are [FIFO](https://en.wikipedia.org/wiki/FIFO_(computing_and_electronics)) and wildcards are greedy. Wildcards should be registered last to ensure they do not consume more specific routes.
+
+```ts
+server.route('/*', () => 301);
+server.route('/test', () => 200);
+
+// Accessing /test returns 301 here, because /* matches /test first.
+```
+
 Asynchronous handlers are supported by returning a `Promise` from the handler.
 
 ```ts
@@ -569,9 +579,20 @@ server.error((req, err) => {
 
 <a id="api-routing-server-dir"></a>
 ### 🔧 `server.dir(path: string, dir: string, handler?: DirHandler)`
-Serve static files from a directory.
+Serve files from a directory.
 ```ts
 server.dir('/content', './public/content');
+```
+
+> [!IMPORTANT]
+> `server.dir` registers a wildcard route. Routes are [FIFO](https://en.wikipedia.org/wiki/FIFO_(computing_and_electronics)) and wildcards are greedy. Directories should be registered last to ensure they do not consume more specific routes.
+
+```ts
+server.dir('/', '/files');
+server.route('/test', () => 200);
+
+// Route / is equal to /* with server.dir()
+// Accessing /test returns 404 here because /files/test does not exist.
 ```
 
 By default, spooder will use the following default handler for serving directories.
@@ -593,6 +614,9 @@ function default_directory_handler(file_path: string, file: DirFile, stat: DirSt
 > Uncaught `ENOENT` errors throw from the directory handler will return a `404` response, other errors will return a `500` response.
 
 Provide your own directory handler for fine-grained control.
+
+> [!IMPORTANT]
+> Providing your own handler will override the default handler defined above. Be sure to implement the same logic if you want to retain the default behavior.
 
 | Parameter | Type | Reference |
 | --- | --- | --- |
