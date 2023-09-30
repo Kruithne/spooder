@@ -374,11 +374,15 @@ In addition to the information provided by the developer, `spooder` also include
 	- [`serve(port: number): Server`](#api-serving-serve)
 - [API > Routing](#api-routing)
 	- [`server.route(path: string, handler: RequestHandler)`](#api-routing-server-route)
-	- [`server.redirect(path: string, redirect_url: string)`](#api-routing-server-redirect)
+- [API > Routing > RequestHandler](#api-routing-request-handler)
+- [API > Routing > Fallback Handling](#api-routing-fallback-handlers)
 	- [`server.handle(status_code: number, handler: RequestHandler)`](#api-routing-server-handle)
 	- [`server.default(handler: DefaultHandler)`](#api-routing-server-default)
 	- [`server.error(handler: ErrorHandler)`](#api-routing-server-error)
+- [API > Routing > Directory Serving](#api-routing-directory-serving)
 	- [`server.dir(path: string, dir: string, handler?: DirHandler)`](#api-routing-server-dir)
+- [API > Routing > Redirects](#api-routing-redirects)
+	- [`server.redirect(path: string, redirect_url: string)`](#api-routing-server-redirect)
 - [API > Server Control](#api-server-control)
 	- [`server.stop(method: ServerStop)`](#api-server-control-server-stop)
 - [API > Error Handling](#api-error-handling)
@@ -424,6 +428,50 @@ server.route('/test/route', (req, url) => {
 });
 ```
 
+<a id="api-routing-request-handler"></a>
+## API > Routing > RequestHandler
+
+`RequestHandler` is a function that accepts a [`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request) object and a [`URL`](https://developer.mozilla.org/en-US/docs/Web/API/URL) object and returns a `HandlerReturnType`.
+
+`HandlerReturnType` must be one of the following.
+
+| Type | Description |
+| --- | --- |
+| `Response` | https://developer.mozilla.org/en-US/docs/Web/API/Response |
+| `Blob` | https://developer.mozilla.org/en-US/docs/Web/API/Blob |
+| `BunFile` | https://bun.sh/docs/api/file-io |
+| `object` | Will be serialized to JSON. |
+| `string` | Will be sent as plain text. |
+| `number` | Sets status code and sends status message as plain text. |
+
+> [!NOTE]
+> For custom JSON serialization on an object/class, implement the [`toJSON()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify) method.
+
+`HandleReturnType` can also be a promise resolving to any of the above types, which will be awaited before sending the response.
+
+> [!NOTE]
+> Returning `Bun.file()` directly is the most efficient way to serve static files as it uses system calls to stream the file directly to the client without loading into user-space.
+
+<a id="api-routing-query-parameters"></a>
+## API > Routing > Query Parameters
+
+Query parameters can be accessed from the `searchParams` property on the `URL` object.
+
+```ts
+server.route('/test', (req, url) => {
+	return new Response(url.searchParams.get('foo'), { status: 200 });
+});
+```
+
+```http
+GET /test?foo=bar HTTP/1.1
+
+HTTP/1.1 200 OK
+Content-Length: 3
+
+bar
+```
+
 Named parameters can be used in paths by prefixing a path segment with a colon.
 
 > [!NOTE]
@@ -434,6 +482,9 @@ server.route('/test/:param', (req, url) => {
 	return new Response(url.searchParams.get('param'), { status: 200 });
 });
 ```
+
+<a id="api-routing-wildcards"></a>
+## API > Routing > Wildcards
 
 Wildcards can be used to match any path that starts with a given path.
 
@@ -456,94 +507,8 @@ server.route('/test', () => 200);
 // Accessing /test returns 301 here, because /* matches /test first.
 ```
 
-Asynchronous handlers are supported by returning a `Promise` from the handler.
-
-```ts
-server.route('/test/route', async (req, url) => {
-	return new Response('Hello, world!', { status: 200 });
-});
-```
-
-Returning a `number` directly from the handler will be treated as a status code and will send a plain text response with the status message as the body.
-
-```ts
-server.route('/test/route', (req, url) => {
-	return 500;
-});
-```
-```http
-HTTP/1.1 500 Internal Server Error
-Content-Length: 21
-Content-Type: text/plain;charset=utf-8
-
-Internal Server Error
-```
-
-Returning a `Blob` such as `BunFile` directly from the handler will be treated as a file and will send the blob as the response body with the appropriate content type and length headers.
-
-> [!NOTE]
-> Returning `Bun.file()` directly is the most efficient way to serve static files as it uses system calls to stream the file directly to the client without loading into user-space.
-
-```ts
-server.route('/test/route', (req, url) => {
-	return Bun.file('test.png');
-});
-```
-```http
-HTTP/1.1 200 OK
-Content-Length: 12345
-Content-Type: image/png
-
-<binary data>
-```
-
-Returning an `object` type such as an array or a plain object will be treated as JSON and will send the object as JSON with the appropriate content type and length headers.
-
-```ts
-server.route('/test/route', (req, url) => {
-	return { message: 'Hello, world!' };
-});
-```
-```http
-HTTP/1.1 200 OK
-Content-Length: 25
-Content-Type: application/json;charset=utf-8
-
-{"message":"Hello, world!"}
-```
-
-Since custom classes are also objects, you can also return a custom class instance and it will be serialized to JSON. To control the serialization process, you can implement the [`toJSON()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify) method on your class.
-
-```ts
-class User {
-	constructor(public name: string, public age: number) {}
-
-	toJSON() {
-		return {
-			name: this.name,
-			age: this.age,
-		};
-	}
-}
-
-server.route('/test/route', (req, url) => {
-	return new User('Bob', 42);
-});
-```
-```http
-HTTP/1.1 200 OK
-Content-Length: 25
-Content-Type: application/json;charset=utf-8
-
-{"name":"Bob","age":42}
-```
-
-<a id="api-routing-server-redirect"></a>
-### 🔧 `server.redirect(path: string, redirect_url: string)`
-Redirect clients to a specified URL with the status code `301 Moved Permanently`.
-```ts
-server.route('/test/route', redirect('https://www.google.co.uk/'));
-```
+<a id="api-routing-fallback-handlers"></a>
+## API > Routing > Fallback Handlers
 
 <a id="api-routing-server-handle"></a>
 ### 🔧 `server.handle(status_code: number, handler: RequestHandler)`
@@ -576,6 +541,9 @@ server.error((req, err) => {
 	return new Response('Custom Internal Server Error Message', { status: 500 });
 });
 ```
+
+<a id="api-routing-directory-serving"></a>
+## API > Routing > Directory Serving
 
 <a id="api-routing-server-dir"></a>
 ### 🔧 `server.dir(path: string, dir: string, handler?: DirHandler)`
@@ -635,6 +603,16 @@ server.dir('/static', '/static', (file_path, file, stat, request, url) => {
 
 > [!NOTE]
 > The directory handler function is only called for files that exist on disk - including directories.
+
+<a id="api-routing-redirects"></a>
+## API > Routing > Redirects
+
+<a id="api-routing-server-redirect"></a>
+### 🔧 `server.redirect(path: string, redirect_url: string)`
+Redirect clients to a specified URL with the status code `301 Moved Permanently`.
+```ts
+server.redirect('/test/route', 'https://www.google.co.uk/');
+```
 
 <a id="api-server-control"></a>
 ## API > Server Control
