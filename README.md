@@ -542,6 +542,19 @@ server.error((req, err) => {
 });
 ```
 
+> [!IMPORTANT]
+> It is highly recommended to use `caution()` or some form of reporting to notify you when this handler is called, as it means an error went entirely uncaught.
+
+```ts
+server.error((req, err) => {
+	// Notify yourself of the error.
+	caution(err);
+
+	// Return a response to the client.
+	return new Response('Custom Internal Server Error Message', { status: 500 });
+});
+```
+
 <a id="api-routing-directory-serving"></a>
 ## API > Routing > Directory Serving
 
