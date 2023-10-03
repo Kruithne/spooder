@@ -402,7 +402,7 @@ In addition to the information provided by the developer, `spooder` also include
 	- [`panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-panic)
 - [API > Content](#api-content)
 	- [`template_sub(template: string, replacements: Record<string, string>): string`](#api-content-template-sub)
-	- [`generate_hash_subs(prefix: string): Promise<Record<string, string>>`](#api-content-generate-hash-subs)
+	- [`generate_hash_subs(length: number, prefix: string): Promise<Record<string, string>>`](#api-content-generate-hash-subs)
 
 <a id="api-serving"></a>
 ## API > Serving
@@ -821,16 +821,26 @@ server.route('/test', (req, url) => {
 ```
 
 ```html
-Hello world 754d9eaa4c7172a1b55b6bb03bc80d66b6d36d35
+Hello world 754d9ea
 ```
 
 > [!IMPORTANT]
 > Specify paths as they appear in git, relative to the repository root and with forward slashes (no leading slash).
 
+By default hashes are truncated to `7` characters (a short hash), a custom length can be provided instead.
+
+```ts
+generate_hash_subs(40).then(...);
+// d65c52a41a75db43e184d2268c6ea9f9741de63e
+```
+
+> [!NOTE]
+> SHA-1 hashes are `40` characters. Git is transitioning to SHA-256, which are `64` characters. Short hashes of `7` are generally sufficient for cache-busting.
+
 Use a different prefix other than `hash=` by passing it as the first parameter.
 
 ```ts
-generate_hash_subs('#').then(subs => hash_sub_table = subs).catch(caution);
+generate_hash_subs(7, '#').then(subs => hash_sub_table = subs).catch(caution);
 
 server.route('/test', (req, url) => {
 	return template_sub('Hello world {#docs/project-logo.png}', hash_sub_table);

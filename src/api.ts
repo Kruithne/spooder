@@ -108,7 +108,7 @@ export function template_sub(template: string, replacements: Record<string, stri
 	return result;
 }
 
-export async function generate_hash_subs(prefix = 'hash='): Promise<Record<string, string>> {
+export async function generate_hash_subs(length = 7, prefix = 'hash='): Promise<Record<string, string>> {
 	const cmd = ['git', 'ls-tree', '-r', 'HEAD'];
 	const process = Bun.spawn(cmd, {
 		stdout: 'pipe',
@@ -128,7 +128,7 @@ export async function generate_hash_subs(prefix = 'hash='): Promise<Record<strin
 
 	let hash_count = 0;
 	while (match = regex.exec(stdout)) {
-		hash_map[prefix + match[4]] = match[3];
+		hash_map[prefix + match[4]] = match[3].substring(0, length);
 		hash_count++;
 	}
 
