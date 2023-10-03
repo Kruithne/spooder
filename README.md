@@ -400,6 +400,8 @@ In addition to the information provided by the developer, `spooder` also include
 	- [`ErrorWithMetadata(message: string, metadata: object)`](#api-error-handling-error-with-metadata)
 	- [`caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-caution)
 	- [`panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-panic)
+- [API > Content](#api-content)
+	- [`template(template: string, replacements: Record<string, string>): string`](#api-content-template)
 
 <a id="api-serving"></a>
 ## API > Serving
@@ -751,6 +753,52 @@ try {
 	// You should await `panic` since the process will exit.
 	await panic(e);
 }
+```
+
+<a id="api-content"></a>
+## API > Content
+
+<a id="api-content-template"></a>
+### 🔧 `template(template: string, replacements: Record<string, string>): string`
+
+Replace placeholders in a template string with values from a replacement object.
+
+> [!NOTE]
+> Placeholders that do not appear in the replacement object will be left as-is. See `ignored` in below example.
+
+```ts
+const template = `
+	<html>
+		<head>
+			<title>{title}</title>
+		</head>
+		<body>
+			<h1>{title}</h1>
+			<p>{content}</p>
+			<p>{ignored}</p>
+		</body>
+	</html>
+`;
+
+const replacements = {
+	title: 'Hello, world!',
+	content: 'This is a test.'
+};
+
+const html = template(template, replacements);
+```
+
+```html
+<html>
+	<head>
+		<title>Hello, world!</title>
+	</head>
+	<body>
+		<h1>Hello, world!</h1>
+		<p>This is a test.</p>
+		<p>{ignored}</p>
+	</body>
+</html>
 ```
 
 ## Legal

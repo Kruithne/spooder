@@ -79,6 +79,34 @@ export async function caution(err_message_or_obj: string | object, ...err: objec
 	await handle_error('caution: ', err_message_or_obj, ...err);
 }
 
+export function template(template: string, replacements: Record<string, string>): string {
+	let result = '';
+	let buffer = '';
+	let buffer_active = false;
+
+	const template_length = template.length;
+	for (let i = 0; i < template_length; i++) {
+		const char = template[i];
+
+		if (char === '{') {
+			buffer_active = true;
+			buffer = '';
+		} else if (char === '}') {
+			buffer_active = false;
+
+			result += replacements[buffer] ?? '{' + buffer + '}';
+
+			buffer = '';
+		} else if (buffer_active) {
+			buffer += char;
+		} else {
+			result += char;
+		}
+	}
+
+	return result;
+}
+
 // Resolvable represents T that is both T or a promise resolving to T.
 type Resolvable<T> = T | Promise<T>;
 
