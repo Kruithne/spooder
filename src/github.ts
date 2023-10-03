@@ -78,10 +78,10 @@ export async function create_github_issue(issue: Issue): Promise<void> {
 	const jwt = generate_jwt(issue.app_id, issue.private_key);
 	const app_res = await request_endpoint('https://api.github.com/app', jwt);
 
-	check_response_is_ok(app_res, 'Cannot authenticate GitHub app ' + issue.app_id);
+	check_response_is_ok(app_res, 'cannot authenticate GitHub app ' + issue.app_id);
 
 	const res_installs = await request_endpoint('https://api.github.com/app/installations', jwt);
-	check_response_is_ok(res_installs, 'Cannot fetch GitHub app installations');
+	check_response_is_ok(res_installs, 'cannot fetch GitHub app installations');
 
 	const json_installs = await res_installs.json() as InstallationResponse;
 
@@ -92,13 +92,13 @@ export async function create_github_issue(issue: Issue): Promise<void> {
 		throw new Error('spooder-bot is not installed on account ' + login_name);
 
 	const res_access_token = await request_endpoint(install.access_tokens_url, jwt, 'POST');
-	check_response_is_ok(res_access_token, 'Cannot fetch GitHub app access token');
+	check_response_is_ok(res_access_token, 'cannot fetch GitHub app access token');
 
 	const json_access_token = await res_access_token.json() as AccessTokenResponse;
 	const access_token = json_access_token.token;
 
 	const repositories = await request_endpoint(install.repositories_url, access_token);
-	check_response_is_ok(repositories, 'Cannot fetch GitHub app repositories');
+	check_response_is_ok(repositories, 'cannot fetch GitHub app repositories');
 
 	const repositories_json = await repositories.json() as RepositoryResponse;
 
@@ -114,7 +114,7 @@ export async function create_github_issue(issue: Issue): Promise<void> {
 		labels: issue.issue_labels
 	});
 
-	check_response_is_ok(issue_res, 'Cannot create GitHub issue');
+	check_response_is_ok(issue_res, 'cannot create GitHub issue');
 
 	const json_issue = await issue_res.json() as IssueResponse;
 	log('raised canary issue #%d in %s: %s', json_issue.number, repository.full_name, json_issue.url);
