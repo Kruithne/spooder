@@ -18,6 +18,8 @@ const internal_config = {
 type Config = typeof internal_config;
 type ConfigObject = Record<string, unknown>;
 
+let cached_config: Config | null = null;
+
 function validate_config_option(source: ConfigObject, target: ConfigObject, root_name: string) {
 	for (const [key, value] of Object.entries(target)) {
 		const key_name = `${root_name}.${key}`;
@@ -60,7 +62,7 @@ function validate_config_option(source: ConfigObject, target: ConfigObject, root
 	}
 }
 
-export async function get_config(): Promise<Config> {
+async function load_config(): Promise<Config> {
 	try {
 		const config_file = Bun.file(path.join(process.cwd(), 'package.json'));
 		const json = await config_file.json();
@@ -76,4 +78,11 @@ export async function get_config(): Promise<Config> {
 	}
 
 	return internal_config;
+}
+
+export async function get_config(): Promise<Config> {
+	if (cached_config === null)
+		cached_config = await load_config();
+
+	return cached_config;
 }
