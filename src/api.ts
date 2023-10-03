@@ -341,7 +341,7 @@ export function serve(port: number) {
 		}
 	});
 
-	log('Server started on port ' + port);
+	log('server started on port ' + port);
 
 	return {
 		/** Register a handler for a specific route. */
