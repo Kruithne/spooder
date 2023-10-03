@@ -401,7 +401,7 @@ In addition to the information provided by the developer, `spooder` also include
 	- [`caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-caution)
 	- [`panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-panic)
 - [API > Content](#api-content)
-	- [`template(template: string, replacements: Record<string, string>): string`](#api-content-template)
+	- [`template_sub(template: string, replacements: Record<string, string>): string`](#api-content-template-sub)
 
 <a id="api-serving"></a>
 ## API > Serving
@@ -758,8 +758,8 @@ try {
 <a id="api-content"></a>
 ## API > Content
 
-<a id="api-content-template"></a>
-### 🔧 `template(template: string, replacements: Record<string, string>): string`
+<a id="api-content-template-sub"></a>
+### 🔧 `template_sub(template: string, replacements: Record<string, string>): string`
 
 Replace placeholders in a template string with values from a replacement object.
 
@@ -785,7 +785,7 @@ const replacements = {
 	content: 'This is a test.'
 };
 
-const html = template(template, replacements);
+const html = template_sub(template, replacements);
 ```
 
 ```html

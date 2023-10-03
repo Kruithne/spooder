@@ -79,7 +79,7 @@ export async function caution(err_message_or_obj: string | object, ...err: objec
 	await handle_error('caution: ', err_message_or_obj, ...err);
 }
 
-export function template(template: string, replacements: Record<string, string>): string {
+export function template_sub(template: string, replacements: Record<string, string>): string {
 	let result = '';
 	let buffer = '';
 	let buffer_active = false;
