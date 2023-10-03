@@ -402,6 +402,7 @@ In addition to the information provided by the developer, `spooder` also include
 	- [`panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-panic)
 - [API > Content](#api-content)
 	- [`template_sub(template: string, replacements: Record<string, string>): string`](#api-content-template-sub)
+	- [`generate_hash_subs(prefix: string): Promise<Record<string, string>>`](#api-content-generate-hash-subs)
 
 <a id="api-serving"></a>
 ## API > Serving
@@ -799,6 +800,40 @@ const html = template_sub(template, replacements);
 		<p>{ignored}</p>
 	</body>
 </html>
+```
+
+<a id="api-content-generate-hash-subs"></a>
+### 🔧 `generate_hash_subs(prefix: string): Promise<Record<string, string>>`
+
+Generate a replacement table for mapping file paths to hashes in templates. This is useful for cache-busting static assets.
+
+```ts
+let hash_sub_table = {};
+
+generate_hash_subs().then(subs => hash_sub_table = subs).catch(caution);
+
+server.route('/test', (req, url) => {
+	return template_sub('Hello world {hash=docs/project-logo.png}', hash_sub_table);
+});
+
+// Outputs:
+// Hello world 754d9eaa4c7172a1b55b6bb03bc80d66b6d36d35
+```
+
+> [!IMPORTANT]
+> Internally `generate_hash_subs()` uses `git ls-tree -r HEAD`, so the working directory must be a git repository.
+
+> [!IMPORTANT]
+> Specify paths as they appear in git, relative to the repository root and with forward slashes (no leading slash).
+
+Use a different prefix other than `hash` by passing it as the first parameter.
+
+```ts
+generate_hash_subs('my-prefix').then(subs => hash_sub_table = subs).catch(caution);
+
+server.route('/test', (req, url) => {
+	return template_sub('Hello world {my-prefix=docs/project-logo.png}', hash_sub_table);
+});
 ```
 
 ## Legal

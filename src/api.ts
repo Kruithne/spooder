@@ -1,4 +1,5 @@
 import { dispatch_report } from './dispatch';
+import { get_config } from './config';
 import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs/promises';
@@ -105,6 +106,33 @@ export function template_sub(template: string, replacements: Record<string, stri
 	}
 
 	return result;
+}
+
+export async function generate_hash_subs(prefix = 'hash='): Promise<Record<string, string>> {
+	const cmd = ['git', 'ls-tree', '-r', 'HEAD'];
+	const process = Bun.spawn(cmd, {
+		stdout: 'pipe',
+		stderr: 'pipe'
+	});
+
+	await process.exited;
+
+	if (process.exitCode as number > 0)
+		throw new Error('generate_hash_subs() failed, `' + cmd.join(' ') + '` exited with non-zero exit code.');
+
+	const stdout = await Bun.readableStreamToText(process.stdout as ReadableStream);
+	const hash_map: Record<string, string> = {};
+
+	const regex = /([^\s]+)\s([^\s]+)\s([^\s]+)\t(.+)/g;
+	let match: RegExpExecArray | null;
+
+	let hash_count = 0;
+	while (match = regex.exec(stdout)) {
+		hash_map[prefix + match[4]] = match[3];
+		hash_count++;
+	}
+
+	return hash_map;
 }
 
 // Resolvable represents T that is both T or a promise resolving to T.
