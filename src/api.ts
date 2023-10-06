@@ -313,7 +313,7 @@ export function serve(port: number) {
 		if (typeof response === 'object')
 			return Response.json(response, { status: status_code });
 	
-		return new Response(String(response), { status: status_code });
+		return new Response(String(response), { status: status_code, headers: { 'Content-Type': 'text/html' } });
 	}
 
 	async function generate_response(req: Request, url: URL): Promise<Response> {

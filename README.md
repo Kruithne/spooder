@@ -468,7 +468,7 @@ server.route('/redirect', () => Response.redirect('/redirected', 301));
 | `Blob` | https://developer.mozilla.org/en-US/docs/Web/API/Blob |
 | `BunFile` | https://bun.sh/docs/api/file-io |
 | `object` | Will be serialized to JSON. |
-| `string` | Will be sent as plain text. |
+| `string` | Will be sent as `text/html``. |
 | `number` | Sets status code and sends status message as plain text. |
 
 > [!NOTE]
