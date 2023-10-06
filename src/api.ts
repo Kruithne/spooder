@@ -410,18 +410,6 @@ export function serve(port: number) {
 			routes.push([path.split('/'), handler]);
 		},
 
-		/** Register a redirect for a specific route. */
-		redirect: (path: string, redirect_url: string): void => {
-			routes.push([path.split('/'), (req: Request, url: URL) => {
-				return new Response(null, {
-					status: 301,
-					headers: {
-						Location: redirect_url
-					}
-				});
-			}]);
-		},
-
 		/** Serve a directory for a specific route. */
 		dir: (path: string, dir: string, handler?: DirHandler): void => {
 			if (path.endsWith('/'))

@@ -385,6 +385,7 @@ In addition to the information provided by the developer, `spooder` also include
 	- [`serve(port: number): Server`](#api-serving-serve)
 - [API > Routing](#api-routing)
 	- [`server.route(path: string, handler: RequestHandler)`](#api-routing-server-route)
+	- [Redirection Routes](#api-routing-redirection-routes)
 - [API > Routing > RequestHandler](#api-routing-request-handler)
 - [API > Routing > Fallback Handling](#api-routing-fallback-handlers)
 	- [`server.handle(status_code: number, handler: RequestHandler)`](#api-routing-server-handle)
@@ -392,8 +393,6 @@ In addition to the information provided by the developer, `spooder` also include
 	- [`server.error(handler: ErrorHandler)`](#api-routing-server-error)
 - [API > Routing > Directory Serving](#api-routing-directory-serving)
 	- [`server.dir(path: string, dir: string, handler?: DirHandler)`](#api-routing-server-dir)
-- [API > Routing > Redirects](#api-routing-redirects)
-	- [`server.redirect(path: string, redirect_url: string)`](#api-routing-server-redirect)
 - [API > Routing > Server-Sent Events](#api-routing-server-sent-events)
 	- [`server.sse(path: string, handler: ServerSentEventHandler)`](#api-routing-server-sse)
 - [API > Server Control](#api-server-control)
@@ -445,6 +444,15 @@ Register a handler for a specific path.
 server.route('/test/route', (req, url) => {
 	return new Response('Hello, world!', { status: 200 });
 });
+```
+
+<a id="api-routing-redirection-routes"></a>
+### Redirection Routes
+
+`spooder` does not provide a built-in redirection handler since it's trivial to implement one using [`Response.redirect`](https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static), part of the standard Web API.
+
+```ts
+server.route('/redirect', () => Response.redirect('/redirected', 301));
 ```
 
 <a id="api-routing-request-handler"></a>
@@ -635,16 +643,6 @@ server.dir('/static', '/static', (file_path, file, stat, request, url) => {
 
 > [!NOTE]
 > The directory handler function is only called for files that exist on disk - including directories.
-
-<a id="api-routing-redirects"></a>
-## API > Routing > Redirects
-
-<a id="api-routing-server-redirect"></a>
-### 🔧 `server.redirect(path: string, redirect_url: string)`
-Redirect clients to a specified URL with the status code `301 Moved Permanently`.
-```ts
-server.redirect('/test/route', 'https://www.google.co.uk/');
-```
 
 <a id="api-routing-server-sse"></a>
 ## API > Routing > Server-Sent Events
