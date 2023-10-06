@@ -213,6 +213,15 @@ type ErrorHandler = (err: Error, req: Request, url: URL) => Response;
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
 type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
+type ServerSentEventClient = {
+	message: (message: string) => void;
+	event: (event_name: string, message: string) => void;
+	close: () => void;
+	closed: Promise<void>;
+}
+
+type ServerSentEventHandler = (req: Request, url: URL, client: ServerSentEventClient) => void;
+
 type DirFile = ReturnType<typeof Bun.file>;
 type DirStat = PromiseType<ReturnType<typeof fs.stat>>;
 
@@ -439,6 +448,58 @@ export function serve(port: number) {
 		/** Stops the server. */
 		stop: (method: ServerStop = ServerStop.GRACEFUL): void => {
 			server.stop(method === ServerStop.IMMEDIATE);
+		},
+
+		/** Register a handler for server-sent events. */
+		sse: (path: string, handler: ServerSentEventHandler) => {
+			routes.push([path.split('/'), (req: Request, url: URL) => {			
+				let stream_controller: ReadableStreamDirectController;
+				let close_resolver: () => void;
+
+				function close_controller() {
+					stream_controller?.close();
+					close_resolver?.();
+				}
+
+				const queue = Array<string>();
+				const stream = new ReadableStream({
+					type: 'direct',
+
+					async pull(controller: ReadableStreamDirectController) {
+						stream_controller = controller;
+						while (!req.signal.aborted) {
+							if (queue.length > 0) {
+								controller.write(queue.shift()!);
+								controller.flush();
+							} else {
+								await Bun.sleep(50);
+							}
+						}
+					}
+				});
+
+				const closed = new Promise<void>(resolve => close_resolver = resolve);
+				req.signal.onabort = close_controller;
+
+				handler(req, url, {
+					message: (message: string) => {
+						queue.push('data:' + message + '\n\n');
+					},
+
+					event: (event_name: string, message: string) => {
+						queue.push('event:' + event_name + '\ndata:' + message + '\n\n');
+					},
+
+					close: close_controller,
+					closed
+				});
+				
+				return new Response(stream, { headers: {
+					'Content-Type': 'text/event-stream',
+					'Cache-Control': 'no-cache',
+					'Connection': 'keep-alive'
+				}});
+			}]);
 		}
 	}
 }

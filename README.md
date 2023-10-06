@@ -394,6 +394,8 @@ In addition to the information provided by the developer, `spooder` also include
 	- [`server.dir(path: string, dir: string, handler?: DirHandler)`](#api-routing-server-dir)
 - [API > Routing > Redirects](#api-routing-redirects)
 	- [`server.redirect(path: string, redirect_url: string)`](#api-routing-server-redirect)
+- [API > Routing > Server-Sent Events](#api-routing-server-sent-events)
+	- [`server.sse(path: string, handler: ServerSentEventHandler)`](#api-routing-server-sse)
 - [API > Server Control](#api-server-control)
 	- [`server.stop(method: ServerStop)`](#api-server-control-server-stop)
 - [API > Error Handling](#api-error-handling)
@@ -642,6 +644,47 @@ server.dir('/static', '/static', (file_path, file, stat, request, url) => {
 Redirect clients to a specified URL with the status code `301 Moved Permanently`.
 ```ts
 server.redirect('/test/route', 'https://www.google.co.uk/');
+```
+
+<a id="api-routing-server-sse"></a>
+## API > Routing > Server-Sent Events
+
+<a id="api-routing-server-sse"></a>
+### 🔧 `server.sse(path: string, handler: ServerSentEventHandler)`
+
+Setup a [server-sent event](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) stream.
+
+```ts
+server.sse('/sse', (req, url, client) => {
+	client.message('Hello, client!'); // Unnamed event.
+	client.event('named_event', 'Hello, client!'); // Named event.
+
+	client.message(JSON.stringify({ foo: 'bar' })); // JSON message.
+});
+```
+
+`client.closed` is a promise that resolves when the client closes the connection.
+
+```ts
+const clients = new Set();
+
+server.sse('/sse', (req, url, client) => {
+	clients.add(client);
+	client.closed.then(() => clients.delete(client));
+});
+```
+
+Connections can be manually closed with `client.close()`. This will also trigger the `client.closed` promise to resolve.
+
+```ts
+server.sse('/sse', (req, url, client) => {
+	client.message('Hello, client!');
+
+	setTimeout(() => {
+		client.message('Goodbye, client!');
+		client.close();
+	}, 5000);
+});
 ```
 
 <a id="api-server-control"></a>
