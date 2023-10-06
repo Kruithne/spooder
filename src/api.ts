@@ -135,6 +135,58 @@ export async function generate_hash_subs(length = 7, prefix = 'hash='): Promise<
 	return hash_map;
 }
 
+type CookieOptions = {
+	same_site?: 'Strict' | 'Lax' | 'None',
+	secure?: boolean,
+	http_only?: boolean,
+	path?: string,
+	expires?: number,
+	encode?: boolean
+};
+
+export function set_cookie(res: Response, name: string, value: string, options?: CookieOptions): void {
+	let cookie = name + '=';
+	if (options !== undefined) {
+		cookie += options.encode ? encodeURIComponent(value) : value;
+
+		if (options.same_site !== undefined)
+			cookie += '; SameSite=' + options.same_site;
+
+		if (options.secure)
+			cookie += '; Secure';
+
+		if (options.http_only)
+			cookie += '; HttpOnly';
+
+		if (options.path !== undefined)
+			cookie += '; Path=' + options.path;
+
+		if (options.expires !== undefined) {
+			const date = new Date(Date.now() + options.expires);
+			cookie += '; Expires=' + date.toUTCString();
+		}
+	} else {
+		cookie += value;
+	}
+
+	res.headers.append('Set-Cookie', cookie);
+}
+
+export function get_cookies(source: Request | Response, decode: boolean = false): Record<string, string> {
+	const parsed_cookies: Record<string, string> = {};
+	const cookie_header = source.headers.get('cookie');
+
+	if (cookie_header !== null) {
+		const cookies = cookie_header.split('; ');
+		for (const cookie of cookies) {
+			const [name, value] = cookie.split('=');
+			parsed_cookies[name] = decode ? decodeURIComponent(value) : value;
+		}
+	}
+
+	return parsed_cookies;
+}
+
 // Resolvable represents T that is both T or a promise resolving to T.
 type Resolvable<T> = T | Promise<T>;
 

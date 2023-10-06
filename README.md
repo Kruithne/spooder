@@ -403,6 +403,9 @@ In addition to the information provided by the developer, `spooder` also include
 - [API > Content](#api-content)
 	- [`template_sub(template: string, replacements: Record<string, string>): string`](#api-content-template-sub)
 	- [`generate_hash_subs(length: number, prefix: string): Promise<Record<string, string>>`](#api-content-generate-hash-subs)
+- [API > State Management](#api-state-management)
+	- [`set_cookie(res: Response, name: string, value: string, options?: CookieOptions)`](#api-state-management-set-cookie)
+	- [`get_cookies(source: Request | Response): Record<string, string>`](#api-state-management-get-cookies)
 
 <a id="api-serving"></a>
 ## API > Serving
@@ -845,6 +848,79 @@ generate_hash_subs(7, '#').then(subs => hash_sub_table = subs).catch(caution);
 server.route('/test', (req, url) => {
 	return template_sub('Hello world {#docs/project-logo.png}', hash_sub_table);
 });
+```
+
+<a id="api-state-management"></a>
+## API > State Management
+
+<a id="api-state-management-set-cookie"></a>
+### 🔧 `set_cookie(res: Response, name: string, value: string, options?: CookieOptions)`
+
+Set a cookie onto a `Response` object.
+
+```ts
+const res = new Response('Cookies!', { status: 200 });
+set_cookie(res, 'my_test_cookie', 'my_cookie_value');
+```
+
+```http
+HTTP/1.1 200 OK
+Set-Cookie: my_test_cookie=my_cookie_value
+Content-Length: 8
+
+Cookies!
+```
+
+> [!IMPORTANT]
+> Spooder does not URL encode cookies by default. This can result in invalid cookies if they contain special characters. See `encode` option on `CookieOptions` below.
+
+```ts
+type CookieOptions = {
+	same_site?: 'Strict' | 'Lax' | 'None',
+	secure?: boolean,
+	http_only?: boolean,
+	path?: string,
+	expires?: number,
+	encode?: boolean
+};
+```
+
+Most of the options that can be provided as `CookieOptions` are part of the standard `Set-Cookie` header. See [HTTP Cookies - MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies).
+
+Passing `encode` as `true` will URL encode the cookie value.
+
+```ts
+set_cookie(res, 'my_test_cookie', 'my cookie value', { encode: true });
+```
+
+```http
+Set-Cookie: my_test_cookie=my%20cookie%20value
+```
+
+<a id="api-state-management-get-cookies"></a>
+### 🔧 `get_cookies(source: Request | Response, decode: boolean = false): Record<string, string>`
+
+Get cookies from a `Request` or `Response` object.
+
+```http
+GET /test HTTP/1.1
+Cookie: my_test_cookie=my_cookie_value
+```
+
+```ts
+const cookies = get_cookies(req);
+{ my_test_cookie: 'my_cookie_value' }
+```
+
+Cookies are not URL decoded by default. This can be enabled by passing `true` as the second parameter.
+
+```http
+GET /test HTTP/1.1
+Cookie: my_test_cookie=my%20cookie%20value
+```
+```ts
+const cookies = get_cookies(req, true);
+{ my_test_cookie: 'my cookie value' }
 ```
 
 ## Legal
