@@ -404,6 +404,7 @@ In addition to the information provided by the developer, `spooder` also include
 - [API > Content](#api-content)
 	- [`template_sub(template: string, replacements: Record<string, string>): string`](#api-content-template-sub)
 	- [`generate_hash_subs(length: number, prefix: string): Promise<Record<string, string>>`](#api-content-generate-hash-subs)
+	- [`apply_range(file: BunFile, request: Request): HandlerReturnType`](#api-content-apply-range)
 - [API > State Management](#api-state-management)
 	- [`set_cookie(res: Response, name: string, value: string, options?: CookieOptions)`](#api-state-management-set-cookie)
 	- [`get_cookies(source: Request | Response): Record<string, string>`](#api-state-management-get-cookies)
@@ -606,7 +607,7 @@ server.route('/test', () => 200);
 By default, spooder will use the following default handler for serving directories.
 
 ```ts
-function default_directory_handler(file_path: string, file: DirFile, stat: DirStat): HandlerReturnType {
+function default_directory_handler(file_path: string, file: BunFile, stat: DirStat, request: Request): HandlerReturnType {
 	// ignore hidden files by default, return 404 to prevent file sniffing
 	if (path.basename(file_path).startsWith('.'))
 		return 404; // Not Found
@@ -614,12 +615,15 @@ function default_directory_handler(file_path: string, file: DirFile, stat: DirSt
 	if (stat.isDirectory())
 		return 401; // Unauthorized
 
-	return file;
+	return apply_range(file, request);
 }
 ```
 
 > [!NOTE]
 > Uncaught `ENOENT` errors throw from the directory handler will return a `404` response, other errors will return a `500` response.
+
+> [!NOTE]
+> The call to `apply_range` in the default directory handler will automatically slice the file based on the `Range` header. This function is also exposed as part of the `spooder` API for use in your own handlers.
 
 Provide your own directory handler for fine-grained control.
 
@@ -889,6 +893,30 @@ generate_hash_subs(7, '#').then(subs => hash_sub_table = subs).catch(caution);
 server.route('/test', (req, url) => {
 	return template_sub('Hello world {#docs/project-logo.png}', hash_sub_table);
 });
+```
+
+<a id="api-apply-range"></a>
+### 🔧 `apply_range(file: BunFile, request: Request): HandlerReturnType`
+
+`apply_range` parses the `Range` header for a request and slices the file accordingly. This is used internally by `server.dir()` and exposed for convenience.
+
+```ts
+server.route('/test', (req, url) => {
+	const file = Bun.file('./test.txt');
+	return apply_range(file, req);
+});
+```
+
+```http
+GET /test HTTP/1.1
+Range: bytes=0-5
+
+HTTP/1.1 206 Partial Content
+Content-Length: 6
+Content-Range: bytes 0-5/6
+Content-Type: text/plain;charset=utf-8
+
+Hello,
 ```
 
 <a id="api-state-management"></a>

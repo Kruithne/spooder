@@ -187,6 +187,29 @@ export function get_cookies(source: Request | Response, decode: boolean = false)
 	return parsed_cookies;
 }
 
+export function apply_range(file: BunFile, request: Request): BunFile {
+	const range_header = request.headers.get('range');
+	if (range_header !== null) {
+		console.log(range_header);
+		const regex = /bytes=(\d*)-(\d*)/;
+		const match = range_header.match(regex);
+
+		if (match !== null) {
+			const start = parseInt(match[1]);
+			const end = parseInt(match[2]);
+
+			const start_is_nan = isNaN(start);
+			const end_is_nan = isNaN(end);
+
+			if (start_is_nan && end_is_nan)
+				return file;
+
+			file = file.slice(start_is_nan ? file.size - end : start, end_is_nan || start_is_nan ? undefined : end);
+		}
+	}
+	return file;
+}
+
 // Resolvable represents T that is both T or a promise resolving to T.
 type Resolvable<T> = T | Promise<T>;
 
@@ -207,7 +230,7 @@ interface ToJson {
 
 type JsonSerializable = JsonPrimitive | JsonObject | JsonArray | ToJson;
 
-type HandlerReturnType = Resolvable<string | number | ReturnType<typeof Bun.file> | Response | JsonSerializable>;
+type HandlerReturnType = Resolvable<string | number | BunFile | Response | JsonSerializable>;
 type RequestHandler = (req: Request, url: URL) => HandlerReturnType;
 type ErrorHandler = (err: Error, req: Request, url: URL) => Response;
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
@@ -222,12 +245,12 @@ type ServerSentEventClient = {
 
 type ServerSentEventHandler = (req: Request, url: URL, client: ServerSentEventClient) => void;
 
-type DirFile = ReturnType<typeof Bun.file>;
+type BunFile = ReturnType<typeof Bun.file>;
 type DirStat = PromiseType<ReturnType<typeof fs.stat>>;
 
-type DirHandler = (file_path: string, file: DirFile, stat: DirStat, request: Request, url: URL) => HandlerReturnType;
+type DirHandler = (file_path: string, file: BunFile, stat: DirStat, request: Request, url: URL) => HandlerReturnType;
 
-function default_directory_handler(file_path: string, file: DirFile, stat: DirStat): HandlerReturnType {
+function default_directory_handler(file_path: string, file: BunFile, stat: DirStat, request: Request): HandlerReturnType {
 	// ignore hidden files by default, return 404 to prevent file sniffing
 	if (path.basename(file_path).startsWith('.'))
 		return 404; // Not Found
@@ -235,7 +258,7 @@ function default_directory_handler(file_path: string, file: DirFile, stat: DirSt
 	if (stat.isDirectory())
 		return 401; // Unauthorized
 
-	return file;
+	return apply_range(file, request);
 }
 
 function route_directory(route_path: string, dir: string, handler: DirHandler): RequestHandler {
