@@ -311,7 +311,7 @@ export function serve(port: number) {
 
 		// This should cover objects, arrays, etc.
 		if (typeof response === 'object')
-			return new Response(JSON.stringify(response), { status: status_code, headers: { 'Content-Type': 'application/json' } });
+			return Response.json(response, { status: status_code });
 	
 		return new Response(String(response), { status: status_code });
 	}
