@@ -142,7 +142,7 @@ You can utilize this to automatically update your server in response to a webhoo
 
 ```ts
 server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
-	setImmediate(() => server.stop(ServerStop.GRACEFUL));
+	setImmediate(() => server.stop(false));
 	return 200;
 });
 ```
@@ -397,7 +397,7 @@ In addition to the information provided by the developer, `spooder` also include
 - [API > Routing > Webhooks](#api-routing-webhooks)
 	- [`server.webhook(secret: string, path: string, handler: WebhookHandler)`](#api-routing-server-webhook)
 - [API > Server Control](#api-server-control)
-	- [`server.stop(method: ServerStop)`](#api-server-control-server-stop)
+	- [`server.stop(immediate: boolean)`](#api-server-control-server-stop)
 - [API > Error Handling](#api-error-handling)
 	- [`ErrorWithMetadata(message: string, metadata: object)`](#api-error-handling-error-with-metadata)
 	- [`caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-caution)
@@ -719,18 +719,18 @@ A webhook callback will only be called if the following critera is met by a requ
 ## API > Server Control
 
 <a id="api-server-control-stop"></a>
-### 🔧 `server.stop(method: ServerStop)`
+### 🔧 `server.stop(immediate: boolean)`
 
 Stop the server process immediately, terminating all in-flight requests.
 
 ```ts
-server.stop(ServerStop.IMMEDIATE);
+server.stop(true);
 ```
 
 Stop the server process gracefully, waiting for all in-flight requests to complete.
 
 ```ts
-server.stop(ServerStop.GRACEFUL);
+server.stop(false);
 ```
 
 <a id="api-error-handling"></a>
