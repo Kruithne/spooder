@@ -138,13 +138,12 @@ Each command should be a separate entry in the array and will be executed in seq
 
 If a command in the sequence fails, the remaining commands will not be executed, however the server will still be started. This is preferred over entering a restart loop or failing to start the server at all.
 
-You can utilize this to automatically update your server in response to a webhook or other event by simply exiting the process.
+You can utilize this to automatically update your server in response to a webhook by exiting the process.
 
 ```ts
-// This is a psuedo-example, you will need to implement webhook handling yourself.
-events.on('receive-webhook', () => {
-	// <- Gracefully finish processing here.
-	process.exit(0);
+server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
+	setImmediate(() => server.stop(ServerStop.GRACEFUL));
+	return 200;
 });
 ```
 
@@ -395,6 +394,8 @@ In addition to the information provided by the developer, `spooder` also include
 	- [`server.dir(path: string, dir: string, handler?: DirHandler)`](#api-routing-server-dir)
 - [API > Routing > Server-Sent Events](#api-routing-server-sent-events)
 	- [`server.sse(path: string, handler: ServerSentEventHandler)`](#api-routing-server-sse)
+- [API > Routing > Webhooks](#api-routing-webhooks)
+	- [`server.webhook(secret: string, path: string, handler: WebhookHandler)`](#api-routing-server-webhook)
 - [API > Server Control](#api-server-control)
 	- [`server.stop(method: ServerStop)`](#api-server-control-server-stop)
 - [API > Error Handling](#api-error-handling)
@@ -688,6 +689,31 @@ server.sse('/sse', (req, url, client) => {
 	}, 5000);
 });
 ```
+
+<a id="api-routing-webhooks"></a>
+## API > Routing > Webhooks
+
+<a id="api-routing-server-webhook"></a>
+### 🔧 `server.webhook(secret: string, path: string, handler: WebhookHandler)`
+
+Setup a webhook handler.
+
+```ts
+server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
+	// React to the webhook.
+	return 200;
+});
+```
+
+A webhook callback will only be called if the following critera is met by a request:
+- Request method is `POST` (returns `405` otherwise)
+- Header `X-Hub-Signature-256` is present (returns `400` otherwise)
+- Header `Content-Type` is `application/json` (returns `401` otherwise)
+- Request body is a valid JSON object (returns `500` otherwise)
+- HMAC signature of the request body matches the `X-Hub-Signature-256` header (returns `401` otherwise)
+
+> [!NOTE]
+> Constant-time comparison is used to prevent timing attacks when comparing the HMAC signature.
 
 <a id="api-server-control"></a>
 ## API > Server Control

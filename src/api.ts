@@ -4,6 +4,7 @@ import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { log } from './utils';
+import crypto from 'crypto';
 
 export class ErrorWithMetadata extends Error {
 	constructor(message: string, public metadata: Record<string, unknown>) {
@@ -232,6 +233,7 @@ type JsonSerializable = JsonPrimitive | JsonObject | JsonArray | ToJson;
 
 type HandlerReturnType = Resolvable<string | number | BunFile | Response | JsonSerializable>;
 type RequestHandler = (req: Request, url: URL) => HandlerReturnType;
+type WebhookHandler = (payload: JsonSerializable) => HandlerReturnType;
 type ErrorHandler = (err: Error, req: Request, url: URL) => Response;
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
 type StatusCodeHandler = (req: Request) => HandlerReturnType;
@@ -439,6 +441,29 @@ export function serve(port: number) {
 				path = path.slice(0, -1);
 
 			routes.push([[...path.split('/'), '*'], route_directory(path, dir, handler ?? default_directory_handler)]);
+		},
+
+		webhook: (secret: string, path: string, handler: WebhookHandler): void => {
+			routes.push([path.split('/'), async (req: Request, url: URL) => {
+				if (req.method !== 'POST')
+					return 405; // Method Not Allowed
+
+				if (req.headers.get('Content-Type') !== 'application/json')
+					return 400; // Bad Request
+
+				const signature = req.headers.get('X-Hub-Signature-256');
+				if (signature === null)
+					return 401; // Unauthorized
+
+				const body = await req.json() as JsonSerializable;
+				const hmac = crypto.createHmac('sha256', secret);
+				hmac.update(JSON.stringify(body));
+
+				if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from('sha256=' + hmac.digest('hex'))))
+					return 401; // Unauthorized
+
+				return handler(body);
+			}]);
 		},
 
 		/** Register a default handler for all status codes. */
