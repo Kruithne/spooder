@@ -318,7 +318,7 @@ export function serve(port: number) {
 	
 		// Content-type/content-length are automatically set for blobs.
 		if (response instanceof Blob)
-			return new Response(response, { status: status_code });
+			return new Response(response as BlobPart, { status: status_code });
 
 		// Status codes can be returned from some handlers.
 		if (return_status_code && typeof response === 'number')
