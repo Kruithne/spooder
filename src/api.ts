@@ -5,6 +5,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { log } from './utils';
 import crypto from 'crypto';
+import { Blob } from 'node:buffer';
 
 export class ErrorWithMetadata extends Error {
 	constructor(message: string, public metadata: Record<string, unknown>) {
@@ -318,7 +319,7 @@ export function serve(port: number) {
 	
 		// Content-type/content-length are automatically set for blobs.
 		if (response instanceof Blob)
-			return new Response(response as BlobPart, { status: status_code });
+			return new Response(response as Blob, { status: status_code });
 
 		// Status codes can be returned from some handlers.
 		if (return_status_code && typeof response === 'number')
