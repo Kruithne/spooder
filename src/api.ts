@@ -71,7 +71,13 @@ async function handle_error(prefix: string, err_message_or_obj: string | object,
 		}
 	}
 
-	await dispatch_report(prefix + error_message, final_err);
+	if (process.env.SPOODER_ENV === 'dev') {
+		log('[dev] dispatch_report %s', prefix + error_message);
+		log('[dev] without --dev, this would raise a canary report');
+		log('[dev] %o', final_err);
+	} else {
+		await dispatch_report(prefix + error_message, final_err);
+	}
 }
 
 export async function panic(err_message_or_obj: string | object, ...err: object[]): Promise<void> {

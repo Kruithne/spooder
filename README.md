@@ -56,6 +56,7 @@ If there are any issues with the provided configuration, a warning will be print
 The `CLI` component of `spooder` is a global command-line tool for running server processes.
 
 - [CLI > Usage](#cli-usage)
+- [CLI > Dev Mode](#cli-dev-mode)
 - [CLI > Auto Restart](#cli-auto-restart)
 - [CLI > Auto Update](#cli-auto-update)
 - [CLI > Canary](#cli-canary)
@@ -94,6 +95,33 @@ While `spooder` uses a `bun run` command by default, it is possible to use any c
 	}
 }
 ```
+
+<a id="cli-dev-mode"></a>
+## CLI > Dev Mode
+
+`spooder` can be started in development mode by providing the `--dev` flag when starting the server.
+
+```bash
+spooder --dev
+```
+
+The following differences will be observed when running in development mode:
+
+- Update commands defined in `spooder.update` will not be executed when starting a server.
+- If the server crashes and `auto_restart` is enabled, the server will not be restarted, and spooder will exit with the same exit code as the server.
+- If canary is configured, reports will not be dispatched to GitHub and instead be printed to the console; this includes crash reports.
+
+It is possible to detect in userland if a server is running in development mode by checking the `SPOODER_ENV` environment variable.
+
+```ts
+if (process.env.SPOODER_DEV === 'dev') {
+	// Server is running in development mode.
+}
+```
+
+> [!NOTE]
+> `SPOODER_ENV` should be either `dev` or `prod`. If the variable is not defined, the server was not started by the `spooder` CLI.
+
 <a id="cli-auto-restart"></a>
 ## CLI > Auto Restart
 
