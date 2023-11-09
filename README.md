@@ -458,6 +458,20 @@ server.route('/test/route', (req, url) => {
 server.route('/redirect', () => Response.redirect('/redirected', 301));
 ```
 
+### Status Code Text
+
+`spooder` exposes `HTTP_STATUS_CODE` to convieniently access status code text.
+
+```ts
+import { HTTP_STATUS_CODE } from 'spooder';
+
+server.default((req, status_code) => {
+	// status_code: 404
+	// Body: Not Found
+	return new Response(HTTP_STATUS_CODE[status_code], { status: status_code });
+});
+```
+
 <a id="api-routing-request-handler"></a>
 ## API > Routing > RequestHandler
 

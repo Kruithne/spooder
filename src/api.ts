@@ -7,6 +7,8 @@ import { log } from './utils';
 import crypto from 'crypto';
 import { Blob } from 'node:buffer';
 
+export const HTTP_STATUS_CODE = http.STATUS_CODES;
+
 export class ErrorWithMetadata extends Error {
 	constructor(message: string, public metadata: Record<string, unknown>) {
 		super(message);
