@@ -404,6 +404,7 @@ In addition to the information provided by the developer, `spooder` also include
 	- [`panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-panic)
 - [API > Content](#api-content)
 	- [`template_sub(template: string, replacements: Record<string, string>): string`](#api-content-template-sub)
+	- [`template_sub_file(template_file: string, replacements: Record<string, string>): Promise<string>`](#api-content-template-sub-file)
 	- [`generate_hash_subs(length: number, prefix: string): Promise<Record<string, string>>`](#api-content-generate-hash-subs)
 	- [`apply_range(file: BunFile, request: Request): HandlerReturnType`](#api-content-apply-range)
 - [API > State Management](#api-state-management)
@@ -875,6 +876,24 @@ const html = template_sub(template, replacements);
 	</body>
 </html>
 ```
+
+<a id="api-content-template-sub-file"></a>
+### 🔧 `template_sub_file(template_file: string, replacements: Record<string, string>): Promise<string>`
+
+Replace placeholders in a template file with values from a replacement object.
+
+> [!NOTE]
+> This function is a convenience wrapper around `template_sub` and `Bun.file().text()` to reduce boilerplate. See `template_sub` for more information.
+
+```ts
+const html = await template_sub_file('./template.html', replacements);
+
+// Is equivalent to:
+const file = Bun.file('./template.html');
+const file_contents = await file.text();
+const html = await template_sub(file_contents, replacements);
+```
+
 
 <a id="api-content-generate-hash-subs"></a>
 ### 🔧 `generate_hash_subs(prefix: string): Promise<Record<string, string>>`

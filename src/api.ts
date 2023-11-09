@@ -82,6 +82,13 @@ export async function caution(err_message_or_obj: string | object, ...err: objec
 	await handle_error('caution: ', err_message_or_obj, ...err);
 }
 
+export async function template_sub_file(template_file: string, replacements: Record<string, string>): Promise<string> {
+	const file = Bun.file(template_file);
+	const file_contents = await file.text();
+
+	return template_sub(file_contents, replacements);
+}
+
 export function template_sub(template: string, replacements: Record<string, string>): string {
 	let result = '';
 	let buffer = '';
