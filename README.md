@@ -607,7 +607,7 @@ server.default((req, status_code) => {
 Register a handler for uncaught errors.
 
 > [!NOTE]
-> This handler does not accept asynchronous functions and must return a `Response` object.
+> Unlike other handlers, this should only return `Response` or `Promise<Response>`.
 ```ts
 server.error((err, req, url) => {
 	return new Response('Custom Internal Server Error Message', { status: 500 });

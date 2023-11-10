@@ -249,7 +249,7 @@ type JsonSerializable = JsonPrimitive | JsonObject | JsonArray | ToJson;
 type HandlerReturnType = Resolvable<string | number | BunFile | Response | JsonSerializable | Blob>;
 type RequestHandler = (req: Request, url: URL) => HandlerReturnType;
 type WebhookHandler = (payload: JsonSerializable) => HandlerReturnType;
-type ErrorHandler = (err: Error, req: Request, url: URL) => Response;
+type ErrorHandler = (err: Error, req: Request, url: URL) => Resolvable<Response>;
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
 type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
@@ -413,7 +413,7 @@ export function serve(port: number) {
 			return new Response(http.STATUS_CODES[status_code], { status: status_code });
 		} catch (e) {
 			if (error_handler !== undefined)
-				return error_handler(e as Error, req, url);
+				return await error_handler(e as Error, req, url);
 
 			return new Response(http.STATUS_CODES[500], { status: 500 });
 		}
