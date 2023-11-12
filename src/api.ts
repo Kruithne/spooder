@@ -98,14 +98,13 @@ export function parse_template(template: string, replacements: Record<string, st
 	for (let i = 0; i < template_length; i++) {
 		const char = template[i];
 
-		if (char === '{') {
+		if (char === '{' && template[i + 1] === '?') {
+			i++;
 			buffer_active = true;
 			buffer = '';
-		} else if (char === '}') {
+		} else if (char === '}' && buffer_active) {
 			buffer_active = false;
-
-			result += replacements[buffer] ?? '{' + buffer + '}';
-
+			result += replacements[buffer] ?? '{?' + buffer + '}';
 			buffer = '';
 		} else if (buffer_active) {
 			buffer += char;

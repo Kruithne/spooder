@@ -887,12 +887,12 @@ Replace placeholders in a template string with values from a replacement object.
 const template = `
 	<html>
 		<head>
-			<title>{title}</title>
+			<title>{?title}</title>
 		</head>
 		<body>
-			<h1>{title}</h1>
-			<p>{content}</p>
-			<p>{ignored}</p>
+			<h1>{?title}</h1>
+			<p>{?content}</p>
+			<p>{?ignored}</p>
 		</body>
 	</html>
 `;
@@ -913,7 +913,7 @@ const html = parse_template(template, replacements);
 	<body>
 		<h1>Hello, world!</h1>
 		<p>This is a test.</p>
-		<p>{ignored}</p>
+		<p>{?ignored}</p>
 	</body>
 </html>
 ```
