@@ -431,8 +431,7 @@ In addition to the information provided by the developer, `spooder` also include
 	- [`caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-caution)
 	- [`panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-panic)
 - [API > Content](#api-content)
-	- [`template_sub(template: string, replacements: Record<string, string>): string`](#api-content-template-sub)
-	- [`template_sub_file(template_file: string, replacements: Record<string, string>): Promise<string>`](#api-content-template-sub-file)
+	- [`parse_template(template: string, replacements: Record<string, string>): string`](#api-content-parse-template)
 	- [`generate_hash_subs(length: number, prefix: string): Promise<Record<string, string>>`](#api-content-generate-hash-subs)
 	- [`apply_range(file: BunFile, request: Request): HandlerReturnType`](#api-content-apply-range)
 - [API > State Management](#api-state-management)
@@ -876,8 +875,8 @@ try {
 <a id="api-content"></a>
 ## API > Content
 
-<a id="api-content-template-sub"></a>
-### 🔧 `template_sub(template: string, replacements: Record<string, string>): string`
+<a id="api-content-parse-template"></a>
+### 🔧 `parse_template(template: string, replacements: Record<string, string>): string`
 
 Replace placeholders in a template string with values from a replacement object.
 
@@ -903,7 +902,7 @@ const replacements = {
 	content: 'This is a test.'
 };
 
-const html = template_sub(template, replacements);
+const html = parse_template(template, replacements);
 ```
 
 ```html
@@ -919,24 +918,6 @@ const html = template_sub(template, replacements);
 </html>
 ```
 
-<a id="api-content-template-sub-file"></a>
-### 🔧 `template_sub_file(template_file: string, replacements: Record<string, string>): Promise<string>`
-
-Replace placeholders in a template file with values from a replacement object.
-
-> [!NOTE]
-> This function is a convenience wrapper around `template_sub` and `Bun.file().text()` to reduce boilerplate. See `template_sub` for more information.
-
-```ts
-const html = await template_sub_file('./template.html', replacements);
-
-// Is equivalent to:
-const file = Bun.file('./template.html');
-const file_contents = await file.text();
-const html = await template_sub(file_contents, replacements);
-```
-
-
 <a id="api-content-generate-hash-subs"></a>
 ### 🔧 `generate_hash_subs(prefix: string): Promise<Record<string, string>>`
 
@@ -951,7 +932,7 @@ let hash_sub_table = {};
 generate_hash_subs().then(subs => hash_sub_table = subs).catch(caution);
 
 server.route('/test', (req, url) => {
-	return template_sub('Hello world {hash=docs/project-logo.png}', hash_sub_table);
+	return parse_template('Hello world {hash=docs/project-logo.png}', hash_sub_table);
 });
 ```
 
@@ -978,7 +959,7 @@ Use a different prefix other than `hash=` by passing it as the first parameter.
 generate_hash_subs(7, '#').then(subs => hash_sub_table = subs).catch(caution);
 
 server.route('/test', (req, url) => {
-	return template_sub('Hello world {#docs/project-logo.png}', hash_sub_table);
+	return parse_template('Hello world {#docs/project-logo.png}', hash_sub_table);
 });
 ```
 
