@@ -89,7 +89,7 @@ export async function caution(err_message_or_obj: string | object, ...err: objec
 	await handle_error('caution: ', err_message_or_obj, ...err);
 }
 
-export function parse_template(template: string, replacements: Record<string, string>): string {
+export function parse_template(template: string, replacements: Record<string, string | Array<string>>): string {
 	let result = '';
 	let buffer = '';
 	let buffer_active = false;
@@ -98,13 +98,41 @@ export function parse_template(template: string, replacements: Record<string, st
 	for (let i = 0; i < template_length; i++) {
 		const char = template[i];
 
-		if (char === '{' && template[i + 1] === '?') {
+		if (char === '{' && template[i + 1] === '$') {
 			i++;
 			buffer_active = true;
 			buffer = '';
 		} else if (char === '}' && buffer_active) {
 			buffer_active = false;
-			result += replacements[buffer] ?? '{?' + buffer + '}';
+
+			if (buffer.startsWith('for:')) {
+				const loop_key = buffer.substring(4);
+
+				const loop_entries = replacements[loop_key];
+				if (loop_entries !== undefined) {
+					const loop_content_start_index = i + 1;
+					const loop_close_index = template.indexOf('{/for}', loop_content_start_index);
+					const loop_content = template.substring(loop_content_start_index, loop_close_index);
+
+					// More performat than replaceAll on larger arrays (and equal on tiny arrays).
+					const content_parts = loop_content.split('%s');
+					const indicies = [] as Array<number>;
+
+					for (let j = 0; j < content_parts.length; j++)
+						if (content_parts[j] === '%s')
+							indicies.push(j);
+
+					for (const loop_entry of loop_entries)
+						for (const index of indicies)
+							content_parts[index] = loop_entry;
+
+					i += loop_content.length + 6;
+				} else {
+					result += '{$' + buffer + '}';
+				}
+			} else {
+				result += replacements[buffer] ?? '{$' + buffer + '}';
+			}
 			buffer = '';
 		} else if (buffer_active) {
 			buffer += char;

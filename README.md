@@ -887,12 +887,12 @@ Replace placeholders in a template string with values from a replacement object.
 const template = `
 	<html>
 		<head>
-			<title>{?title}</title>
+			<title>{$title}</title>
 		</head>
 		<body>
-			<h1>{?title}</h1>
-			<p>{?content}</p>
-			<p>{?ignored}</p>
+			<h1>{$title}</h1>
+			<p>{$content}</p>
+			<p>{$ignored}</p>
 		</body>
 	</html>
 `;
@@ -913,10 +913,40 @@ const html = parse_template(template, replacements);
 	<body>
 		<h1>Hello, world!</h1>
 		<p>This is a test.</p>
-		<p>{?ignored}</p>
+		<p>{$ignored}</p>
 	</body>
 </html>
 ```
+
+`parse_template` supports looping arrays with the following syntax.
+
+```html
+{$for:foo}My colour is %s{/for}
+```
+```ts
+const template = `
+	<ul>
+		{$for:foo}<li>%s</li>{/for}
+	</ul>
+`;
+
+const replacements = {
+	foo: ['red', 'green', 'blue']
+};
+
+const html = parse_template(template, replacements);
+```
+
+```html
+<ul>
+	<li>red</li>
+	<li>green</li>
+	<li>blue</li>
+</ul>
+```
+
+> [!WARNING]
+> Nested loops are not supported.
 
 <a id="api-content-generate-hash-subs"></a>
 ### 🔧 `generate_hash_subs(prefix: string): Promise<Record<string, string>>`
