@@ -89,6 +89,20 @@ export async function caution(err_message_or_obj: string | object, ...err: objec
 	await handle_error('caution: ', err_message_or_obj, ...err);
 }
 
+type CallableFunction = (...args: any[]) => any;
+type Callable = Promise<any> | CallableFunction;
+
+export async function safe(target_fn: Callable) {
+	try {
+		if (target_fn instanceof Promise)
+			await target_fn;
+		else
+			await target_fn();
+	} catch (e) {
+		caution(e as Error);
+	}
+}
+
 export function parse_template(template: string, replacements: Record<string, string | Array<string>>): string {
 	let result = '';
 	let buffer = '';

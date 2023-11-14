@@ -430,6 +430,7 @@ In addition to the information provided by the developer, `spooder` also include
 	- [`ErrorWithMetadata(message: string, metadata: object)`](#api-error-handling-error-with-metadata)
 	- [`caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-caution)
 	- [`panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-panic)
+	- [`safe(fn: Callable): Promise<void>`](#api-error-handling-safe)
 - [API > Content](#api-content)
 	- [`parse_template(template: string, replacements: Record<string, string>): string`](#api-content-parse-template)
 	- [`generate_hash_subs(length: number, prefix: string): Promise<Record<string, string>>`](#api-content-generate-hash-subs)
@@ -870,6 +871,30 @@ try {
 	// You should await `panic` since the process will exit.
 	await panic(e);
 }
+```
+
+<a id="api-error-handling-safe"></a>
+### 🔧 `safe(fn: Callable): Promise<void>`
+
+`safe()` is a utility function that wraps a "callable" and calls `caution()` if it throws an error.
+
+> ![NOTE]
+> This utility is primarily intended to be used to reduce boilerplate for fire-and-forget functions that you want to be notified about if they fail. 
+
+```ts
+safe(async (() => {
+	// This code will run async and any errors will invoke caution().
+});
+```
+
+`safe()` supports both async and sync callables, as well as Promise objects. `safe()` can also used with `await`.
+
+```ts
+await safe(() => {
+	return new Promise((resolve, reject) => {
+		// Do stuff.
+	});
+});
 ```
 
 <a id="api-content"></a>
