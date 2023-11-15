@@ -432,7 +432,7 @@ In addition to the information provided by the developer, `spooder` also include
 	- [`panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-panic)
 	- [`safe(fn: Callable): Promise<void>`](#api-error-handling-safe)
 - [API > Content](#api-content)
-	- [`parse_template(template: string, replacements: Record<string, string>): string`](#api-content-parse-template)
+	- [`parse_template(template: string, replacements: Record<string, string>, drop_missing: boolean): string`](#api-content-parse-template)
 	- [`generate_hash_subs(length: number, prefix: string): Promise<Record<string, string>>`](#api-content-generate-hash-subs)
 	- [`apply_range(file: BunFile, request: Request): HandlerReturnType`](#api-content-apply-range)
 - [API > State Management](#api-state-management)
@@ -901,12 +901,9 @@ await safe(() => {
 ## API > Content
 
 <a id="api-content-parse-template"></a>
-### 🔧 `parse_template(template: string, replacements: Record<string, string>): string`
+### 🔧 `parse_template(template: string, replacements: Record<string, string>, drop_missing: boolean): string`
 
 Replace placeholders in a template string with values from a replacement object.
-
-> [!NOTE]
-> Placeholders that do not appear in the replacement object will be left as-is. See `ignored` in below example.
 
 ```ts
 const template = `
@@ -939,6 +936,25 @@ const html = parse_template(template, replacements);
 		<h1>Hello, world!</h1>
 		<p>This is a test.</p>
 		<p>{$ignored}</p>
+	</body>
+</html>
+```
+
+By default, placeholders that do not appear in the replacement object will be left as-is. Set `drop_missing` to `true` to remove them.
+
+```ts
+parse_template(template, replacements, true);
+```
+
+```html
+<html>
+	<head>
+		<title>Hello, world!</title>
+	</head>
+	<body>
+		<h1>Hello, world!</h1>
+		<p>This is a test.</p>
+		<p></p>
 	</body>
 </html>
 ```

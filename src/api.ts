@@ -103,7 +103,7 @@ export async function safe(target_fn: Callable) {
 	}
 }
 
-export function parse_template(template: string, replacements: Record<string, string | Array<string>>): string {
+export function parse_template(template: string, replacements: Record<string, string | Array<string>>, drop_missing = false): string {
 	let result = '';
 	let buffer = '';
 	let buffer_active = false;
@@ -127,7 +127,8 @@ export function parse_template(template: string, replacements: Record<string, st
 				const loop_close_index = template.indexOf('{/for}', loop_content_start_index);
 				
 				if (loop_close_index === -1) {
-					result += '{$' + buffer + '}';
+					if (!drop_missing)
+						result += '{$' + buffer + '}';
 				} else {
 					const loop_content = template.substring(loop_content_start_index, loop_close_index);
 					if (loop_entries !== undefined) {
@@ -138,15 +139,20 @@ export function parse_template(template: string, replacements: Record<string, st
 
 						for (const loop_entry of loop_entries) {
 							inner_replacements.entry = loop_entry;
-							result += parse_template(loop_content, inner_replacements);
+							result += parse_template(loop_content, inner_replacements, drop_missing);
 						}
 					} else {
-						result += '{$' + buffer + '}' + loop_content + '{/for}';
+						if (!drop_missing)
+							result += '{$' + buffer + '}' + loop_content + '{/for}';
 					}
 					i += loop_content.length + 6;
 				}
 			} else {
-				result += replacements[buffer] ?? '{$' + buffer + '}';
+				const replacement = replacements[buffer];
+				if (replacement !== undefined)
+					result += replacement;
+				else if (!drop_missing)
+					result += '{$' + buffer + '}';
 			}
 			buffer = '';
 		} else if (buffer_active) {
