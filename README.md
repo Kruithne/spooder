@@ -962,12 +962,12 @@ parse_template(template, replacements, true);
 `parse_template` supports looping arrays with the following syntax.
 
 ```html
-{$for:foo}My colour is {$entry}{/for}
+{$for:foo}My colour is %s{/for}
 ```
 ```ts
 const template = `
 	<ul>
-		{$for:foo}<li>{$entry}</li>{/for}
+		{$for:foo}<li>%s</li>{/for}
 	</ul>
 `;
 

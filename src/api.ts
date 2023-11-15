@@ -132,14 +132,9 @@ export function parse_template(template: string, replacements: Record<string, st
 				} else {
 					const loop_content = template.substring(loop_content_start_index, loop_close_index);
 					if (loop_entries !== undefined) {
-						const inner_replacements = {
-							...replacements,
-							entry: ''
-						};
-
 						for (const loop_entry of loop_entries) {
-							inner_replacements.entry = loop_entry;
-							result += parse_template(loop_content, inner_replacements, drop_missing);
+							const inner_content = loop_content.replaceAll('%s', loop_entry);
+							result += parse_template(inner_content, replacements, drop_missing);
 						}
 					} else {
 						if (!drop_missing)
