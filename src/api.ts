@@ -142,6 +142,8 @@ export function parse_template(template: string, replacements: Record<string, st
 						for (const loop_entry of loop_entries)
 							for (const index of indicies)
 								content_parts[index] = loop_entry;
+
+						result += content_parts.join('');
 					} else {
 						result += '{$' + buffer + '}' + loop_content + '{/for}';
 					}
