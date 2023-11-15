@@ -161,7 +161,7 @@ export function parse_template(template: string, replacements: Record<string, st
 	return result;
 }
 
-export async function generate_hash_subs(length = 7, prefix = '$hash='): Promise<Record<string, string>> {
+export async function generate_hash_subs(length = 7, prefix = 'hash='): Promise<Record<string, string>> {
 	const cmd = ['git', 'ls-tree', '-r', 'HEAD'];
 	const process = Bun.spawn(cmd, {
 		stdout: 'pipe',

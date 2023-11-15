@@ -1008,7 +1008,7 @@ generate_hash_subs(40).then(...);
 > [!NOTE]
 > SHA-1 hashes are `40` characters. Git is transitioning to SHA-256, which are `64` characters. Short hashes of `7` are generally sufficient for cache-busting.
 
-Use a different prefix other than `$hash=` by passing it as the first parameter.
+Use a different prefix other than `hash=` by passing it as the first parameter.
 
 ```ts
 generate_hash_subs(7, '$#').then(subs => hash_sub_table = subs).catch(caution);
