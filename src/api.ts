@@ -125,24 +125,28 @@ export function parse_template(template: string, replacements: Record<string, st
 				const loop_entries = replacements[loop_key];
 				const loop_content_start_index = i + 1;
 				const loop_close_index = template.indexOf('{/for}', loop_content_start_index);
-				const loop_content = template.substring(loop_content_start_index, loop_close_index);
-
-				if (loop_entries !== undefined) {
-					// More performat than replaceAll on larger arrays (and equal on tiny arrays).
-					const content_parts = loop_content.split('%s');
-					const indicies = [] as Array<number>;
-
-					for (let j = 0; j < content_parts.length; j++)
-						if (content_parts[j] === '%s')
-							indicies.push(j);
-
-					for (const loop_entry of loop_entries)
-						for (const index of indicies)
-							content_parts[index] = loop_entry;
-
-					i += loop_content.length + 6;
+				
+				if (loop_close_index === -1) {
+					result += '{$' + buffer + '}';
 				} else {
-					result += '{$' + buffer + '}' + loop_content + '{/for}';
+					const loop_content = template.substring(loop_content_start_index, loop_close_index);
+					if (loop_entries !== undefined) {
+						// More performat than replaceAll on larger arrays (and equal on tiny arrays).
+						const content_parts = loop_content.split('%s');
+						const indicies = [] as Array<number>;
+	
+						for (let j = 0; j < content_parts.length; j++)
+							if (content_parts[j] === '%s')
+								indicies.push(j);
+	
+						for (const loop_entry of loop_entries)
+							for (const index of indicies)
+								content_parts[index] = loop_entry;
+	
+						i += loop_content.length + 6;
+					} else {
+						result += '{$' + buffer + '}' + loop_content + '{/for}';
+					}
 				}
 			} else {
 				result += replacements[buffer] ?? '{$' + buffer + '}';
