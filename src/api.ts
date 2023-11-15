@@ -131,8 +131,15 @@ export function parse_template(template: string, replacements: Record<string, st
 				} else {
 					const loop_content = template.substring(loop_content_start_index, loop_close_index);
 					if (loop_entries !== undefined) {
-						for (const loop_entry of loop_entries)
-							result += loop_content.replaceAll('%s', loop_entry);
+						const inner_replacements = {
+							...replacements,
+							entry: ''
+						};
+
+						for (const loop_entry of loop_entries) {
+							inner_replacements.entry = loop_entry;
+							result += parse_template(loop_content, inner_replacements);
+						}
 					} else {
 						result += '{$' + buffer + '}' + loop_content + '{/for}';
 					}

@@ -946,12 +946,12 @@ const html = parse_template(template, replacements);
 `parse_template` supports looping arrays with the following syntax.
 
 ```html
-{$for:foo}My colour is %s{/for}
+{$for:foo}My colour is {$entry}{/for}
 ```
 ```ts
 const template = `
 	<ul>
-		{$for:foo}<li>%s</li>{/for}
+		{$for:foo}<li>{$entry}</li>{/for}
 	</ul>
 `;
 
@@ -970,8 +970,25 @@ const html = parse_template(template, replacements);
 </ul>
 ```
 
-> [!WARNING]
-> Nested loops are not supported.
+All placeholders inside a `{$for:}` loop are substituted, but only if the loop variable exists.
+
+In the following example, `missing` does not exist, so `test` is not substituted inside the loop, but `test` is still substituted outside the loop.
+
+```html
+<div>Hello {$test}!</div>
+{$for:missing}<div>Loop {$test}</div>{/for}
+```
+
+```ts
+parse_template(..., {
+	test: 'world'
+});
+```
+
+```html
+<div>Hello world!</div>
+{$for}Loop <div>{$test}</div>{/for}
+```
 
 <a id="api-content-generate-hash-subs"></a>
 ### 🔧 `generate_hash_subs(prefix: string): Promise<Record<string, string>>`
