@@ -123,11 +123,11 @@ export function parse_template(template: string, replacements: Record<string, st
 				const loop_key = buffer.substring(4);
 
 				const loop_entries = replacements[loop_key];
-				if (loop_entries !== undefined) {
-					const loop_content_start_index = i + 1;
-					const loop_close_index = template.indexOf('{/for}', loop_content_start_index);
-					const loop_content = template.substring(loop_content_start_index, loop_close_index);
+				const loop_content_start_index = i + 1;
+				const loop_close_index = template.indexOf('{/for}', loop_content_start_index);
+				const loop_content = template.substring(loop_content_start_index, loop_close_index);
 
+				if (loop_entries !== undefined) {
 					// More performat than replaceAll on larger arrays (and equal on tiny arrays).
 					const content_parts = loop_content.split('%s');
 					const indicies = [] as Array<number>;
@@ -142,7 +142,7 @@ export function parse_template(template: string, replacements: Record<string, st
 
 					i += loop_content.length + 6;
 				} else {
-					result += '{$' + buffer + '}';
+					result += '{$' + buffer + '}' + loop_content + '{/for}';
 				}
 			} else {
 				result += replacements[buffer] ?? '{$' + buffer + '}';
