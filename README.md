@@ -484,6 +484,9 @@ server.route('/test/route', (req, url) => {
 
 By default, `spooder` will register routes defined with `server.route()` and `server.dir()` as `GET` routes. Requests to these routes with other methods will return `405 Method Not Allowed`.
 
+> [!NOTE]
+> spooder does not automatically handle HEAD requests natively.
+
 This can be controlled by providing the `method` parameter with a string or array defining one or more of the following methods.
 
 ```
