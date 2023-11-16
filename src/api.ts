@@ -8,6 +8,10 @@ import { Blob } from 'node:buffer';
 
 export const HTTP_STATUS_CODE = http.STATUS_CODES;
 
+// Create enum containing HTTP methods
+type HTTP_METHOD = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS' | 'CONNECT' | 'TRACE';
+type HTTP_METHODS = HTTP_METHOD|HTTP_METHOD[];
+
 export class ErrorWithMetadata extends Error {
 	constructor(message: string, public metadata: Record<string, unknown>) {
 		super(message);
@@ -349,8 +353,15 @@ function print_request_info(req: Request, res: Response, url: URL, request_start
 	return res;
 }
 
+function is_valid_method(method: HTTP_METHODS, req: Request): boolean {
+	if (Array.isArray(method))
+		return method.includes(req.method as HTTP_METHOD);
+
+	return req.method === method;
+}
+
 export function serve(port: number) {
-	const routes = new Array<[string[], RequestHandler]>();
+	const routes = new Array<[string[], RequestHandler, HTTP_METHODS]>();
 	const handlers = new Map<number, StatusCodeHandler>();
 	
 	let error_handler: ErrorHandler | undefined;
@@ -388,8 +399,9 @@ export function serve(port: number) {
 		try {
 			const route_array = url.pathname.split('/').filter(e => !(e === '..' || e === '.'));
 			let handler: RequestHandler | undefined;
+			let methods: HTTP_METHODS | undefined;
 
-			for (const [path, route_handler] of routes) {
+			for (const [path, route_handler, route_methods] of routes) {
 				const is_trailing_wildcard = path[path.length - 1] === '*';
 				if (!is_trailing_wildcard && path.length !== route_array.length)
 					continue;
@@ -414,20 +426,25 @@ export function serve(port: number) {
 
 				if (match) {
 					handler = route_handler;
+					methods = route_methods;
 					break;
 				}
 			}
 
 			// Check for a handler for the route.
 			if (handler !== undefined) {
-				const response = await resolve_handler(handler(req, url), status_code, true);
-				if (response instanceof Response)
-					return response;
+				if (is_valid_method(methods!, req)) {
+					const response = await resolve_handler(handler(req, url), status_code, true);
+					if (response instanceof Response)
+						return response;
 
-				// If the handler returned a status code, use that instead.
-				status_code = response;
+					// If the handler returned a status code, use that instead.
+					status_code = response;
+				} else {
+					status_code = 405; // Method Not Allowed
+				}
 			} else {
-				status_code = 404;
+				status_code = 404; // Not Found
 			}
 
 			// Fallback to checking for a handler for the status code.
@@ -472,23 +489,20 @@ export function serve(port: number) {
 
 	return {
 		/** Register a handler for a specific route. */
-		route: (path: string, handler: RequestHandler): void => {
-			routes.push([path.split('/'), handler]);
+		route: (path: string, handler: RequestHandler, method: HTTP_METHODS = 'GET'): void => {
+			routes.push([path.split('/'), handler, method]);
 		},
 
 		/** Serve a directory for a specific route. */
-		dir: (path: string, dir: string, handler?: DirHandler): void => {
+		dir: (path: string, dir: string, handler?: DirHandler, method: HTTP_METHODS = 'GET'): void => {
 			if (path.endsWith('/'))
 				path = path.slice(0, -1);
 
-			routes.push([[...path.split('/'), '*'], route_directory(path, dir, handler ?? default_directory_handler)]);
+			routes.push([[...path.split('/'), '*'], route_directory(path, dir, handler ?? default_directory_handler), method]);
 		},
 
 		webhook: (secret: string, path: string, handler: WebhookHandler): void => {
 			routes.push([path.split('/'), async (req: Request, url: URL) => {
-				if (req.method !== 'POST')
-					return 405; // Method Not Allowed
-
 				if (req.headers.get('Content-Type') !== 'application/json')
 					return 400; // Bad Request
 
@@ -504,7 +518,7 @@ export function serve(port: number) {
 					return 401; // Unauthorized
 
 				return handler(body);
-			}]);
+			}, 'POST']);
 		},
 
 		/** Register a default handler for all status codes. */
@@ -576,7 +590,7 @@ export function serve(port: number) {
 					'Cache-Control': 'no-cache',
 					'Connection': 'keep-alive'
 				}});
-			}]);
+			}, 'GET']);
 		}
 	}
 }

@@ -411,15 +411,17 @@ In addition to the information provided by the developer, `spooder` also include
 - [API > Serving](#api-serving)
 	- [`serve(port: number): Server`](#api-serving-serve)
 - [API > Routing](#api-routing)
-	- [`server.route(path: string, handler: RequestHandler)`](#api-routing-server-route)
+	- [`server.route(path: string, handler: RequestHandler, method: HTTP_METHODS)`](#api-routing-server-route)
+	- [HTTP Methods](#api-routing-methods)
 	- [Redirection Routes](#api-routing-redirection-routes)
+	- [Status Code Text](#api-routing-status-code-text)
 - [API > Routing > RequestHandler](#api-routing-request-handler)
 - [API > Routing > Fallback Handling](#api-routing-fallback-handlers)
 	- [`server.handle(status_code: number, handler: RequestHandler)`](#api-routing-server-handle)
 	- [`server.default(handler: DefaultHandler)`](#api-routing-server-default)
 	- [`server.error(handler: ErrorHandler)`](#api-routing-server-error)
 - [API > Routing > Directory Serving](#api-routing-directory-serving)
-	- [`server.dir(path: string, dir: string, handler?: DirHandler)`](#api-routing-server-dir)
+	- [`server.dir(path: string, dir: string, handler?: DirHandler, method: HTTP_METHODS)`](#api-routing-server-dir)
 - [API > Routing > Server-Sent Events](#api-routing-server-sent-events)
 	- [`server.sse(path: string, handler: ServerSentEventHandler)`](#api-routing-server-sse)
 - [API > Routing > Webhooks](#api-routing-webhooks)
@@ -477,6 +479,29 @@ server.route('/test/route', (req, url) => {
 });
 ```
 
+<a id="api-routing-methods"></a>
+### HTTP Methods
+
+By default, `spooder` will register routes defined with `server.route()` and `server.dir()` as `GET` routes. Requests to these routes with other methods will return `405 Method Not Allowed`.
+
+This can be controlled by providing the `method` parameter with a string or array defining one or more of the following methods.
+
+```
+GET | HEAD | POST | PUT | DELETE | CONNECT | OPTIONS | TRACE | PATCH
+```
+
+```ts
+server.route('/test/route', (req, url) => {
+	if (req.method === 'GET')
+		// Handle GET request.
+	else if (req.method === 'POST')
+		// Handle POST request.
+}, ['GET', 'POST']);
+```
+
+> [!NOTE]
+> Routes defined with .sse() or .webhook() are always registered as 'GET' and 'POST' respectively and cannot be configured.
+
 <a id="api-routing-redirection-routes"></a>
 ### Redirection Routes
 
@@ -486,6 +511,7 @@ server.route('/test/route', (req, url) => {
 server.route('/redirect', () => Response.redirect('/redirected', 301));
 ```
 
+<a id="api-routing-status-code-text"></a>
 ### Status Code Text
 
 `spooder` exposes `HTTP_STATUS_CODE` to convieniently access status code text.
