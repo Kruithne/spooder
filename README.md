@@ -914,7 +914,7 @@ try {
 
 `safe()` is a utility function that wraps a "callable" and calls `caution()` if it throws an error.
 
-> ![NOTE]
+> [!NOTE]
 > This utility is primarily intended to be used to reduce boilerplate for fire-and-forget functions that you want to be notified about if they fail. 
 
 ```ts
