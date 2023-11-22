@@ -28,7 +28,7 @@ export class ErrorWithMetadata extends Error {
 			if (value instanceof Promise)
 				resolved_value = await value;
 			else if (typeof value === 'function')
-				resolved_value = value();
+				resolved_value = await value();
 			else if (value instanceof ReadableStream)
 				resolved_value = await Bun.readableStreamToText(value);
 
