@@ -227,7 +227,7 @@ server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
 
 `canary` is a feature in `spooder` which allows server problems to be raised as issues in your repository on GitHub.
 
-To enable this feature, you will need to configure a GitHub App and configure it:
+To enable this feature, you will need to create a GitHub App and configure it:
 
 ### 1. Create a GitHub App
 
