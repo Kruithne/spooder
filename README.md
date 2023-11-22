@@ -582,7 +582,7 @@ bar
 
 Named parameters can be used in paths by prefixing a path segment with a colon.
 
-> [!NOTE]
+> [!IMPORTANT]
 > Named parameters will overwrite existing query parameters with the same name.
 
 ```ts
