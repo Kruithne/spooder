@@ -8,9 +8,67 @@
 - It provides streamlined APIs for common server tasks in a minimalistic way, without the overhead of a full-featured web framework.
 - It is opinionated in its design to reduce complexity and overhead.
 
+The design goal behind `spooder` is not to provide a full-featured web server, but to expand the Bun runtime with a set of APIs and utilities that make it easy to develop servers with minimal overhead.
+
+> [!NOTE]
+> If you think a is missing a feature, consider opening an issue with your use-case. The goal behind `spooder` is to provide APIs that are useful for a wide range of use-cases, not to provide bespoke features better suited for userland.
+
 It consists of two components, the `CLI` and the `API`. 
 - The `CLI` is responsible for keeping the server process running, applying updates in response to source control changes, and automatically raising issues on GitHub via the canary feature.
 - The `API` provides a minimal building-block style API for developing servers, with a focus on simplicity and performance.
+
+> [!WARNING]
+> `spooder` is stable but still in active development. Backwards compatibility between versions is not guaranteed and breaking changes may be introduced. Consider pinning a specific version in your `package.json`.
+
+# CLI
+
+The `CLI` component of `spooder` is a global command-line tool for running server processes.
+
+- [CLI > Usage](#cli-usage)
+- [CLI > Dev Mode](#cli-dev-mode)
+- [CLI > Auto Restart](#cli-auto-restart)
+- [CLI > Auto Update](#cli-auto-update)
+- [CLI > Canary](#cli-canary)
+	- [CLI > Canary > Crash](#cli-canary-crash)
+	- [CLI > Canary > Sanitization](#cli-canary-sanitization)
+	- [CLI > Canary > System Information](#cli-canary-system-information)
+
+# API
+
+`spooder` exposes a simple yet powerful API for developing servers. The API is designed to be minimal to leave control in the hands of the developer and not add overhead for features you may not need.
+
+- [API > Serving](#api-serving)
+	- [`serve(port: number): Server`](#api-serving-serve)
+- [API > Routing](#api-routing)
+	- [`server.route(path: string, handler: RequestHandler, method: HTTP_METHODS)`](#api-routing-server-route)
+	- [HTTP Methods](#api-routing-methods)
+	- [Redirection Routes](#api-routing-redirection-routes)
+	- [Status Code Text](#api-routing-status-code-text)
+- [API > Routing > RequestHandler](#api-routing-request-handler)
+- [API > Routing > Fallback Handling](#api-routing-fallback-handlers)
+	- [`server.handle(status_code: number, handler: RequestHandler)`](#api-routing-server-handle)
+	- [`server.default(handler: DefaultHandler)`](#api-routing-server-default)
+	- [`server.error(handler: ErrorHandler)`](#api-routing-server-error)
+- [API > Routing > Directory Serving](#api-routing-directory-serving)
+	- [`server.dir(path: string, dir: string, handler?: DirHandler, method: HTTP_METHODS)`](#api-routing-server-dir)
+- [API > Routing > Server-Sent Events](#api-routing-server-sent-events)
+	- [`server.sse(path: string, handler: ServerSentEventHandler)`](#api-routing-server-sse)
+- [API > Routing > Webhooks](#api-routing-webhooks)
+	- [`server.webhook(secret: string, path: string, handler: WebhookHandler)`](#api-routing-server-webhook)
+- [API > Server Control](#api-server-control)
+	- [`server.stop(immediate: boolean)`](#api-server-control-server-stop)
+- [API > Error Handling](#api-error-handling)
+	- [`ErrorWithMetadata(message: string, metadata: object)`](#api-error-handling-error-with-metadata)
+	- [`caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-caution)
+	- [`panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-panic)
+	- [`safe(fn: Callable): Promise<void>`](#api-error-handling-safe)
+- [API > Content](#api-content)
+	- [`parse_template(template: string, replacements: Record<string, string>, drop_missing: boolean): string`](#api-content-parse-template)
+	- [`generate_hash_subs(length: number, prefix: string): Promise<Record<string, string>>`](#api-content-generate-hash-subs)
+	- [`apply_range(file: BunFile, request: Request): HandlerReturnType`](#api-content-apply-range)
+- [API > State Management](#api-state-management)
+	- [`set_cookie(res: Response, name: string, value: string, options?: CookieOptions)`](#api-state-management-set-cookie)
+	- [`get_cookies(source: Request | Response): Record<string, string>`](#api-state-management-get-cookies)
 
 # Installation
 
@@ -50,20 +108,6 @@ If there are any issues with the provided configuration, a warning will be print
 
 > [!NOTE]
 > Configuration warnings **do not** raise `caution` events with the `spooder` canary functionality.
-
-# CLI
-
-The `CLI` component of `spooder` is a global command-line tool for running server processes.
-
-- [CLI > Usage](#cli-usage)
-- [CLI > Dev Mode](#cli-dev-mode)
-- [CLI > Auto Restart](#cli-auto-restart)
-- [CLI > Auto Update](#cli-auto-update)
-- [CLI > Canary](#cli-canary)
-	- [CLI > Canary > Crash](#cli-canary-crash)
-	- [CLI > Canary > Sanitization](#cli-canary-sanitization)
-	- [CLI > Canary > System Information](#cli-canary-system-information)
-
 
 <a id="cli-usage"></a>
 ## CLI > Usage
@@ -403,43 +447,6 @@ In addition to the information provided by the developer, `spooder` also include
 	}
 }
 ```
-
-# API
-
-`spooder` exposes a simple yet powerful API for developing servers. The API is designed to be minimal to leave control in the hands of the developer and not add overhead for features you may not need.
-
-- [API > Serving](#api-serving)
-	- [`serve(port: number): Server`](#api-serving-serve)
-- [API > Routing](#api-routing)
-	- [`server.route(path: string, handler: RequestHandler, method: HTTP_METHODS)`](#api-routing-server-route)
-	- [HTTP Methods](#api-routing-methods)
-	- [Redirection Routes](#api-routing-redirection-routes)
-	- [Status Code Text](#api-routing-status-code-text)
-- [API > Routing > RequestHandler](#api-routing-request-handler)
-- [API > Routing > Fallback Handling](#api-routing-fallback-handlers)
-	- [`server.handle(status_code: number, handler: RequestHandler)`](#api-routing-server-handle)
-	- [`server.default(handler: DefaultHandler)`](#api-routing-server-default)
-	- [`server.error(handler: ErrorHandler)`](#api-routing-server-error)
-- [API > Routing > Directory Serving](#api-routing-directory-serving)
-	- [`server.dir(path: string, dir: string, handler?: DirHandler, method: HTTP_METHODS)`](#api-routing-server-dir)
-- [API > Routing > Server-Sent Events](#api-routing-server-sent-events)
-	- [`server.sse(path: string, handler: ServerSentEventHandler)`](#api-routing-server-sse)
-- [API > Routing > Webhooks](#api-routing-webhooks)
-	- [`server.webhook(secret: string, path: string, handler: WebhookHandler)`](#api-routing-server-webhook)
-- [API > Server Control](#api-server-control)
-	- [`server.stop(immediate: boolean)`](#api-server-control-server-stop)
-- [API > Error Handling](#api-error-handling)
-	- [`ErrorWithMetadata(message: string, metadata: object)`](#api-error-handling-error-with-metadata)
-	- [`caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-caution)
-	- [`panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-panic)
-	- [`safe(fn: Callable): Promise<void>`](#api-error-handling-safe)
-- [API > Content](#api-content)
-	- [`parse_template(template: string, replacements: Record<string, string>, drop_missing: boolean): string`](#api-content-parse-template)
-	- [`generate_hash_subs(length: number, prefix: string): Promise<Record<string, string>>`](#api-content-generate-hash-subs)
-	- [`apply_range(file: BunFile, request: Request): HandlerReturnType`](#api-content-apply-range)
-- [API > State Management](#api-state-management)
-	- [`set_cookie(res: Response, name: string, value: string, options?: CookieOptions)`](#api-state-management-set-cookie)
-	- [`get_cookies(source: Request | Response): Record<string, string>`](#api-state-management-get-cookies)
 
 <a id="api-serving"></a>
 ## API > Serving
