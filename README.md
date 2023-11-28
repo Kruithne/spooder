@@ -158,7 +158,7 @@ The following differences will be observed when running in development mode:
 It is possible to detect in userland if a server is running in development mode by checking the `SPOODER_ENV` environment variable.
 
 ```ts
-if (process.env.SPOODER_DEV === 'dev') {
+if (process.env.SPOODER_ENV === 'dev') {
 	// Server is running in development mode.
 }
 ```
