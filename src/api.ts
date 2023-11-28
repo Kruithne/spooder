@@ -107,10 +107,15 @@ export async function safe(target_fn: Callable) {
 	}
 }
 
-export function parse_template(template: string, replacements: Record<string, string | Array<string>>, drop_missing = false): string {
+type ReplacerFn = (key: string) => string | Array<string>;
+type Replacements = Record<string, string | Array<string>> | ReplacerFn;
+
+export function parse_template(template: string, replacements: Replacements, drop_missing = false): string {
 	let result = '';
 	let buffer = '';
 	let buffer_active = false;
+
+	const is_replacer_fn = typeof replacements === 'function';
 
 	const template_length = template.length;
 	for (let i = 0; i < template_length; i++) {
@@ -126,7 +131,7 @@ export function parse_template(template: string, replacements: Record<string, st
 			if (buffer.startsWith('for:')) {
 				const loop_key = buffer.substring(4);
 
-				const loop_entries = replacements[loop_key];
+				const loop_entries = is_replacer_fn ? replacements(loop_key) : replacements[loop_key];
 				const loop_content_start_index = i + 1;
 				const loop_close_index = template.indexOf('{/for}', loop_content_start_index);
 				
@@ -147,7 +152,7 @@ export function parse_template(template: string, replacements: Record<string, st
 					i += loop_content.length + 6;
 				}
 			} else {
-				const replacement = replacements[buffer];
+				const replacement = is_replacer_fn ? replacements(buffer) : replacements[buffer];
 				if (replacement !== undefined)
 					result += replacement;
 				else if (!drop_missing)

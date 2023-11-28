@@ -937,7 +937,7 @@ await safe(() => {
 ## API > Content
 
 <a id="api-content-parse-template"></a>
-### 🔧 `parse_template(template: string, replacements: Record<string, string>, drop_missing: boolean): string`
+### 🔧 `parse_template(template: string, replacements: Replacements, drop_missing: boolean): string`
 
 Replace placeholders in a template string with values from a replacement object.
 
@@ -991,6 +991,29 @@ parse_template(template, replacements, true);
 		<h1>Hello, world!</h1>
 		<p>This is a test.</p>
 		<p></p>
+	</body>
+</html>
+```
+
+`parse_template` supports passing a function instead of a replacement object. This function will be called for each placeholder and the return value will be used as the replacement.
+
+```ts
+const replacer = (placeholder: string) => {
+	return placeholder.toUpperCase();
+};
+
+parse_template('Hello {$world}', replacer);
+```
+
+```html
+<html>
+	<head>
+		<title>TITLE</title>
+	</head>
+	<body>
+		<h1>TITLE</h1>
+		<p>CONTENT</p>
+		<p>IGNORED</p>
 	</body>
 </html>
 ```
