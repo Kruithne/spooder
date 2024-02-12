@@ -10,8 +10,7 @@
 	},
 	"module": "./src/api.ts",
 	"devDependencies": {
-		"@types/node": "^20.0.0",
-		"bun-types": "^0.5.0"
+		"@types/bun": "^1.0.5"
 	},
 	"bin": {
 		"spooder": "./src/cli.ts"

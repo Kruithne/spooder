@@ -385,7 +385,7 @@ export function serve(port: number) {
 	
 		// Content-type/content-length are automatically set for blobs.
 		if (response instanceof Blob)
-			return new Response(response as Blob, { status: status_code });
+			return new Response(response as unknown as BodyInit, { status: status_code });
 
 		// Status codes can be returned from some handlers.
 		if (return_status_code && typeof response === 'number')
@@ -559,14 +559,16 @@ export function serve(port: number) {
 
 				const queue = Array<string>();
 				const stream = new ReadableStream({
+					// @ts-ignore Bun implements a "direct" mode which does not exist in the spec.
 					type: 'direct',
 
-					async pull(controller: ReadableStreamDirectController) {
-						stream_controller = controller;
+					async pull(controller) {
+						// @ts-ignore `controller` in "direct" mode is ReadableStreamDirectController.
+						stream_controller = controller as ReadableStreamDirectController;
 						while (!req.signal.aborted) {
 							if (queue.length > 0) {
-								controller.write(queue.shift()!);
-								controller.flush();
+								stream_controller.write(queue.shift()!);
+								stream_controller.flush();
 							} else {
 								await Bun.sleep(50);
 							}
