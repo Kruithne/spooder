@@ -331,7 +331,7 @@ function route_directory(route_path: string, dir: string, handler: DirHandler): 
 			const file_stat = await fs.stat(file_path);
 			const bun_file = Bun.file(file_path);
 
-			return handler(file_path, bun_file, file_stat, req, url);
+			return await handler(file_path, bun_file, file_stat, req, url);
 		} catch (e) {
 			const err = e as NodeJS.ErrnoException;
 			if (err?.code === 'ENOENT')

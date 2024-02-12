@@ -728,6 +728,16 @@ server.dir('/static', '/static', (file_path, file, stat, request, url) => {
 > [!NOTE]
 > The directory handler function is only called for files that exist on disk - including directories.
 
+Asynchronous directory handlers are supported and will be awaited.
+
+```js
+server.dir('/static', '/static', async (file_path, file) => {
+	let file_contents = await file.text();
+	// do something with file_contents
+	return file_contents;
+});
+```
+
 <a id="api-routing-server-sse"></a>
 ## API > Routing > Server-Sent Events
 
