@@ -17,9 +17,6 @@ It consists of two components, the `CLI` and the `API`.
 - The `CLI` is responsible for keeping the server process running, applying updates in response to source control changes, and automatically raising issues on GitHub via the canary feature.
 - The `API` provides a minimal building-block style API for developing servers, with a focus on simplicity and performance.
 
-> [!WARNING]
-> `spooder` is stable but still in active development. Backwards compatibility between versions is not guaranteed and breaking changes may be introduced. Consider pinning a specific version in your `package.json`.
-
 # CLI
 
 The `CLI` component of `spooder` is a global command-line tool for running server processes.
