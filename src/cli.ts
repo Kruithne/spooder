@@ -64,7 +64,7 @@ async function start_server() {
 		function capture_stream(stream: ReadableStream, output: NodeJS.WritableStream) {
 			const reader = stream.getReader();
 
-			reader.read().then(function read_chunk(chunk: ReadableStreamDefaultReadResult<Uint8Array>) {
+			reader.read().then(function read_chunk(chunk) {
 				if (chunk.done)
 					return;
 
