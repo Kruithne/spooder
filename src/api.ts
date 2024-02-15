@@ -343,7 +343,6 @@ export function get_cookies(source: Request | Response, decode: boolean = false)
 export function apply_range(file: BunFile, request: Request): BunFile {
 	const range_header = request.headers.get('range');
 	if (range_header !== null) {
-		console.log(range_header);
 		const regex = /bytes=(\d*)-(\d*)/;
 		const match = range_header.match(regex);
 
@@ -440,13 +439,22 @@ function format_query_parameters(search_params: URLSearchParams): string {
 	for (let [key, value] of search_params)
 		result_parts.push(`${key}: ${value}`);
 
-	return '{ ' + result_parts.join(', ') + ' }';
+	return '\x1b[90m( ' + result_parts.join(', ') + ' )\x1b[0m';
 }
 
 function print_request_info(req: Request, res: Response, url: URL, request_start: number): Response {
 	const request_time = Date.now() - request_start;
 	const search_params = url.search.length > 0 ? format_query_parameters(url.searchParams) : '';
-	console.log(`[${res.status}] ${req.method} ${url.pathname} ${search_params} [${request_time}ms]`);
+
+	// format status code based on range (2xx is green, 4xx is yellow, 5xx is red), use ansi colors.
+	const status_fmt = res.status < 300 ? '\x1b[32m' : res.status < 500 ? '\x1b[33m' : '\x1b[31m';
+	const status_code = status_fmt + res.status + '\x1b[0m';
+
+	// format request time based on range (0-100ms is green, 100-500ms is yellow, 500ms+ is red), use ansi colors.
+	const time_fmt = request_time < 100 ? '\x1b[32m' : request_time < 500 ? '\x1b[33m' : '\x1b[31m';
+	const request_time_str = time_fmt + request_time + 'ms\x1b[0m';
+
+	log('[%s] {%s} %s %s [{%s}]', status_code, req.method, url.pathname, search_params, request_time_str);
 	return res;
 }
 
