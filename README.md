@@ -1244,7 +1244,7 @@ const cookies = get_cookies(req, true);
 
 `spooder` provides a straightforward API to manage database schema in revisions through source control.
 
-> [!NOTICE]
+> [!NOTE]
 > Currently, only SQLite is supported. This may be expanded once Bun supports more database drivers.
 
 <a id="api-database-schema-db-update-schema-sqlite"></a>
