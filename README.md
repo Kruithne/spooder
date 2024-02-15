@@ -66,6 +66,9 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 - [API > State Management](#api-state-management)
 	- [`set_cookie(res: Response, name: string, value: string, options?: CookieOptions)`](#api-state-management-set-cookie)
 	- [`get_cookies(source: Request | Response): Record<string, string>`](#api-state-management-get-cookies)
+- [API > Database Schema](#api-database-schema)
+	- [`db_update_schema_sqlite(db: Database, schema: string): Promise<void>`](#api-database-schema-db-update-schema-sqlite)
+	- [`db_init_schema_sqlite(db_path: string, schema: string): Promise<Database>`](#api-database-schema-db-init-schema-sqlite)
 
 # Installation
 
@@ -1212,6 +1215,107 @@ Cookie: my_test_cookie=my%20cookie%20value
 ```ts
 const cookies = get_cookies(req, true);
 { my_test_cookie: 'my cookie value' }
+```
+
+<a id="api-database-schema"></a>
+## API > Database Schema
+
+`spooder` provides a straightforward API to manage database schema in revisions through source control.
+
+> [!NOTICE]
+> Currently, only SQLite is supported. This may be expanded once Bun supports more database drivers.
+
+<a id="api-database-schema-db-update-schema-sqlite"></a>
+### 🔧 `db_update_schema_sqlite(db: Database, schema: string): Promise<void>`
+
+`db_update_schema_sqlite` takes a [`Database`](https://bun.sh/docs/api/sqlite) instance and a schema directory.
+
+The schema directory is expected to contain an SQL file for each table in the database with the file name matching the name of the table.
+
+```
+- database.sqlite
+- schema/
+	- users.sql
+	- posts.sql
+	- comments.sql
+```
+
+```ts
+import { db_update_schema_sqlite } from 'spooder';
+import { Database } from 'bun:sqlite';
+
+const db = new Database('./database.sqlite');
+await db_update_schema_sqlite(db, './schema');
+```
+
+Each of the SQL files should contain all of the revisions for the table, with the first revision being table creation and subsequent revisions being table modifications.
+
+```sql
+-- [1] Table creation.
+CREATE TABLE users (
+	id INTEGER PRIMARY KEY,
+	username TEXT NOT NULL,
+	password TEXT NOT NULL
+);
+
+-- [2] Add email column.
+ALTER TABLE users ADD COLUMN email TEXT;
+
+-- [3] Cleanup invalid usernames.
+DELETE FROM users WHERE username = 'admin';
+DELETE FROM users WHERE username = 'root';
+```
+
+Each revision should be clearly marked with a comment containing the revision number in square brackets. Anything proceeding the revision number is treated as a comment and ignored.
+
+>[!NOTICE]
+> The exact revision header syntax is `^--\s*\[(\d+)\]`.
+
+Everything following a revision header is considered part of that revision until the next revision header or the end of the file, allowing for multiple SQL statements to be included in a single revision.
+
+When calling `db_update_schema_sqlite`, unapplied revisions will be applied in ascending order (regardless of order within the file) until the schema is up-to-date. Schema revisions are tracked in a table called `db_schema` which is created automatically if it does not exist with the following schema.
+
+```sql
+CREATE TABLE db_schema (
+	db_schema_table_name TEXT PRIMARY KEY,
+	db_schema_version INTEGER
+);
+```
+
+>[!IMPORTANT]
+> The entire process is transactional. If an error occurs during the application of **any** revision for **any** table, the entire process will be rolled back and the database will be left in the state it was before the update was attempted.
+
+>[!IMPORTANT]
+> `db_update_schema_sqlite` will throw an error if the revisions cannot be parsed or applied for any reason. It is important you catch and handle appropriately.
+
+```ts
+try {
+	const db = new Database('./database.sqlite');
+	await db_update_schema_sqlite(db, './schema');
+} catch (e) {
+	// panic (crash) or gracefully continue, etc.
+	await panic(e);
+}
+```
+
+<a id="api-database-schema-db-init-schema-sqlite"></a>
+### 🔧 `db_init_schema_sqlite(db_path: string, schema: string): Promise<Database>`
+
+`db_init_schema_sqlite` exists as a convenience function to create a new database and apply the schema in one step.
+
+```ts
+import { db_init_schema_sqlite } from 'spooder';
+const db = await db_init_schema_sqlite('./database.sqlite', './schema');
+```
+
+The above is equivalent to the following.
+
+```ts
+import { db_update_schema_sqlite } from 'spooder';
+import { Database } from 'bun:sqlite';
+
+const db = new Database('./database.sqlite', { create: true });
+await db_update_schema_sqlite(db, './schema');
 ```
 
 ## Legal

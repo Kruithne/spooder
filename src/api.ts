@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import { log } from './utils';
 import crypto from 'crypto';
 import { Blob } from 'node:buffer';
+import { Database } from 'bun:sqlite';
 
 export const HTTP_STATUS_CODE = http.STATUS_CODES;
 
@@ -194,6 +195,97 @@ export async function generate_hash_subs(length = 7, prefix = 'hash='): Promise<
 	}
 
 	return hash_map;
+}
+
+type Row_DBSchema = { db_schema_table_name: string, db_schema_version: number };
+
+export async function db_update_schema_sqlite(db: Database, schema_dir: string) {
+	log('[db] updating database schema for %s', db.filename);
+
+	const schema_versions = new Map();
+
+	try {
+		const query = db.query('SELECT db_schema_table_name, db_schema_version FROM db_schema');
+		for (const row of query.all() as Array<Row_DBSchema>)
+			schema_versions.set(row.db_schema_table_name, row.db_schema_version);
+	} catch (e) {
+		log('[db] creating db_schema table');
+		db.run('CREATE TABLE db_schema (db_schema_table_name TEXT PRIMARY KEY, db_schema_version INTEGER)');
+	}
+	
+	db.transaction(async () => {
+		const update_schema_query = db.prepare(`
+			INSERT INTO db_schema (db_schema_version, db_schema_table_name) VALUES (?1, ?2)
+			ON CONFLICT(db_schema_table_name) DO UPDATE SET db_schema_version = EXCLUDED.db_schema_version
+		`);
+
+		const schema_files = await fs.readdir(schema_dir);
+		for (const schema_file of schema_files) {
+			const schema_file_lower = schema_file.toLowerCase();
+			if (!schema_file_lower.endsWith('.sql'))
+				continue;
+
+			log('[db] parsing schema file %s', schema_file_lower);
+
+			const schema_name = path.basename(schema_file_lower, '.sql');
+			const schema_path = path.join(schema_dir, schema_file);
+			const schema = await fs.readFile(schema_path, 'utf8');
+
+			const revisions = new Map();
+			let current_rev_id = 0;
+			let current_rev = '';
+
+			for (const line of schema.split(/\r?\n/)) {
+				const rev_start = line.match(/^--\s*\[(\d+)\]/);
+				if (rev_start !== null) {
+					// New chunk definition detected, store the current chunk and start a new one.
+					if (current_rev_id > 0) {
+						revisions.set(current_rev_id, current_rev);
+						current_rev = '';
+					}
+
+					const rev_number = parseInt(rev_start[1]);
+					if (isNaN(rev_number) || rev_number < 1)
+						throw new Error(rev_number + ' is not a valid revision number in ' + schema_file_lower);
+					current_rev_id = rev_number;
+				} else {
+					// Append to existing revision.
+					current_rev += line + '\n';
+				}
+			}
+
+			// There may be something left in current_chunk once we reach end of the file.
+			if (current_rev_id > 0)
+				revisions.set(current_rev_id, current_rev);
+
+			if (revisions.size === 0) {
+				log('[db] %s contains no valid revisions', schema_file);
+				continue;
+			}
+
+			const current_schema_version = schema_versions.get(schema_name) ?? 0;
+			const chunk_keys = Array.from(revisions.keys()).filter(chunk_id => chunk_id > current_schema_version).sort((a, b) => a - b);
+
+			let newest_schema_version = current_schema_version;
+			for (const rev_id of chunk_keys) {
+				const revision = revisions.get(rev_id);
+				log('[db] applying revision %d to %s', rev_id, schema_name);
+				db.transaction(() => db.run(revision))();
+				newest_schema_version = rev_id;
+			}
+
+			if (newest_schema_version > current_schema_version) {
+				log('[db] updated table %s to revision %d', schema_name, newest_schema_version);
+				update_schema_query.run(newest_schema_version, schema_name);
+			}
+		}
+	})();
+}
+
+export async function db_init_schema_sqlite(db_path: string, schema_dir: string): Promise<Database> {
+	const db = new Database(db_path, { create: true });
+	await db_update_schema_sqlite(db, schema_dir);
+	return db;
 }
 
 type CookieOptions = {
