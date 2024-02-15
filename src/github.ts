@@ -117,5 +117,5 @@ export async function create_github_issue(issue: Issue): Promise<void> {
 	check_response_is_ok(issue_res, 'cannot create GitHub issue');
 
 	const json_issue = await issue_res.json() as IssueResponse;
-	log('raised canary issue #%d in %s: %s', json_issue.number, repository.full_name, json_issue.url);
+	log('[{canary}] raised issue {#%d} in {%s}: %s', json_issue.number, repository.full_name, json_issue.url);
 }

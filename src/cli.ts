@@ -10,7 +10,7 @@ async function start_server() {
 	const is_dev_mode = argv.includes('--dev');
 
 	if (is_dev_mode)
-		log('[dev] spooder has been started in dev mode');
+		log('[{dev}] spooder has been started in {dev mode}');
 
 	const config = await get_config();
 
@@ -19,12 +19,12 @@ async function start_server() {
 		const n_update_commands = update_commands.length;
 
 		if (n_update_commands > 0) {
-			log('running %d update commands', n_update_commands);
+			log('running {%d} update commands', n_update_commands);
 
 			for (let i = 0; i < n_update_commands; i++) {
 				const config_update_command = update_commands[i];
 
-				log('[%d] %s', i, config_update_command);
+				log('[{%d}] %s', i, config_update_command);
 
 				const update_proc = Bun.spawn(parse_command_line(config_update_command), {
 					cwd: process.cwd(),
@@ -34,7 +34,7 @@ async function start_server() {
 
 				await update_proc.exited;
 
-				log('[%d] exited with code %d', i, update_proc.exitCode);
+				log('[{%d}] exited with code {%d}', i, update_proc.exitCode);
 
 				if (update_proc.exitCode !== 0) {
 					log('aborting update due to non-zero exit code from [%d]', i);
@@ -43,7 +43,7 @@ async function start_server() {
 			}
 		}
 	} else {
-		log('[dev] skipping update commands in dev mode');
+		log('[{dev}] skipping update commands in {dev mode}');
 	}
 
 	const crash_console_history = config.canary.crash_console_history;
@@ -86,15 +86,15 @@ async function start_server() {
 	await proc.exited;
 	
 	const proc_exit_code = proc.exitCode;
-	log('server exited with code %s', proc_exit_code);
+	log('server exited with code {%s}', proc_exit_code);
 	
 	if (proc_exit_code !== 0) {
 		const console_output = include_crash_history ? strip_color_codes(stream_history.join('\n')) : undefined;
 
 		if (is_dev_mode) {
-			log('[dev] crash: server exited unexpectedly (exit code %d)', proc_exit_code);
-			log('[dev] without --dev, this would raise a canary report');
-			log('[dev] console output:\n%s', console_output);
+			log('[{dev}] crash: server exited unexpectedly (exit code {%d})', proc_exit_code);
+			log('[{dev}] without {--dev}, this would raise a canary report');
+			log('[{dev}] console output:\n%s', console_output);
 		} else {
 			dispatch_report('crash: server exited unexpectedly', [{
 				proc_exit_code, console_output
@@ -105,10 +105,10 @@ async function start_server() {
 	const auto_restart_ms = config.auto_restart;
 	if (auto_restart_ms > -1) {
 		if (is_dev_mode) {
-			log('[dev] auto-restart is disabled in dev mode');
+			log('[{dev}] auto-restart is {disabled} in {dev mode}');
 			process.exit(proc_exit_code ?? 0);
 		} else {
-			log('restarting server in %dms', auto_restart_ms);
+			log('restarting server in {%dms}', auto_restart_ms);
 			setTimeout(start_server, auto_restart_ms);
 		}
 	}

@@ -93,9 +93,9 @@ async function check_cache_table(key: string, repository: string, expiry: number
 			}
 		}
 	} catch (e) {
-		log('failed to read canary cache file ' + cache_file_path);
-		log('error: ' + (e as Error).message);
-		log('you should resolve this issue to prevent spamming GitHub with canary reports');
+		log('[{canary}] failed to read canary cache file {%s}', cache_file_path);
+		log('[{canary}] error: ' + (e as Error).message);
+		log('[{canary}] resolve this issue to prevent spamming GitHub with canary reports');
 	}
 
 	if (cache_table.has(key_hash)) {
@@ -159,13 +159,13 @@ export async function dispatch_report(report_title: string, report_body: Array<u
 		const canary_repostiory = config.canary.repository;
 
 		if (canary_account.length === 0|| canary_repostiory.length === 0) {
-			log('[canary] report dispatch failed; no account/repository configured');
+			log('[{canary}] report dispatch failed; no account/repository configured');
 			return;
 		}
 
 		const is_cached = await check_cache_table(report_title, canary_repostiory, config.canary.throttle);
 		if (is_cached) {
-			log('[canary] throttled canary report: ' + report_title);
+			log('[{canary}] throttled canary report: {%s}', report_title);
 			return;
 		}
 
@@ -211,6 +211,6 @@ export async function dispatch_report(report_title: string, report_body: Array<u
 			issue_labels: config.canary.labels
 		});
 	} catch (e) {
-		log('[canary error] ' + (e as Error)?.message ?? 'unspecified error');
+		log('[{canary error}] ' + (e as Error)?.message ?? 'unspecified error');
 	}
 }

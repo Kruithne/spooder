@@ -1,6 +1,13 @@
+import { format } from 'node:util';
+
 /** Logs a message to stdout with the prefix `[spooder] ` */
 export function log(message: string, ...args: unknown[]): void {
-	console.log('[spooder] ' + message, ...args);
+	let formatted_message = format('[{spooder}] ' + message, ...args);
+	
+	// Replace all {...} with text wrapped in ANSI color code 6.
+	formatted_message = formatted_message.replace(/\{([^}]+)\}/g, '\x1b[38;5;6m$1\x1b[0m');
+
+	process.stdout.write(formatted_message + '\n');
 }
 
 /** Strips ANSI color codes from a string */

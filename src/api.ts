@@ -77,9 +77,9 @@ async function handle_error(prefix: string, err_message_or_obj: string | object,
 	}
 
 	if (process.env.SPOODER_ENV === 'dev') {
-		log('[dev] dispatch_report %s', prefix + error_message);
-		log('[dev] without --dev, this would raise a canary report');
-		log('[dev] %o', final_err);
+		log('[{dev}] dispatch_report %s', prefix + error_message);
+		log('[{dev}] without {--dev}, this would raise a canary report');
+		log('[{dev}] %o', final_err);
 	} else {
 		await dispatch_report(prefix + error_message, final_err);
 	}
@@ -200,7 +200,7 @@ export async function generate_hash_subs(length = 7, prefix = 'hash='): Promise<
 type Row_DBSchema = { db_schema_table_name: string, db_schema_version: number };
 
 export async function db_update_schema_sqlite(db: Database, schema_dir: string) {
-	log('[db] updating database schema for %s', db.filename);
+	log('[{db}] updating database schema for {%s}', db.filename);
 
 	const schema_versions = new Map();
 
@@ -209,7 +209,7 @@ export async function db_update_schema_sqlite(db: Database, schema_dir: string) 
 		for (const row of query.all() as Array<Row_DBSchema>)
 			schema_versions.set(row.db_schema_table_name, row.db_schema_version);
 	} catch (e) {
-		log('[db] creating db_schema table');
+		log('[{db}] creating {db_schema} table');
 		db.run('CREATE TABLE db_schema (db_schema_table_name TEXT PRIMARY KEY, db_schema_version INTEGER)');
 	}
 	
@@ -225,7 +225,7 @@ export async function db_update_schema_sqlite(db: Database, schema_dir: string) 
 			if (!schema_file_lower.endsWith('.sql'))
 				continue;
 
-			log('[db] parsing schema file %s', schema_file_lower);
+			log('[{db}] parsing schema file {%s}', schema_file_lower);
 
 			const schema_name = path.basename(schema_file_lower, '.sql');
 			const schema_path = path.join(schema_dir, schema_file);
@@ -259,7 +259,7 @@ export async function db_update_schema_sqlite(db: Database, schema_dir: string) 
 				revisions.set(current_rev_id, current_rev);
 
 			if (revisions.size === 0) {
-				log('[db] %s contains no valid revisions', schema_file);
+				log('[{db}] {%s} contains no valid revisions', schema_file);
 				continue;
 			}
 
@@ -269,13 +269,13 @@ export async function db_update_schema_sqlite(db: Database, schema_dir: string) 
 			let newest_schema_version = current_schema_version;
 			for (const rev_id of chunk_keys) {
 				const revision = revisions.get(rev_id);
-				log('[db] applying revision %d to %s', rev_id, schema_name);
+				log('[{db}] applying revision {%d} to {%s}', rev_id, schema_name);
 				db.transaction(() => db.run(revision))();
 				newest_schema_version = rev_id;
 			}
 
 			if (newest_schema_version > current_schema_version) {
-				log('[db] updated table %s to revision %d', schema_name, newest_schema_version);
+				log('[{db}] updated table {%s} to revision {%d}', schema_name, newest_schema_version);
 				update_schema_query.run(newest_schema_version, schema_name);
 			}
 		}
