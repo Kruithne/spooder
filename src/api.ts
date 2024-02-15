@@ -442,8 +442,7 @@ function format_query_parameters(search_params: URLSearchParams): string {
 	return '\x1b[90m( ' + result_parts.join(', ') + ' )\x1b[0m';
 }
 
-function print_request_info(req: Request, res: Response, url: URL, request_start: number): Response {
-	const request_time = Date.now() - request_start;
+function print_request_info(req: Request, res: Response, url: URL, request_time: number): Response {
 	const search_params = url.search.length > 0 ? format_query_parameters(url.searchParams) : '';
 
 	// format status code based on range (2xx is green, 4xx is yellow, 5xx is red), use ansi colors.
@@ -578,6 +577,11 @@ export function serve(port: number) {
 		}
 	}
 
+	type SlowRequestCallback = (req: Request, request_time: number) => void;
+
+	let slow_request_callback: SlowRequestCallback | null = null;
+	let slow_request_threshold: number = 1000;
+
 	const server = Bun.serve({
 		port,
 		development: false,
@@ -587,7 +591,12 @@ export function serve(port: number) {
 			const request_start = Date.now();
 
 			const response = await generate_response(req, url);
-			return print_request_info(req, response, url, request_start);
+			const request_time = Date.now() - request_start;
+
+			if (slow_request_callback !== null && request_time > slow_request_threshold)
+				slow_request_callback(req, request_time);
+
+			return print_request_info(req, response, url, request_time);
 		}
 	});
 
@@ -625,6 +634,12 @@ export function serve(port: number) {
 
 				return handler(body);
 			}, 'POST']);
+		},
+
+		/** Register a callback for slow requests. */
+		on_slow_request: (callback: SlowRequestCallback, threshold = 1000): void => {
+			slow_request_callback = callback;
+			slow_request_threshold = threshold;
 		},
 
 		/** Register a default handler for all status codes. */

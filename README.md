@@ -46,6 +46,7 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 	- [`server.handle(status_code: number, handler: RequestHandler)`](#api-routing-server-handle)
 	- [`server.default(handler: DefaultHandler)`](#api-routing-server-default)
 	- [`server.error(handler: ErrorHandler)`](#api-routing-server-error)
+	- [`server.on_slow_request(callback: SlowRequestCallback, threshold: number)`](#api-routing-server-on-slow-request)
 - [API > Routing > Directory Serving](#api-routing-directory-serving)
 	- [`server.dir(path: string, dir: string, handler?: DirHandler, method: HTTP_METHODS)`](#api-routing-server-dir)
 - [API > Routing > Server-Sent Events](#api-routing-server-sent-events)
@@ -662,6 +663,27 @@ server.error((err, req, url) => {
 	return new Response('Custom Internal Server Error Message', { status: 500 });
 });
 ```
+
+<a id="api-routing-server-on-slow-request"></a>
+### 🔧 `server.on_slow_request(callback: SlowRequestCallback, threshold: number)`
+
+`server.on_slow_request` can be used to register a callback for requests that take an undesirable amount of time to process.
+
+By default requests that take longer than `1000ms` to process will trigger the callback, but this can be adjusted by providing a custom threshold.
+
+> [!IMPORTANT]
+> If your canary reports to a public repository, be cautious about directly including the `req` object in the callback. This can lead to sensitive information being leaked.
+
+```ts
+server.on_slow_request(async (req, time) => {
+	// avoid `time` in the title to avoid canary spam
+	// see caution() API for information
+	await caution('Slow request warning', { req, time });
+}, 500);
+```
+
+> [!INFORMATION]
+> The callback is not awaited internally, so you can use `async/await` freely without blocking the server/request.
 
 <a id="api-routing-directory-serving"></a>
 ## API > Routing > Directory Serving
