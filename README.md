@@ -682,7 +682,7 @@ server.on_slow_request(async (req, time) => {
 }, 500);
 ```
 
-> [!INFORMATION]
+> [!INFO]
 > The callback is not awaited internally, so you can use `async/await` freely without blocking the server/request.
 
 <a id="api-routing-directory-serving"></a>
