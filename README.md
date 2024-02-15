@@ -1290,7 +1290,7 @@ DELETE FROM users WHERE username = 'root';
 
 Each revision should be clearly marked with a comment containing the revision number in square brackets. Anything proceeding the revision number is treated as a comment and ignored.
 
->[!NOTICE]
+>[!NOTE]
 > The exact revision header syntax is `^--\s*\[(\d+)\]`.
 
 Everything following a revision header is considered part of that revision until the next revision header or the end of the file, allowing for multiple SQL statements to be included in a single revision.
