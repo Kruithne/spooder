@@ -1254,6 +1254,9 @@ const cookies = get_cookies(req, true);
 
 The schema directory is expected to contain an SQL file for each table in the database with the file name matching the name of the table.
 
+> [!NOTE]
+> Files without the `.sql` extension (case-insensitive) will be ignored.
+
 ```
 - database.sqlite
 - schema/
