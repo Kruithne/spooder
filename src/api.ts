@@ -170,7 +170,7 @@ export function parse_template(template: string, replacements: Replacements, dro
 	return result;
 }
 
-export async function generate_hash_subs(length = 7, prefix = 'hash='): Promise<Record<string, string>> {
+export async function get_git_hashes(length = 7): Promise<Record<string, string>> {
 	const cmd = ['git', 'ls-tree', '-r', 'HEAD'];
 	const process = Bun.spawn(cmd, {
 		stdout: 'pipe',
@@ -180,7 +180,7 @@ export async function generate_hash_subs(length = 7, prefix = 'hash='): Promise<
 	await process.exited;
 
 	if (process.exitCode as number > 0)
-		throw new Error('generate_hash_subs() failed, `' + cmd.join(' ') + '` exited with non-zero exit code.');
+		throw new Error('get_git_hashes() failed, `' + cmd.join(' ') + '` exited with non-zero exit code.');
 
 	const stdout = await Bun.readableStreamToText(process.stdout as ReadableStream);
 	const hash_map: Record<string, string> = {};
@@ -188,11 +188,20 @@ export async function generate_hash_subs(length = 7, prefix = 'hash='): Promise<
 	const regex = /([^\s]+)\s([^\s]+)\s([^\s]+)\t(.+)/g;
 	let match: RegExpExecArray | null;
 
-	let hash_count = 0;
-	while (match = regex.exec(stdout)) {
-		hash_map[prefix + match[4]] = match[3].substring(0, length);
-		hash_count++;
-	}
+	while (match = regex.exec(stdout))
+		hash_map[match[4]] = match[3].substring(0, length);
+
+	return hash_map;
+}
+
+export async function generate_hash_subs(length = 7, prefix = 'hash=', hashes?: Record<string, string>): Promise<Record<string, string>> {	
+	const hash_map: Record<string, string> = {};
+
+	if (!hashes)
+		hashes = await get_git_hashes(length);
+
+	for (const [file, hash] of Object.entries(hashes))
+		hash_map[prefix + file] = hash;
 
 	return hash_map;
 }

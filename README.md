@@ -62,7 +62,8 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 	- [`safe(fn: Callable): Promise<void>`](#api-error-handling-safe)
 - [API > Content](#api-content)
 	- [`parse_template(template: string, replacements: Record<string, string>, drop_missing: boolean): string`](#api-content-parse-template)
-	- [`generate_hash_subs(length: number, prefix: string): Promise<Record<string, string>>`](#api-content-generate-hash-subs)
+	- [`generate_hash_subs(length: number, prefix: string, hashes?: Record<string, string>): Promise<Record<string, string>>`](#api-content-generate-hash-subs)
+	- [`get_git_hashes(length: number): Promise<Record<string, string>>`](#api-content-get-git-hashes)
 	- [`apply_range(file: BunFile, request: Request): HandlerReturnType`](#api-content-apply-range)
 - [API > State Management](#api-state-management)
 	- [`set_cookie(res: Response, name: string, value: string, options?: CookieOptions)`](#api-state-management-set-cookie)
@@ -1098,7 +1099,7 @@ parse_template(..., {
 ```
 
 <a id="api-content-generate-hash-subs"></a>
-### 🔧 `generate_hash_subs(prefix: string): Promise<Record<string, string>>`
+### 🔧 `generate_hash_subs(length: number, prefix: string, hashes?: Record<string, string>): Promise<Record<string, string>>`
 
 Generate a replacement table for mapping file paths to hashes in templates. This is useful for cache-busting static assets.
 
@@ -1140,6 +1141,29 @@ generate_hash_subs(7, '$#').then(subs => hash_sub_table = subs).catch(caution);
 server.route('/test', (req, url) => {
 	return parse_template('Hello world {$#docs/project-logo.png}', hash_sub_table);
 });
+```
+
+<a id="api-content-get-git-hashes"></a>
+### 🔧 ``get_git_hashes(length: number): Promise<Record<string, string>>``
+
+Internally, `generate_hash_subs()` uses `get_git_hashes()` to retrieve the hash table from git. This function is exposed for convenience.
+
+> [!IMPORTANT]
+> Internally `get_git_hashes()` uses `git ls-tree -r HEAD`, so the working directory must be a git repository.
+
+```ts
+const hashes = await get_git_hashes(7);
+// { 'docs/project-logo.png': '754d9ea' }
+```
+
+If you're using `generate_hash_subs()` and `get_git_hashes()` at the same time, it is more efficient to pass the result of `get_git_hashes()` directly to `generate_hash_subs()` to prevent redundant calls to git.
+
+```ts
+const hashes = await get_git_hashes(7);
+const subs = await generate_hash_subs(7, undefined, hashes);
+
+// hashes[0] -> { 'docs/project-logo.png': '754d9ea' }
+// subs[0] -> { 'hash=docs/project-logo.png': '754d9ea' }
 ```
 
 <a id="api-apply-range"></a>
