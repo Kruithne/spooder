@@ -69,7 +69,8 @@ async function start_server() {
 					return;
 
 				const chunk_str = text_decoder.decode(chunk.value);
-				stream_history.push(...chunk_str.split(/\r?\n/));
+				for (const chunk of chunk_str.split(/\r?\n/))
+					stream_history.push(chunk.trimEnd());
 
 				if (stream_history.length > crash_console_history)
 					stream_history.splice(0, stream_history.length - crash_console_history);
