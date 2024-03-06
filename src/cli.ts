@@ -84,9 +84,7 @@ async function start_server() {
 		capture_stream(proc.stderr as ReadableStream, process.stderr);
 	}
 	
-	await proc.exited;
-	
-	const proc_exit_code = proc.exitCode;
+	const proc_exit_code = await proc.exited;
 	log('server exited with code {%s}', proc_exit_code);
 	
 	if (proc_exit_code !== 0) {
