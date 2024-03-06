@@ -108,7 +108,7 @@ export async function safe(target_fn: Callable) {
 	}
 }
 
-type ReplacerFn = (key: string) => string | Array<string>;
+type ReplacerFn = (key: string) => string | Array<string> | undefined;
 type Replacements = Record<string, string | Array<string>> | ReplacerFn;
 
 export function parse_template(template: string, replacements: Replacements, drop_missing = false): string {
