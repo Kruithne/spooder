@@ -586,7 +586,7 @@ export function serve(port: number) {
 		}
 	}
 
-	type SlowRequestCallback = (req: Request, request_time: number) => void;
+	type SlowRequestCallback = (req: Request, request_time: number, url: URL) => void;
 
 	let slow_request_callback: SlowRequestCallback | null = null;
 	let slow_request_threshold: number = 1000;
@@ -603,7 +603,7 @@ export function serve(port: number) {
 			const request_time = Date.now() - request_start;
 
 			if (slow_request_callback !== null && request_time > slow_request_threshold)
-				slow_request_callback(req, request_time);
+				slow_request_callback(req, request_time, url);
 
 			return print_request_info(req, response, url, request_time);
 		}

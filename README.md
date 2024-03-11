@@ -676,7 +676,7 @@ By default requests that take longer than `1000ms` to process will trigger the c
 > If your canary reports to a public repository, be cautious about directly including the `req` object in the callback. This can lead to sensitive information being leaked.
 
 ```ts
-server.on_slow_request(async (req, time) => {
+server.on_slow_request(async (req, time, url) => {
 	// avoid `time` in the title to avoid canary spam
 	// see caution() API for information
 	await caution('Slow request warning', { req, time });
