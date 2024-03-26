@@ -716,6 +716,9 @@ server.route('/api/endpoint', async (req, url) => {
 
 	try {
 		const json = await req.json();
+		if (json === null || typeof json !== 'object' || Array.isArray(json))
+			return 400;
+
 		// do something with json.
 		return 200;
 	} catch (err) {
@@ -734,6 +737,9 @@ server.route('/api/endpoint', validate_req_json(async (json, req, url) => {
 ```
 
 This behaves the same as the code above, where a `400` status code is returned if the `Content-Type` header is not `application/json` or if the request body is not valid JSON, and no error is thrown.
+
+> [!NOTE]
+> While arrays and other primitives are valid JSON, `validate_req_json` will only pass objects to the handler, since they are the most common use case for JSON request bodies and it removes the need to validate that in the handler. If you need to use arrays or other primitives, either box them in an object or provide your own validation.
 
 <a id="api-routing-directory-serving"></a>
 ## API > Routing > Directory Serving

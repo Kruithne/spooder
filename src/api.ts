@@ -398,7 +398,7 @@ type ErrorHandler = (err: Error, req: Request, url: URL) => Resolvable<Response>
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
 type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
-type JSONRequestHandler = (req: Request, url: URL, json: JsonSerializable) => HandlerReturnType;
+type JSONRequestHandler = (req: Request, url: URL, json: JsonObject) => HandlerReturnType;
 
 type ServerSentEventClient = {
 	message: (message: string) => void;
@@ -451,7 +451,13 @@ export function validate_req_json(JSONRequestHandler: JSONRequestHandler): Reque
 			if (req.headers.get('Content-Type') !== 'application/json')
 				return 400; // Bad Request
 
-			return JSONRequestHandler(req, url, await req.json());
+			const json = await req.json();
+
+			// validate json is a plain object
+			if (json === null || typeof json !== 'object' || Array.isArray(json))
+				return 400; // Bad Request
+
+			return JSONRequestHandler(req, url, json);
 		} catch (e) {
 			return 400; // Bad Request
 		}
