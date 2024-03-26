@@ -398,6 +398,8 @@ type ErrorHandler = (err: Error, req: Request, url: URL) => Resolvable<Response>
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
 type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
+type JSONRequestHandler = (req: Request, url: URL, json: JsonSerializable) => HandlerReturnType;
+
 type ServerSentEventClient = {
 	message: (message: string) => void;
 	event: (event_name: string, message: string) => void;
@@ -438,6 +440,20 @@ function route_directory(route_path: string, dir: string, handler: DirHandler): 
 				return 404; // Not Found
 
 			return 500; // Internal Server Error
+		}
+	};
+}
+
+export function validate_req_json(JSONRequestHandler: JSONRequestHandler): RequestHandler {
+	return async (req: Request, url: URL) => {
+		try {
+			// validate content type header
+			if (req.headers.get('Content-Type') !== 'application/json')
+				return 400; // Bad Request
+
+			return JSONRequestHandler(req, url, await req.json());
+		} catch (e) {
+			return 400; // Bad Request
 		}
 	};
 }

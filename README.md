@@ -47,6 +47,8 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 	- [`server.default(handler: DefaultHandler)`](#api-routing-server-default)
 	- [`server.error(handler: ErrorHandler)`](#api-routing-server-error)
 	- [`server.on_slow_request(callback: SlowRequestCallback, threshold: number)`](#api-routing-server-on-slow-request)
+- [API > Routing > Validation](#api-routing-validation)
+	- [`validate_req_json(handler: JSONRequestHandler)`](#api-routing-validate-req-json)
 - [API > Routing > Directory Serving](#api-routing-directory-serving)
 	- [`server.dir(path: string, dir: string, handler?: DirHandler, method: HTTP_METHODS)`](#api-routing-server-dir)
 - [API > Routing > Server-Sent Events](#api-routing-server-sent-events)
@@ -685,6 +687,53 @@ server.on_slow_request(async (req, time, url) => {
 
 > [!NOTE]
 > The callback is not awaited internally, so you can use `async/await` freely without blocking the server/request.
+
+<a id="api-routing-validation"></a>
+## API > Routing > Validation
+
+<a id="api-routing-validate-req-json"></a>
+### 🔧 `validate_req_json(handler: JSONRequestHandler)`
+
+In the scenario that you're expecting an endpoint to receive JSON data, you might set up a handler like this:
+
+```ts
+server.route('/api/endpoint', async (req, url) => {
+	const json = await req.json();
+	// do something with json.
+	return 200;
+})
+```
+
+The problem with this is that if the request body is not valid JSON, the server will throw an error (potentially triggering canary reports) and return a `500` response.
+
+What should instead happen is something like this:
+
+```ts
+server.route('/api/endpoint', async (req, url) => {
+	// check content-type header
+	if (req.headers.get('Content-Type') !== 'application/json')
+		return 400;
+
+	try {
+		const json = await req.json();
+		// do something with json.
+		return 200;
+	} catch (err) {
+		return 400;
+	}
+})
+```
+
+As you can see this is quite verbose and adds a lot of boilerplate to your handlers. `validate_req_json` can be used to simplify this.
+
+```ts
+server.route('/api/endpoint', validate_req_json(async (json, req, url) => {
+	// do something with json.
+	return 200;
+}));
+```
+
+This behaves the same as the code above, where a `400` status code is returned if the `Content-Type` header is not `application/json` or if the request body is not valid JSON, and no error is thrown.
 
 <a id="api-routing-directory-serving"></a>
 ## API > Routing > Directory Serving
