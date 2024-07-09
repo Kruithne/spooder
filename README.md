@@ -437,7 +437,7 @@ In addition to the information provided by the developer, `spooder` also include
 		"modules": "108"
 	},
 	"bun": {
-		"version": "0.6.4",
+		"version": "0.6.5",
 		"rev": "f02561530fda1ee9396f51c8bc99b38716e38296",
 		"memory_usage": {
 			"rss": 99672064,
