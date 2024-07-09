@@ -780,7 +780,7 @@ function default_directory_handler(file_path: string, file: BunFile, stat: DirSt
 ```
 
 > [!NOTE]
-> Uncaught `ENOENT` errors throw from the directory handler will return a `404` response, other errors will return a `500` response.
+> Uncaught `ENOENT` errors thrown from the directory handler will return a `404` response, other errors will return a `500` response.
 
 > [!NOTE]
 > The call to `apply_range` in the default directory handler will automatically slice the file based on the [`Range`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Range) header. This function is also exposed as part of the `spooder` API for use in your own handlers.
