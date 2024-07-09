@@ -200,7 +200,9 @@ When starting or restarting a server process, `spooder` can automatically update
 {
 	"spooder": {
 		"update": [
-			"git pull",
+			"git reset --hard",
+			"git clean -fd",
+			"git pull origin main",
 			"bun install"
 		]
 	}
