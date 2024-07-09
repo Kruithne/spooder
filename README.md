@@ -210,7 +210,7 @@ When starting or restarting a server process, `spooder` can automatically update
 Each command should be a separate entry in the array and will be executed in sequence. The server process will be started once all commands have resolved.
 
 > [!IMPORTANT]
-> Chainging commands using `&&` or `||` operators does not work.
+> Chaining commands using `&&` or `||` operators does not work.
 
 If a command in the sequence fails, the remaining commands will not be executed, however the server will still be started. This is preferred over entering a restart loop or failing to start the server at all.
 
