@@ -1066,24 +1066,6 @@ const html = parse_template(template, replacements);
 </html>
 ```
 
-Object properties are supported by using the dot syntax.
-
-```ts
-const template = `<span>{$foo.bar}</span>`;
-
-const replacements = {
-	foo: {
-		bar: 'Hello, world!';
-	}
-};
-
-const html = parse_template(template, replacements);
-```
-
-```html
-<span>Hello, world!</span>
-```
-
 By default, placeholders that do not appear in the replacement object will be left as-is. Set `drop_missing` to `true` to remove them.
 
 ```ts
@@ -1125,15 +1107,16 @@ parse_template('Hello {$world}', replacer);
 	</body>
 </html>
 ```
+
 `parse_template` supports looping arrays with the following syntax.
 
 ```html
-{$for:foo as bar}My colour is {$bar}{/for}
+{$for:foo}My colour is %s{/for}
 ```
 ```ts
 const template = `
 	<ul>
-		{$for:foo as bar}<li>{$bar}</li>{/for}
+		{$for:foo}<li>%s</li>{/for}
 	</ul>
 `;
 
@@ -1152,39 +1135,24 @@ const html = parse_template(template, replacements);
 </ul>
 ```
 
-Loops also support object properties using the dot syntax.
+All placeholders inside a `{$for:}` loop are substituted, but only if the loop variable exists.
+
+In the following example, `missing` does not exist, so `test` is not substituted inside the loop, but `test` is still substituted outside the loop.
 
 ```html
-{$for:foo as bar}My colour is {$bar.baz}{/for}
+<div>Hello {$test}!</div>
+{$for:missing}<div>Loop {$test}</div>{/for}
 ```
+
 ```ts
-const template = `
-	<ul>
-		{$for:foo as bar}<li>My colour is {$bar.baz}</li>{/for}
-	</ul>
-`;
+parse_template(..., {
+	test: 'world'
+});
 ```
 
-If/else statements are supported in templates, which include blocks based on the existence/truthiness of a property.
-
 ```html
-{$if:is_on_earth}
-	Hello, world!
-{else}
-	Hello, Mars!
-{/if}
-```
-
-This also works with nested properties and loops.
-
-```html
-{$for:countries as country}
-	{$if:country.is_in_europe}
-		Europe: {$country.name}
-	{else}
-		Not Europe: {$country.name}
-	{/if}
-{/for}
+<div>Hello world!</div>
+{$for}Loop <div>{$test}</div>{/for}
 ```
 
 <a id="api-content-generate-hash-subs"></a>
