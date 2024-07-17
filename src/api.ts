@@ -108,8 +108,8 @@ export async function safe(target_fn: Callable) {
 	}
 }
 
-type ReplacerFn = (key: string) => string | Array<string> | undefined;
-type Replacements = Record<string, string | Array<string>> | ReplacerFn;
+type ReplacerFn = (key: string) => string | Array<any> | Record<string, any> | undefined;
+type Replacements = Record<string, string | Array<any> | Record<string, any>> | ReplacerFn;
 
 export function parse_template(template: string, replacements: Replacements, drop_missing = false): string {
 	let result = '';
@@ -117,6 +117,28 @@ export function parse_template(template: string, replacements: Replacements, dro
 	let buffer_active = false;
 
 	const is_replacer_fn = typeof replacements === 'function';
+
+	function getValue(key: string): any {
+		const var_parts = key.split('.');
+		let value: any = is_replacer_fn ? replacements(var_parts[0]) : replacements[var_parts[0]];
+		
+		for (let j = 1; j < var_parts.length; j++) {
+			if (value && typeof value === 'object') {
+				value = value[var_parts[j]];
+			} else {
+				value = undefined;
+				break;
+			}
+		}
+		return value;
+	}
+
+	function parseBlock(content: string, local_replacements: Replacements): string {
+		return parse_template(content, {
+			...replacements,
+			...local_replacements
+		}, drop_missing);
+	}
 
 	const template_length = template.length;
 	for (let i = 0; i < template_length; i++) {
@@ -130,9 +152,8 @@ export function parse_template(template: string, replacements: Replacements, dro
 			buffer_active = false;
 
 			if (buffer.startsWith('for:')) {
-				const loop_key = buffer.substring(4);
-
-				const loop_entries = is_replacer_fn ? replacements(loop_key) : replacements[loop_key];
+				const [loop_key, loop_var] = buffer.substring(4).split(' as ');
+				const loop_entries = getValue(loop_key);
 				const loop_content_start_index = i + 1;
 				const loop_close_index = template.indexOf('{/for}', loop_content_start_index);
 				
@@ -141,19 +162,48 @@ export function parse_template(template: string, replacements: Replacements, dro
 						result += '{$' + buffer + '}';
 				} else {
 					const loop_content = template.substring(loop_content_start_index, loop_close_index);
-					if (loop_entries !== undefined) {
-						for (const loop_entry of loop_entries) {
-							const inner_content = loop_content.replaceAll('%s', loop_entry);
-							result += parse_template(inner_content, replacements, drop_missing);
-						}
+					if (Array.isArray(loop_entries)) {
+						for (const loop_entry of loop_entries)
+							result += parseBlock(loop_content, { [loop_var]: loop_entry });
 					} else {
 						if (!drop_missing)
 							result += '{$' + buffer + '}' + loop_content + '{/for}';
 					}
-					i += loop_content.length + 6;
+					i = loop_close_index + 5; // Move past {/for}
+				}
+			} else if (buffer.startsWith('if:')) {
+				const condition_key = buffer.substring(3);
+				const condition_value = getValue(condition_key);
+				const if_content_start_index = i + 1;
+				const if_close_index = template.indexOf('{/if}', if_content_start_index);
+				
+				if (if_close_index === -1) {
+					if (!drop_missing)
+						result += '{$' + buffer + '}';
+				} else {
+					const if_content = template.substring(if_content_start_index, if_close_index);
+					const else_index = if_content.indexOf('{else}');
+					
+					if (else_index === -1) {
+						// No else block
+						if (condition_value) {
+							result += parseBlock(if_content, {});
+						}
+					} else {
+						// Has else block
+						const true_content = if_content.substring(0, else_index);
+						const false_content = if_content.substring(else_index + 6); // +6 to move past {else}
+						
+						if (condition_value)
+							result += parseBlock(true_content, {});
+						else
+							result += parseBlock(false_content, {});
+					}
+					i = if_close_index + 4; // Move past {/if}
 				}
 			} else {
-				const replacement = is_replacer_fn ? replacements(buffer) : replacements[buffer];
+				const replacement = getValue(buffer);
+
 				if (replacement !== undefined)
 					result += replacement;
 				else if (!drop_missing)
