@@ -225,6 +225,10 @@ server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
 });
 ```
 
+### Skip Updates
+
+In addition to being skipped in [dev mode](#cli-dev-mode), updates can also be skipped in production mode by passing the `--no-update` flag.
+
 <a id="cli-canary"></a>
 ## CLI > Canary
 

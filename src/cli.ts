@@ -8,13 +8,18 @@ async function start_server() {
 
 	const argv = process.argv.slice(2);
 	const is_dev_mode = argv.includes('--dev');
+	const skip_updates = argv.includes('--no-update');
 
 	if (is_dev_mode)
 		log('[{dev}] spooder has been started in {dev mode}');
 
 	const config = await get_config();
 
-	if (!is_dev_mode) {
+	if (is_dev_mode) {
+		log('[{update}] skipping update commands in {dev mode}');
+	} else if (skip_updates) {
+		log('[{update}] skipping update commands due to {--no-update} flag');
+	} else {
 		const update_commands = config.update;
 		const n_update_commands = update_commands.length;
 
@@ -42,8 +47,6 @@ async function start_server() {
 				}
 			}
 		}
-	} else {
-		log('[{dev}] skipping update commands in {dev mode}');
 	}
 
 	const crash_console_history = config.canary.crash_console_history;
