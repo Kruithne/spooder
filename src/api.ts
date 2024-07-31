@@ -368,7 +368,7 @@ export async function db_init_schema_sqlite(db_path: string, schema_dir: string)
 	return db;
 }
 
-export async function db_init_schema_mysql(db_info: mysql_types.ConnectionConfig, schema_dir: string): Promise<mysql_types.Connection> {
+export async function db_init_schema_mysql(db_info: mysql_types.ConnectionOptions, schema_dir: string): Promise<mysql_types.Connection> {
 	if (mysql === undefined)
 		throw new Error('{db_init_schema_mysql} cannot be called without optional dependency {mysql2} installed');
 
