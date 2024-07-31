@@ -1,7 +1,7 @@
 {
 	"name": "spooder",
 	"type": "module",
-	"version": "4.3.2",
+	"version": "4.4.0",
 	"exports": {
 		".": {
 			"bun": "./src/api.ts",
@@ -13,8 +13,8 @@
 		"@types/bun": "^1.0.5"
 	},
 	"optionalDependencies": {
-    	"mysql2": "^3.11.0"
-  	},
+		"mysql2": "^3.11.0"
+	},
 	"bin": {
 		"spooder": "./src/cli.ts"
 	}
