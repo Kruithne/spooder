@@ -1029,7 +1029,7 @@ await safe(() => {
 ## API > Content
 
 <a id="api-content-parse-template"></a>
-### 🔧 `parse_template(template: string, replacements: Replacements, drop_missing: boolean): string`
+### 🔧 `parse_template(template: string, replacements: Replacements, drop_missing: boolean): Promise<string>`
 
 Replace placeholders in a template string with values from a replacement object.
 
@@ -1052,7 +1052,7 @@ const replacements = {
 	content: 'This is a test.'
 };
 
-const html = parse_template(template, replacements);
+const html = await parse_template(template, replacements);
 ```
 
 ```html
@@ -1071,7 +1071,7 @@ const html = parse_template(template, replacements);
 By default, placeholders that do not appear in the replacement object will be left as-is. Set `drop_missing` to `true` to remove them.
 
 ```ts
-parse_template(template, replacements, true);
+await parse_template(template, replacements, true);
 ```
 
 ```html
@@ -1087,14 +1087,14 @@ parse_template(template, replacements, true);
 </html>
 ```
 
-`parse_template` supports passing a function instead of a replacement object. This function will be called for each placeholder and the return value will be used as the replacement.
+`parse_template` supports passing a function instead of a replacement object. This function will be called for each placeholder and the return value will be used as the replacement. This function can be a Promise/async function.
 
 ```ts
 const replacer = (placeholder: string) => {
 	return placeholder.toUpperCase();
 };
 
-parse_template('Hello {$world}', replacer);
+await parse_template('Hello {$world}', replacer);
 ```
 
 ```html
@@ -1126,7 +1126,7 @@ const replacements = {
 	foo: ['red', 'green', 'blue']
 };
 
-const html = parse_template(template, replacements);
+const html = await parse_template(template, replacements);
 ```
 
 ```html
@@ -1147,7 +1147,7 @@ In the following example, `missing` does not exist, so `test` is not substituted
 ```
 
 ```ts
-parse_template(..., {
+await parse_template(..., {
 	test: 'world'
 });
 ```

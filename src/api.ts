@@ -119,9 +119,10 @@ export async function safe(target_fn: Callable) {
 }
 
 type ReplacerFn = (key: string) => string | Array<string> | undefined;
-type Replacements = Record<string, string | Array<string>> | ReplacerFn;
+type AsyncReplaceFn = (key: string) => Promise<string | Array<string> | undefined>;
+type Replacements = Record<string, string | Array<string>> | ReplacerFn | AsyncReplaceFn;
 
-export function parse_template(template: string, replacements: Replacements, drop_missing = false): string {
+export async function parse_template(template: string, replacements: Replacements, drop_missing = false): Promise<string> {
 	let result = '';
 	let buffer = '';
 	let buffer_active = false;
@@ -142,7 +143,7 @@ export function parse_template(template: string, replacements: Replacements, dro
 			if (buffer.startsWith('for:')) {
 				const loop_key = buffer.substring(4);
 
-				const loop_entries = is_replacer_fn ? replacements(loop_key) : replacements[loop_key];
+				const loop_entries = is_replacer_fn ? await replacements(loop_key) : replacements[loop_key];
 				const loop_content_start_index = i + 1;
 				const loop_close_index = template.indexOf('{/for}', loop_content_start_index);
 				
@@ -154,7 +155,7 @@ export function parse_template(template: string, replacements: Replacements, dro
 					if (loop_entries !== undefined) {
 						for (const loop_entry of loop_entries) {
 							const inner_content = loop_content.replaceAll('%s', loop_entry);
-							result += parse_template(inner_content, replacements, drop_missing);
+							result += await parse_template(inner_content, replacements, drop_missing);
 						}
 					} else {
 						if (!drop_missing)
@@ -163,7 +164,7 @@ export function parse_template(template: string, replacements: Replacements, dro
 					i += loop_content.length + 6;
 				}
 			} else {
-				const replacement = is_replacer_fn ? replacements(buffer) : replacements[buffer];
+				const replacement = is_replacer_fn ? await replacements(buffer) : replacements[buffer];
 				if (replacement !== undefined)
 					result += replacement;
 				else if (!drop_missing)
