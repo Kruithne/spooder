@@ -6,6 +6,16 @@ import { log } from './utils';
 import crypto from 'crypto';
 import { Blob } from 'node:buffer';
 import { Database } from 'bun:sqlite';
+import type * as mysql_types from 'mysql2/promise';
+
+let mysql: typeof mysql_types | undefined;
+try {
+	mysql = await import('mysql2/promise') as typeof mysql_types;
+} catch (e) {
+	// mysql2 optional dependency not installed.
+	// this dependency will be replaced once bun:sql supports mysql.
+	// db_update_schema_mysql and db_init_schema_mysql will throw.
+}
 
 export const HTTP_STATUS_CODE = http.STATUS_CODES;
 
@@ -207,6 +217,66 @@ export async function generate_hash_subs(length = 7, prefix = 'hash=', hashes?: 
 }
 
 type Row_DBSchema = { db_schema_table_name: string, db_schema_version: number };
+type SchemaVersionMap = Map<string, number>;
+
+async function db_load_schema(schema_dir: string, schema_versions: SchemaVersionMap) {
+	const schema_out = [];
+	const schema_files = await fs.readdir(schema_dir);
+
+	for (const schema_file of schema_files) {
+		const schema_file_lower = schema_file.toLowerCase();
+		if (!schema_file_lower.endsWith('.sql'))
+			continue;
+
+		log('[{db}] parsing schema file {%s}', schema_file_lower);
+
+		const schema_name = path.basename(schema_file_lower, '.sql');
+		const schema_path = path.join(schema_dir, schema_file);
+		const schema = await fs.readFile(schema_path, 'utf8');
+
+		const revisions = new Map();
+		let current_rev_id = 0;
+		let current_rev = '';
+
+		for (const line of schema.split(/\r?\n/)) {
+			const rev_start = line.match(/^--\s*\[(\d+)\]/);
+			if (rev_start !== null) {
+				// New chunk definition detected, store the current chunk and start a new one.
+				if (current_rev_id > 0) {
+					revisions.set(current_rev_id, current_rev);
+					current_rev = '';
+				}
+
+				const rev_number = parseInt(rev_start[1]);
+				if (isNaN(rev_number) || rev_number < 1)
+					throw new Error(rev_number + ' is not a valid revision number in ' + schema_file_lower);
+				current_rev_id = rev_number;
+			} else {
+				// Append to existing revision.
+				current_rev += line + '\n';
+			}
+		}
+
+		// There may be something left in current_chunk once we reach end of the file.
+		if (current_rev_id > 0)
+			revisions.set(current_rev_id, current_rev);
+
+		if (revisions.size === 0) {
+			log('[{db}] {%s} contains no valid revisions', schema_file);
+			continue;
+		}
+
+		const current_schema_version = schema_versions.get(schema_name) ?? 0;
+		schema_out.push({
+			revisions,
+			name: schema_name,
+			current_version: current_schema_version,
+			chunk_keys: Array.from(revisions.keys()).filter(chunk_id => chunk_id > current_schema_version).sort((a, b) => a - b)
+		});
+	}
+
+	return schema_out;
+}
 
 export async function db_update_schema_sqlite(db: Database, schema_dir: string) {
 	log('[{db}] updating database schema for {%s}', db.filename);
@@ -228,72 +298,86 @@ export async function db_update_schema_sqlite(db: Database, schema_dir: string) 
 			ON CONFLICT(db_schema_table_name) DO UPDATE SET db_schema_version = EXCLUDED.db_schema_version
 		`);
 
-		const schema_files = await fs.readdir(schema_dir);
-		for (const schema_file of schema_files) {
-			const schema_file_lower = schema_file.toLowerCase();
-			if (!schema_file_lower.endsWith('.sql'))
-				continue;
+		const schemas = await db_load_schema(schema_dir, schema_versions);
 
-			log('[{db}] parsing schema file {%s}', schema_file_lower);
-
-			const schema_name = path.basename(schema_file_lower, '.sql');
-			const schema_path = path.join(schema_dir, schema_file);
-			const schema = await fs.readFile(schema_path, 'utf8');
-
-			const revisions = new Map();
-			let current_rev_id = 0;
-			let current_rev = '';
-
-			for (const line of schema.split(/\r?\n/)) {
-				const rev_start = line.match(/^--\s*\[(\d+)\]/);
-				if (rev_start !== null) {
-					// New chunk definition detected, store the current chunk and start a new one.
-					if (current_rev_id > 0) {
-						revisions.set(current_rev_id, current_rev);
-						current_rev = '';
-					}
-
-					const rev_number = parseInt(rev_start[1]);
-					if (isNaN(rev_number) || rev_number < 1)
-						throw new Error(rev_number + ' is not a valid revision number in ' + schema_file_lower);
-					current_rev_id = rev_number;
-				} else {
-					// Append to existing revision.
-					current_rev += line + '\n';
-				}
-			}
-
-			// There may be something left in current_chunk once we reach end of the file.
-			if (current_rev_id > 0)
-				revisions.set(current_rev_id, current_rev);
-
-			if (revisions.size === 0) {
-				log('[{db}] {%s} contains no valid revisions', schema_file);
-				continue;
-			}
-
-			const current_schema_version = schema_versions.get(schema_name) ?? 0;
-			const chunk_keys = Array.from(revisions.keys()).filter(chunk_id => chunk_id > current_schema_version).sort((a, b) => a - b);
-
-			let newest_schema_version = current_schema_version;
-			for (const rev_id of chunk_keys) {
-				const revision = revisions.get(rev_id);
-				log('[{db}] applying revision {%d} to {%s}', rev_id, schema_name);
+		for (const schema of schemas) {
+			let newest_schema_version = schema.current_version;
+			for (const rev_id of schema.chunk_keys) {
+				const revision = schema.revisions.get(rev_id);
+				log('[{db}] applying revision {%d} to {%s}', rev_id, schema.name);
 				db.transaction(() => db.run(revision))();
 				newest_schema_version = rev_id;
 			}
-
-			if (newest_schema_version > current_schema_version) {
-				log('[{db}] updated table {%s} to revision {%d}', schema_name, newest_schema_version);
-				update_schema_query.run(newest_schema_version, schema_name);
+	
+			if (newest_schema_version > schema.current_version) {
+				log('[{db}] updated table {%s} to revision {%d}', schema.name, newest_schema_version);
+				update_schema_query.run(newest_schema_version, schema.name);
 			}
 		}
 	})();
 }
 
+export async function db_update_schema_mysql(db: mysql_types.Connection, schema_dir: string) {
+	if (mysql === undefined)
+		throw new Error('{db_update_schema_mysql} cannot be called without optional dependency {mysql2} installed');
+
+	log('[{db}] updating database schema for {%s}', db.config.database);
+
+	const schema_versions = new Map();
+
+	try {
+		const [rows] = await db.query('SELECT db_schema_table_name, db_schema_version FROM db_schema');
+		for (const row of rows as Array<Row_DBSchema>)
+			schema_versions.set(row.db_schema_table_name, row.db_schema_version);
+	} catch (e) {
+		log('[{db}] creating {db_schema} table');
+		await db.query('CREATE TABLE db_schema (db_schema_table_name VARCHAR(255) PRIMARY KEY, db_schema_version INT)');
+	}
+
+	await db.beginTransaction();
+	
+	const update_schema_query = await db.prepare(`
+		INSERT INTO db_schema (db_schema_version, db_schema_table_name) VALUES (?, ?)
+		ON DUPLICATE KEY UPDATE db_schema_version = VALUES(db_schema_version);
+	`);
+
+	const schemas = await db_load_schema(schema_dir, schema_versions);
+	for (const schema of schemas) {
+		let newest_schema_version = schema.current_version;
+		for (const rev_id of schema.chunk_keys) {
+			const revision = schema.revisions.get(rev_id);
+			log('[{db}] applying revision {%d} to {%s}', rev_id, schema.name);
+
+			await db.query(revision);
+			newest_schema_version = rev_id;
+		}
+
+		if (newest_schema_version > schema.current_version) {
+			log('[{db}] updated table {%s} to revision {%d}', schema.name, newest_schema_version);
+			
+			await update_schema_query.execute([newest_schema_version, schema.name]);
+		}
+	}
+
+	await db.commit();
+}
+
 export async function db_init_schema_sqlite(db_path: string, schema_dir: string): Promise<Database> {
 	const db = new Database(db_path, { create: true });
 	await db_update_schema_sqlite(db, schema_dir);
+	return db;
+}
+
+export async function db_init_schema_mysql(db_info: mysql_types.ConnectionConfig, schema_dir: string): Promise<mysql_types.Connection> {
+	if (mysql === undefined)
+		throw new Error('{db_init_schema_mysql} cannot be called without optional dependency {mysql2} installed');
+
+	// required for parsing multiple statements from schema files
+	db_info.multipleStatements = true;
+
+	const db = await mysql.createConnection(db_info);
+	await db_update_schema_mysql(db, schema_dir);
+
 	return db;
 }
 

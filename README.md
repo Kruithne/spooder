@@ -71,8 +71,6 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 	- [`set_cookie(res: Response, name: string, value: string, options?: CookieOptions)`](#api-state-management-set-cookie)
 	- [`get_cookies(source: Request | Response): Record<string, string>`](#api-state-management-get-cookies)
 - [API > Database Schema](#api-database-schema)
-	- [`db_update_schema_sqlite(db: Database, schema: string): Promise<void>`](#api-database-schema-db-update-schema-sqlite)
-	- [`db_init_schema_sqlite(db_path: string, schema: string): Promise<Database>`](#api-database-schema-db-init-schema-sqlite)
 
 # Installation
 
@@ -1329,13 +1327,52 @@ const cookies = get_cookies(req, true);
 
 `spooder` provides a straightforward API to manage database schema in revisions through source control.
 
+Database schema is updated with `db_update_schema_DRIVER` where `DRIVER` corresponds to the database driver being used.
+
 > [!NOTE]
-> Currently, only SQLite is supported. This may be expanded once Bun supports more database drivers.
+> Currently, only SQLite and MySQL are supported. This may be expanded once Bun supports more database drivers.
 
-<a id="api-database-schema-db-update-schema-sqlite"></a>
-### 🔧 `db_update_schema_sqlite(db: Database, schema: string): Promise<void>`
+```ts
+// sqlite example
+import { db_update_schema_sqlite } from 'spooder';
+import { Database } from 'bun:sqlite';
 
-`db_update_schema_sqlite` takes a [`Database`](https://bun.sh/docs/api/sqlite) instance and a schema directory.
+const db = new Database('./database.sqlite');
+await db_update_schema_sqlite(db, './schema');
+```
+
+```ts
+// mysql example
+import { db_update_schema_mysql } from 'spooder';
+import mysql from 'mysql2';
+
+const db = await mysql.createConnection({
+	// connection options
+	// see https://github.com/mysqljs/mysql#connection-options
+})
+```
+
+> [!IMPORTANT]
+> MySQL requires the optional dependency `mysql2` to be installed - this is not automatically installed with spooder. This will be replaced when bun:sql supports MySQL natively.
+
+Database initiation and schema updating can be streamlined with the `db_init_schema_DRIVER` functions. The following examples are equivalent to the above ones.
+
+```ts
+// sqlite example
+import { db_init_schema_sqlite } from 'spooder';
+const db = await db_init_schema_sqlite('./database.sqlite', './schema');
+```
+
+```ts
+// mysql example
+import { db_init_schema_mysql } from 'spooder';
+const db = await db_init_schema_mysql({
+	// connection options
+	// see https://github.com/mysqljs/mysql#connection-options
+}, './schema');
+```
+
+### Schema Files
 
 The schema directory is expected to contain an SQL file for each table in the database with the file name matching the name of the table.
 
@@ -1406,26 +1443,6 @@ try {
 	// panic (crash) or gracefully continue, etc.
 	await panic(e);
 }
-```
-
-<a id="api-database-schema-db-init-schema-sqlite"></a>
-### 🔧 `db_init_schema_sqlite(db_path: string, schema: string): Promise<Database>`
-
-`db_init_schema_sqlite` exists as a convenience function to create a new database and apply the schema in one step.
-
-```ts
-import { db_init_schema_sqlite } from 'spooder';
-const db = await db_init_schema_sqlite('./database.sqlite', './schema');
-```
-
-The above is equivalent to the following.
-
-```ts
-import { db_update_schema_sqlite } from 'spooder';
-import { Database } from 'bun:sqlite';
-
-const db = new Database('./database.sqlite', { create: true });
-await db_update_schema_sqlite(db, './schema');
 ```
 
 ## Legal

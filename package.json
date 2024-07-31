@@ -12,6 +12,9 @@
 	"devDependencies": {
 		"@types/bun": "^1.0.5"
 	},
+	"optionalDependencies": {
+    	"mysql2": "^3.11.0"
+  	},
 	"bin": {
 		"spooder": "./src/cli.ts"
 	}
