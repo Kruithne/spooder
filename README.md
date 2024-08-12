@@ -734,7 +734,7 @@ server.route('/api/endpoint', async (req, url) => {
 As you can see this is quite verbose and adds a lot of boilerplate to your handlers. `validate_req_json` can be used to simplify this.
 
 ```ts
-server.route('/api/endpoint', validate_req_json(async (json, req, url) => {
+server.route('/api/endpoint', validate_req_json(async (req, url, json) => {
 	// do something with json.
 	return 200;
 }));
