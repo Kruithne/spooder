@@ -46,7 +46,9 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 	- [`server.handle(status_code: number, handler: RequestHandler)`](#api-routing-server-handle)
 	- [`server.default(handler: DefaultHandler)`](#api-routing-server-default)
 	- [`server.error(handler: ErrorHandler)`](#api-routing-server-error)
+- [API > Routing > Slow Requests](#api-routing-slow-requests)
 	- [`server.on_slow_request(callback: SlowRequestCallback, threshold: number)`](#api-routing-server-on-slow-request)
+	- [`server.allow_slow_request(req: Request)`](#api-routing-server-allow-slow-request)
 - [API > Routing > Validation](#api-routing-validation)
 	- [`validate_req_json(handler: JSONRequestHandler)`](#api-routing-validate-req-json)
 - [API > Routing > Directory Serving](#api-routing-directory-serving)
@@ -671,6 +673,9 @@ server.error((err, req, url) => {
 });
 ```
 
+<a id="api-routing-slow-requests"></a>
+## API > Routing > Slow Requests
+
 <a id="api-routing-server-on-slow-request"></a>
 ### 🔧 `server.on_slow_request(callback: SlowRequestCallback, threshold: number)`
 
@@ -691,6 +696,27 @@ server.on_slow_request(async (req, time, url) => {
 
 > [!NOTE]
 > The callback is not awaited internally, so you can use `async/await` freely without blocking the server/request.
+
+<a id="api-routing-server-allow-slow-request"></a>
+### 🔧 `server.allow_slow_request(req: Request)`
+
+In some scenarios, mitigation throttling or heavy workloads may cause slow requests intentionally. To prevent these triggering a caution, requests can be marked as slow.
+
+```ts
+server.on_slow_request(async (req, time, url) => {
+	await caution('Slow request warning', { req, time });
+}, 500);
+
+server.route('/test', async (req) => {
+	// this request is marked as slow, therefore won't
+	// trigger on_slow_request despite taking 5000ms+
+	server.allow_slow_request(req);
+	await new Promise(res => setTimeout(res, 5000));
+});
+```
+
+> [!NOTE]
+> This will have no effect if a handler hasn't been registered with `on_slow_request`.
 
 <a id="api-routing-validation"></a>
 ## API > Routing > Validation

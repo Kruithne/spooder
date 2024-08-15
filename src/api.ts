@@ -698,6 +698,8 @@ export function serve(port: number) {
 	let slow_request_callback: SlowRequestCallback | null = null;
 	let slow_request_threshold: number = 1000;
 
+	const slow_requests = new WeakSet();
+
 	const server = Bun.serve({
 		port,
 		development: false,
@@ -709,8 +711,12 @@ export function serve(port: number) {
 			const response = await generate_response(req, url);
 			const request_time = Date.now() - request_start;
 
-			if (slow_request_callback !== null && request_time > slow_request_threshold)
+			const is_known_slow = slow_requests.has(req);
+			if (slow_request_callback !== null && request_time > slow_request_threshold && is_known_slow)
 				slow_request_callback(req, request_time, url);
+
+			if (is_known_slow)
+				slow_requests.delete(req);
 
 			return print_request_info(req, response, url, request_time);
 		}
@@ -756,6 +762,11 @@ export function serve(port: number) {
 		on_slow_request: (callback: SlowRequestCallback, threshold = 1000): void => {
 			slow_request_callback = callback;
 			slow_request_threshold = threshold;
+		},
+
+		/** Mark a request as slow, preventing it from triggering slow request callback. */
+		allow_slow_request: (req: Request): void => {
+			slow_requests.add(req);
 		},
 
 		/** Register a default handler for all status codes. */
