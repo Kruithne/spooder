@@ -712,7 +712,7 @@ export function serve(port: number) {
 			const request_time = Date.now() - request_start;
 
 			const is_known_slow = slow_requests.has(req);
-			if (slow_request_callback !== null && request_time > slow_request_threshold && is_known_slow)
+			if (slow_request_callback !== null && request_time > slow_request_threshold && !is_known_slow)
 				slow_request_callback(req, request_time, url);
 
 			if (is_known_slow)
