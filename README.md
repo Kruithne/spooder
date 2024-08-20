@@ -1398,6 +1398,20 @@ const db = await db_init_schema_mysql({
 }, './schema');
 ```
 
+### Pooling
+
+MySQL supports connection pooling. spooder allows you to create a connection pool instead of a single connection.
+
+```ts
+import { db_init_schema_mysql_pool } from 'spooder';
+const pool = await db_init_schema_mysql_pool({
+	// connection options
+	connectionLimit: 10
+});
+
+const connection = await pool.getConnection();
+```
+
 ### Schema Files
 
 The schema directory is expected to contain an SQL file for each table in the database with the file name matching the name of the table.

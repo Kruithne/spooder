@@ -369,17 +369,35 @@ export async function db_init_schema_sqlite(db_path: string, schema_dir: string)
 	return db;
 }
 
-export async function db_init_schema_mysql(db_info: mysql_types.ConnectionOptions, schema_dir: string): Promise<mysql_types.Connection> {
+async function _db_init_schema_mysql(db_info: mysql_types.ConnectionOptions, schema_dir: string, pool = false): Promise<mysql_types.Pool | mysql_types.Connection> {
 	if (mysql === undefined)
 		throw new Error('{db_init_schema_mysql} cannot be called without optional dependency {mysql2} installed');
 
 	// required for parsing multiple statements from schema files
 	db_info.multipleStatements = true;
 
-	const db = await mysql.createConnection(db_info);
-	await db_update_schema_mysql(db, schema_dir);
+	if (pool) {
+		const pool = mysql.createPool(db_info);
+		const connection = await pool.getConnection();
 
-	return db;
+		await db_update_schema_mysql(connection, schema_dir);
+		connection.release();
+
+		return pool;
+	} else {
+		const connection = await mysql.createConnection(db_info);
+		await db_update_schema_mysql(connection, schema_dir);
+		
+		return connection;
+	}
+}
+
+export async function db_init_schema_mysql_pool(db_info: mysql_types.ConnectionOptions, schema_dir: string): Promise<mysql_types.Pool> {
+	return await _db_init_schema_mysql(db_info, schema_dir, true) as mysql_types.Pool;
+}
+
+export async function db_init_schema_mysql(db_info: mysql_types.ConnectionOptions, schema_dir: string): Promise<mysql_types.Connection> {
+	return await _db_init_schema_mysql(db_info, schema_dir, false) as mysql_types.Connection;
 }
 
 type CookieOptions = {
