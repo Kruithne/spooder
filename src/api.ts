@@ -547,7 +547,7 @@ function route_directory(route_path: string, dir: string, handler: DirHandler): 
 	};
 }
 
-export function validate_req_json(JSONRequestHandler: JSONRequestHandler): RequestHandler {
+export function validate_req_json(json_handler: JSONRequestHandler): RequestHandler {
 	return async (req: Request, url: URL) => {
 		try {
 			// validate content type header
@@ -560,7 +560,7 @@ export function validate_req_json(JSONRequestHandler: JSONRequestHandler): Reque
 			if (json === null || typeof json !== 'object' || Array.isArray(json))
 				return 400; // Bad Request
 
-			return JSONRequestHandler(req, url, json);
+			return json_handler(req, url, json);
 		} catch (e) {
 			return 400; // Bad Request
 		}
