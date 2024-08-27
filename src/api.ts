@@ -400,7 +400,7 @@ export async function db_init_schema_mysql(db_info: mysql_types.ConnectionOption
 	return await _db_init_schema_mysql(db_info, schema_dir, false) as mysql_types.Connection;
 }
 
-type CookieOptions = {
+export type CookieOptions = {
 	same_site?: 'Strict' | 'Lax' | 'None',
 	secure?: boolean,
 	http_only?: boolean,
