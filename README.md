@@ -1306,7 +1306,8 @@ type CookieOptions = {
 	http_only?: boolean,
 	path?: string,
 	expires?: number,
-	encode?: boolean
+	encode?: boolean,
+	max_age?: number
 };
 ```
 

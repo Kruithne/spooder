@@ -406,7 +406,8 @@ export type CookieOptions = {
 	http_only?: boolean,
 	path?: string,
 	expires?: number,
-	encode?: boolean
+	encode?: boolean,
+	max_age?: number
 };
 
 export function set_cookie(res: Response, name: string, value: string, options?: CookieOptions): void {
@@ -430,6 +431,9 @@ export function set_cookie(res: Response, name: string, value: string, options?:
 			const date = new Date(Date.now() + options.expires);
 			cookie += '; Expires=' + date.toUTCString();
 		}
+
+		if (options.max_age !== undefined)
+			cookie += '; Max-Age=' + options.max_age;
 	} else {
 		cookie += value;
 	}
