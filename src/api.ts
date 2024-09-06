@@ -727,7 +727,7 @@ export function serve(port: number) {
 		development: false,
 
 		async fetch(req: Request): Promise<Response> {
-			const url = new URL(req.url);
+			const url = new URL(req.url) as URL;
 			const request_start = Date.now();
 
 			const response = await generate_response(req, url);
