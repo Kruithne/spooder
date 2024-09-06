@@ -564,7 +564,7 @@ export function validate_req_json(json_handler: JSONRequestHandler): RequestHand
 			if (json === null || typeof json !== 'object' || Array.isArray(json))
 				return 400; // Bad Request
 
-			return json_handler(req, url, json);
+			return json_handler(req, url, json as JsonObject);
 		} catch (e) {
 			return 400; // Bad Request
 		}
