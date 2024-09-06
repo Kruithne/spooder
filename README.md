@@ -220,7 +220,10 @@ You can utilize this to automatically update your server in response to a webhoo
 
 ```ts
 server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
-	setImmediate(() => server.stop(false));
+	setImmediate(async () => {
+		await server.stop(false);
+		process.exit();
+	});
 	return 200;
 });
 ```
@@ -928,6 +931,12 @@ Stop the server process gracefully, waiting for all in-flight requests to comple
 
 ```ts
 server.stop(false);
+```
+
+`server.stop()` returns a promise, which if awaited, resolves when all pending connections have been completed.
+```ts
+await server.stop(false);
+// do something now all connections are done
 ```
 
 <a id="api-error-handling"></a>

@@ -807,8 +807,11 @@ export function serve(port: number) {
 		},
 
 		/** Stops the server. */
-		stop: (immediate = false): void => {
+		stop: async (immediate = false): Promise<void> => {
 			server.stop(immediate);
+
+			while (server.pendingRequests > 0)
+				await Bun.sleep(1000);
 		},
 
 		/** Register a handler for server-sent events. */
