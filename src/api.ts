@@ -507,7 +507,7 @@ type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
 type JSONRequestHandler = (req: Request, url: URL, json: JsonObject) => HandlerReturnType;
 
-type ServerSentEventClient = {
+export type ServerSentEventClient = {
 	message: (message: string) => void;
 	event: (event_name: string, message: string) => void;
 	close: () => void;
