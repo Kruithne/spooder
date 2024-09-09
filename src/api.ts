@@ -819,53 +819,65 @@ export function serve(port: number) {
 			routes.push([path.split('/'), (req: Request, url: URL) => {			
 				let stream_controller: ReadableStreamDirectController;
 				let close_resolver: () => void;
-
+		
 				function close_controller() {
 					stream_controller?.close();
 					close_resolver?.();
 				}
-
-				const queue = Array<string>();
+		
+				let lastEventTime = Date.now();
+				const KEEP_ALIVE_INTERVAL = 15000;
+		
 				const stream = new ReadableStream({
 					// @ts-ignore Bun implements a "direct" mode which does not exist in the spec.
 					type: 'direct',
-
+		
 					async pull(controller) {
 						// @ts-ignore `controller` in "direct" mode is ReadableStreamDirectController.
 						stream_controller = controller as ReadableStreamDirectController;
+						
 						while (!req.signal.aborted) {
-							if (queue.length > 0) {
-								stream_controller.write(queue.shift()!);
+							const now = Date.now();
+							if (now - lastEventTime >= KEEP_ALIVE_INTERVAL) {
+								stream_controller.write(':keep-alive\n\n');
 								stream_controller.flush();
-							} else {
-								await Bun.sleep(50);
+								lastEventTime = now;
 							}
+							
+							await Bun.sleep(100); // prevent tight loop
 						}
 					}
 				});
-
+		
 				const closed = new Promise<void>(resolve => close_resolver = resolve);
 				req.signal.onabort = close_controller;
-
+		
 				handler(req, url, {
 					message: (message: string) => {
-						queue.push('data:' + message + '\n\n');
+						stream_controller.write('data: ' + message + '\n\n');
+						stream_controller.flush();
+						lastEventTime = Date.now();
 					},
-
+		
 					event: (event_name: string, message: string) => {
-						queue.push('event:' + event_name + '\ndata:' + message + '\n\n');
+						stream_controller.write('event: ' + event_name + '\ndata: ' + message + '\n\n');
+						stream_controller.flush();
+						lastEventTime = Date.now();
 					},
-
+		
 					close: close_controller,
 					closed
 				});
 				
-				return new Response(stream, { headers: {
-					'Content-Type': 'text/event-stream',
-					'Cache-Control': 'no-cache',
-					'Connection': 'keep-alive'
-				}});
+				return new Response(stream, { 
+					headers: {
+						'Content-Type': 'text/event-stream',
+						'Cache-Control': 'no-cache',
+						'Connection': 'keep-alive',
+						'X-Accel-Buffering': 'no', // Disable proxy buffering
+					}
+				});
 			}, 'GET']);
 		}
-	}
+	};
 }
