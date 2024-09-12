@@ -19,8 +19,8 @@ server.websocket('/websocket', {
 		console.log('websocket close');
 	},
 
-	message: (ws, message) => {
-		console.log('websocket message: ' + message);
+	message_json: (ws, message) => {
+		console.log(message);
 	},
 
 	drain: (ws) => {

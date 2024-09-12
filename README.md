@@ -949,6 +949,17 @@ server.websocket('/path/to/websocket', {
 		// message is a string
 	},
 
+	message_json: (ws, data) => {
+		// called when a websocket message is received
+		// payload is parsed as JSON
+
+		// if payload cannot be parsed, socket will be
+		// closed with error 1003: Unsupported Data
+
+		// messages are only internally parsed if this
+		// handler is present
+	},
+
 	drain: (ws) => {
 		// called when a websocket with backpressure drains
 	}

@@ -107,6 +107,7 @@ export async function caution(err_message_or_obj: string | object, ...err: objec
 type WebsocketHandlers = {
 	accept?: (req: Request) => boolean,
 	message?: (ws: WebSocket, message: string) => void,
+	message_json?: (ws: WebSocket, message: JsonSerializable) => void,
 	open?: (ws: WebSocket) => void,
 	close?: (ws: WebSocket, code: number, reason: string) => void,
 	drain?: (ws: WebSocket) => void
@@ -731,6 +732,7 @@ export function serve(port: number) {
 	const slow_requests = new WeakSet();
 
 	let ws_message_handler: any = undefined;
+	let ws_message_json_handler: any = undefined;
 	let ws_open_handler: any = undefined;
 	let ws_close_handler: any = undefined;
 	let ws_drain_handler: any = undefined;
@@ -759,6 +761,20 @@ export function serve(port: number) {
 		websocket: {
 			message(ws, message) {
 				ws_message_handler?.(ws, message);
+
+				if (ws_message_json_handler) {
+					try {
+						if (message instanceof ArrayBuffer)
+							message = new TextDecoder().decode(message);
+						else if (message instanceof Buffer)
+							message = message.toString('utf8');
+
+						const parsed = JSON.parse(message as string);
+						ws_message_json_handler(ws, parsed);
+					} catch (e) {
+						ws.close(1003, 'Unsupported Data');
+					}
+				}
 			},
 
 			open(ws) {
@@ -803,6 +819,7 @@ export function serve(port: number) {
 				return new Response('WebSocket upgrade failed', { status: 500 });
 			}, 'GET']);
 
+			ws_message_json_handler = handlers.message_json;
 			ws_open_handler = handlers.open;
 			ws_close_handler = handlers.close;
 			ws_message_handler = handlers.message;
