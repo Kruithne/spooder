@@ -57,6 +57,8 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 	- [`server.sse(path: string, handler: ServerSentEventHandler)`](#api-routing-server-sse)
 - [API > Routing > Webhooks](#api-routing-webhooks)
 	- [`server.webhook(secret: string, path: string, handler: WebhookHandler)`](#api-routing-server-webhook)
+- [API > Routing > WebSockets](#api-routing-websockets)
+	- [`server.websocket(path: string, handlers: WebsocketHandlers)`](#api-routing-server-websocket)
 - [API > Server Control](#api-server-control)
 	- [`server.stop(immediate: boolean)`](#api-server-control-server-stop)
 - [API > Error Handling](#api-error-handling)
@@ -914,6 +916,47 @@ A webhook callback will only be called if the following critera is met by a requ
 
 > [!NOTE]
 > Constant-time comparison is used to prevent timing attacks when comparing the HMAC signature.
+
+<a id="api-routing-websockets"></a>
+## API > Routing > WebSockets
+
+<a id="api-routing-server-websocket"></a>
+### 🔧 `server.websocket(path: string, handlers: WebSocketHandlers)`
+
+Register a route which handles websocket connections.
+
+```ts
+server.websocket('/path/to/websocket', {
+	// all of these handlers are OPTIONAL
+
+	accept: (req) => {
+		// validates a request before it is upgraded
+		// returns HTTP 401 if FALSE is returned
+		// allows you to check headers/authentication
+		return true;
+	},
+
+	open: (ws) => {
+		// called when a websocket client connects
+	},
+
+	close: (ws, code, reason) => {
+		// called when a websocket client disconnects
+	},
+
+	message: (ws, message) => {
+		// called when a websocket message is received
+		// message is a string
+	},
+
+	drain: (ws) => {
+		// called when a websocket with backpressure drains
+	}
+});
+```
+
+> [!IMPORTANT]
+> While it is possible to register multiple routes for websockets, the only handler which is unique per route is `accept()`. The last handlers provided to any route (with the exception of `accept()`) will apply to ALL websocket routes. This is a limitation in Bun.
 
 <a id="api-server-control"></a>
 ## API > Server Control

@@ -104,6 +104,14 @@ export async function caution(err_message_or_obj: string | object, ...err: objec
 	await handle_error('caution: ', err_message_or_obj, ...err);
 }
 
+type WebsocketHandlers = {
+	accept?: (req: Request) => boolean,
+	message?: (ws: WebSocket, message: string) => void,
+	open?: (ws: WebSocket) => void,
+	close?: (ws: WebSocket, code: number, reason: string) => void,
+	drain?: (ws: WebSocket) => void
+};
+
 type CallableFunction = (...args: any[]) => any;
 type Callable = Promise<any> | CallableFunction;
 
@@ -722,6 +730,11 @@ export function serve(port: number) {
 
 	const slow_requests = new WeakSet();
 
+	let ws_message_handler: any = undefined;
+	let ws_open_handler: any = undefined;
+	let ws_close_handler: any = undefined;
+	let ws_drain_handler: any = undefined;
+
 	const server = Bun.serve({
 		port,
 		development: false,
@@ -741,6 +754,24 @@ export function serve(port: number) {
 				slow_requests.delete(req);
 
 			return print_request_info(req, response, url, request_time);
+		},
+
+		websocket: {
+			message(ws, message) {
+				ws_message_handler?.(ws, message);
+			},
+
+			open(ws) {
+				ws_open_handler?.(ws);
+			},
+
+			close(ws, code, reason) {
+				ws_close_handler?.(ws, code, reason);
+			},
+
+			drain(ws) {
+				ws_drain_handler?.(ws);
+			}
 		}
 	});
 
@@ -758,6 +789,24 @@ export function serve(port: number) {
 				path = path.slice(0, -1);
 
 			routes.push([[...path.split('/'), '*'], route_directory(path, dir, handler ?? default_directory_handler), method]);
+		},
+
+		/** Add a route to upgrade connections to websockets. */
+		websocket: (path: string, handlers: WebsocketHandlers): void => {
+			routes.push([path.split('/'), async (req: Request, url: URL) => {
+				if (handlers.accept?.(req) === false)
+					return 401; // Unauthorized
+
+				if (server.upgrade(req))
+					return 101; // Switching Protocols
+
+				return new Response('WebSocket upgrade failed', { status: 500 });
+			}, 'GET']);
+
+			ws_open_handler = handlers.open;
+			ws_close_handler = handlers.close;
+			ws_message_handler = handlers.message;
+			ws_drain_handler = handlers.drain;
 		},
 
 		webhook: (secret: string, path: string, handler: WebhookHandler): void => {
