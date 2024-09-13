@@ -933,6 +933,10 @@ server.websocket('/path/to/websocket', {
 		// validates a request before it is upgraded
 		// returns HTTP 401 if FALSE is returned
 		// allows you to check headers/authentication
+
+		// if an OBJECT is returned, the object will
+		// be accessible on the websocket as ws.data.*
+
 		return true;
 	},
 

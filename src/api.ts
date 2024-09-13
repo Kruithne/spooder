@@ -810,10 +810,18 @@ export function serve(port: number) {
 		/** Add a route to upgrade connections to websockets. */
 		websocket: (path: string, handlers: WebsocketHandlers): void => {
 			routes.push([path.split('/'), async (req: Request, url: URL) => {
-				if (await handlers.accept?.(req) === false)
-					return 401; // Unauthorized
+				let context_data = undefined;
+				if (handlers.accept) {
+					const res = await handlers.accept(req);
+					
+					if (typeof res === 'object') {
+						context_data = res;
+					} else if (!res) {
+						return 401; // Unauthorized
+					}
+				}
 
-				if (server.upgrade(req))
+				if (server.upgrade(req, { data: context_data }))
 					return 101; // Switching Protocols
 
 				return new Response('WebSocket upgrade failed', { status: 500 });
