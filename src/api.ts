@@ -105,7 +105,7 @@ export async function caution(err_message_or_obj: string | object, ...err: objec
 }
 
 type WebsocketHandlers = {
-	accept?: (req: Request) => boolean,
+	accept?: (req: Request) => boolean | Promise<boolean>,
 	message?: (ws: WebSocket, message: string) => void,
 	message_json?: (ws: WebSocket, message: JsonSerializable) => void,
 	open?: (ws: WebSocket) => void,
@@ -810,7 +810,7 @@ export function serve(port: number) {
 		/** Add a route to upgrade connections to websockets. */
 		websocket: (path: string, handlers: WebsocketHandlers): void => {
 			routes.push([path.split('/'), async (req: Request, url: URL) => {
-				if (handlers.accept?.(req) === false)
+				if (await handlers.accept?.(req) === false)
 					return 401; // Unauthorized
 
 				if (server.upgrade(req))
