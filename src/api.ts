@@ -104,8 +104,9 @@ export async function caution(err_message_or_obj: string | object, ...err: objec
 	await handle_error('caution: ', err_message_or_obj, ...err);
 }
 
+type WebsocketAcceptReturn = object | boolean;
 type WebsocketHandlers = {
-	accept?: (req: Request) => boolean | Promise<boolean>,
+	accept?: (req: Request) => WebsocketAcceptReturn | Promise<WebsocketAcceptReturn>,
 	message?: (ws: WebSocket, message: string) => void,
 	message_json?: (ws: WebSocket, message: JsonSerializable) => void,
 	open?: (ws: WebSocket) => void,
