@@ -1485,7 +1485,7 @@ const connection = await pool.getConnection();
 The schema directory is expected to contain an SQL file for each table in the database with the file name matching the name of the table.
 
 > [!NOTE]
-> Files without the `.sql` extension (case-insensitive) will be ignored.
+> The schema directory is searched recursively and files without the `.sql` extension (case-insensitive) will be ignored.
 
 ```
 - database.sqlite

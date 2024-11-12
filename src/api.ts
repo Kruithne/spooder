@@ -232,9 +232,13 @@ type SchemaVersionMap = Map<string, number>;
 
 async function db_load_schema(schema_dir: string, schema_versions: SchemaVersionMap) {
 	const schema_out = [];
-	const schema_files = await fs.readdir(schema_dir);
+	const schema_files = await fs.readdir(schema_dir, { recursive: true, withFileTypes: true });
 
-	for (const schema_file of schema_files) {
+	for (const schema_file_ent of schema_files) {
+		if (schema_file_ent.isDirectory())
+			continue;
+
+		const schema_file = schema_file_ent.name;
 		const schema_file_lower = schema_file.toLowerCase();
 		if (!schema_file_lower.endsWith('.sql'))
 			continue;
