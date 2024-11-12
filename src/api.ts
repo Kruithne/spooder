@@ -246,7 +246,7 @@ async function db_load_schema(schema_dir: string, schema_versions: SchemaVersion
 		log('[{db}] parsing schema file {%s}', schema_file_lower);
 
 		const schema_name = path.basename(schema_file_lower, '.sql');
-		const schema_path = path.join(schema_dir, schema_file);
+		const schema_path = path.join(schema_file_ent.parentPath, schema_file);
 		const schema = await fs.readFile(schema_path, 'utf8');
 
 		const revisions = new Map();
