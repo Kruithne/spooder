@@ -804,6 +804,22 @@ export function serve(port: number) {
 			routes.push([path.split('/'), handler, method]);
 		},
 
+		/** Unregister a specific route */
+		unroute: (path: string): void => {
+			const path_parts = path.split('/');
+			routes.splice(routes.findIndex(([route_parts]) => {
+				if (route_parts.length !== path_parts.length)
+					return false;
+
+				for (let i = 0; i < route_parts.length; i++) {
+					if (route_parts[i] !== path_parts[i])
+						return false;
+				}
+
+				return true;
+			}, 1));
+		},
+
 		/** Serve a directory for a specific route. */
 		dir: (path: string, dir: string, handler?: DirHandler, method: HTTP_METHODS = 'GET'): void => {
 			if (path.endsWith('/'))

@@ -38,6 +38,7 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 	- [`serve(port: number): Server`](#api-serving-serve)
 - [API > Routing](#api-routing)
 	- [`server.route(path: string, handler: RequestHandler, method: HTTP_METHODS)`](#api-routing-server-route)
+	- [`server.unroute(path: string)`](#api-routing-server-unroute)
 	- [HTTP Methods](#api-routing-methods)
 	- [Redirection Routes](#api-routing-redirection-routes)
 	- [Status Code Text](#api-routing-status-code-text)
@@ -499,6 +500,16 @@ Register a handler for a specific path.
 server.route('/test/route', (req, url) => {
 	return new Response('Hello, world!', { status: 200 });
 });
+```
+
+<a id="api-routing-server-unrouote"></a>
+### 🔧 `server.unroute(path: string)`
+
+Unregister a specific route.
+
+```ts
+server.route('/test/route', () => {});
+server.unroute('/test/route');
 ```
 
 <a id="api-routing-methods"></a>
