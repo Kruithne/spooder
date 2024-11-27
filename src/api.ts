@@ -616,7 +616,7 @@ function is_valid_method(method: HTTP_METHODS, req: Request): boolean {
 	return req.method === method;
 }
 
-export function serve(port: number) {
+export function serve(port: number, hostname?: string) {
 	const routes = new Array<[string[], RequestHandler, HTTP_METHODS]>();
 	const handlers = new Map<number, StatusCodeHandler>();
 	
@@ -744,6 +744,7 @@ export function serve(port: number) {
 
 	const server = Bun.serve({
 		port,
+		hostname,
 		development: false,
 
 		async fetch(req: Request): Promise<Response> {

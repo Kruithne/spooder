@@ -35,7 +35,7 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 `spooder` exposes a simple yet powerful API for developing servers. The API is designed to be minimal to leave control in the hands of the developer and not add overhead for features you may not need.
 
 - [API > Serving](#api-serving)
-	- [`serve(port: number): Server`](#api-serving-serve)
+	- [`serve(port: number, hostname?: string): Server`](#api-serving-serve)
 - [API > Routing](#api-routing)
 	- [`server.route(path: string, handler: RequestHandler, method: HTTP_METHODS)`](#api-routing-server-route)
 	- [`server.unroute(path: string)`](#api-routing-server-unroute)
@@ -468,14 +468,15 @@ In addition to the information provided by the developer, `spooder` also include
 ## API > Serving
 
 <a id="api-serving-serve"></a>
-### `serve(port: number): Server`
+### `serve(port: number, hostname?: string): Server`
 
-Bootstrap a server on the specified port.
+Bootstrap a server on the specified port (and optional hostname).
 
 ```ts
 import { serve } from 'spooder';
 
-const server = serve(8080);
+const server = serve(8080); // port only
+const server = serve(3000, '0.0.0.0'); // optional hostname
 ```
 
 By default, the server responds with:
