@@ -797,7 +797,7 @@ export function serve(port: number, hostname?: string) {
 		}
 	});
 
-	log('server started on port {%d}', port);
+	log('server started on port {%d} (host: {%s})', port, hostname ?? 'unspecified');
 
 	return {
 		/** Register a handler for a specific route. */
