@@ -173,6 +173,25 @@ export async function parse_template(template: string, replacements: Replacement
 					}
 					i += loop_content.length + 6;
 				}
+			} else if (buffer.startsWith('if:')) {
+				const if_key = buffer.substring(3);
+				const if_content_start_index = i + 1;
+				const if_close_index = template.indexOf('{/if}', if_content_start_index);
+
+				if (if_close_index === -1) {
+					if (!drop_missing)
+						result += '{$' + buffer + '}';
+				} else {
+					const if_content = template.substring(if_content_start_index, if_close_index);
+					const condition_value = is_replacer_fn ? await replacements(if_key) : replacements[if_key];
+
+					if (!drop_missing) {
+						result += '{$' + buffer + '}' + if_content + '{/if}';
+					} else if (condition_value) {
+						result += await parse_template(if_content, replacements, drop_missing);
+					}
+					i += if_content.length + 5;
+				}
 			} else {
 				const replacement = is_replacer_fn ? await replacements(buffer) : replacements[buffer];
 				if (replacement !== undefined)

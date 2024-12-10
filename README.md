@@ -1215,6 +1215,16 @@ await parse_template('Hello {$world}', replacer);
 </html>
 ```
 
+`parse_template` supports optional scopes with the following syntax.
+
+```html
+{$if:foo}I love {$foo}{/if}
+```
+Contents contained inside an `if` block will be rendered providing the given value, in this case `foo` is truthy in the substitution table.
+
+An `if` block is only removed if `drop_missing` is `true`, allowing them to persist through multiple passes of a template.
+
+
 `parse_template` supports looping arrays with the following syntax.
 
 ```html
