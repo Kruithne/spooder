@@ -312,23 +312,23 @@ async function db_load_schema(schema_dir: string, schema_versions: SchemaVersion
 	return schema_out;
 }
 
-export async function db_update_schema_sqlite(db: Database, schema_dir: string) {
+export async function db_update_schema_sqlite(db: Database, schema_dir: string, schema_table_name = 'db_schema') {
 	log('[{db}] updating database schema for {%s}', db.filename);
 
 	const schema_versions = new Map();
 
 	try {
-		const query = db.query('SELECT db_schema_table_name, db_schema_version FROM db_schema');
+		const query = db.query('SELECT db_schema_table_name, db_schema_version FROM ' + schema_table_name);
 		for (const row of query.all() as Array<Row_DBSchema>)
 			schema_versions.set(row.db_schema_table_name, row.db_schema_version);
 	} catch (e) {
-		log('[{db}] creating {db_schema} table');
-		db.run('CREATE TABLE db_schema (db_schema_table_name TEXT PRIMARY KEY, db_schema_version INTEGER)');
+		log('[{db}] creating {%s} table', schema_table_name);
+		db.run(`CREATE TABLE ${schema_table_name} (db_schema_table_name TEXT PRIMARY KEY, db_schema_version INTEGER)`);
 	}
 	
 	db.transaction(async () => {
 		const update_schema_query = db.prepare(`
-			INSERT INTO db_schema (db_schema_version, db_schema_table_name) VALUES (?1, ?2)
+			INSERT INTO ${schema_table_name} (db_schema_version, db_schema_table_name) VALUES (?1, ?2)
 			ON CONFLICT(db_schema_table_name) DO UPDATE SET db_schema_version = EXCLUDED.db_schema_version
 		`);
 
@@ -351,7 +351,7 @@ export async function db_update_schema_sqlite(db: Database, schema_dir: string) 
 	})();
 }
 
-export async function db_update_schema_mysql(db: mysql_types.Connection, schema_dir: string) {
+export async function db_update_schema_mysql(db: mysql_types.Connection, schema_dir: string, schema_table_name = 'db_schema') {
 	if (mysql === undefined)
 		throw new Error('{db_update_schema_mysql} cannot be called without optional dependency {mysql2} installed');
 
@@ -360,18 +360,18 @@ export async function db_update_schema_mysql(db: mysql_types.Connection, schema_
 	const schema_versions = new Map();
 
 	try {
-		const [rows] = await db.query('SELECT db_schema_table_name, db_schema_version FROM db_schema');
+		const [rows] = await db.query('SELECT db_schema_table_name, db_schema_version FROM ' + schema_table_name);
 		for (const row of rows as Array<Row_DBSchema>)
 			schema_versions.set(row.db_schema_table_name, row.db_schema_version);
 	} catch (e) {
-		log('[{db}] creating {db_schema} table');
-		await db.query('CREATE TABLE db_schema (db_schema_table_name VARCHAR(255) PRIMARY KEY, db_schema_version INT)');
+		log('[{db}] creating {%s} table', schema_table_name);
+		await db.query(`CREATE TABLE ${schema_table_name} (db_schema_table_name VARCHAR(255) PRIMARY KEY, db_schema_version INT)`);
 	}
 
 	await db.beginTransaction();
 	
 	const update_schema_query = await db.prepare(`
-		INSERT INTO db_schema (db_schema_version, db_schema_table_name) VALUES (?, ?)
+		INSERT INTO ${schema_table_name} (db_schema_version, db_schema_table_name) VALUES (?, ?)
 		ON DUPLICATE KEY UPDATE db_schema_version = VALUES(db_schema_version);
 	`);
 

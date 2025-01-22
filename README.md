@@ -1471,6 +1471,12 @@ const db = await mysql.createConnection({
 > [!IMPORTANT]
 > MySQL requires the optional dependency `mysql2` to be installed - this is not automatically installed with spooder. This will be replaced when bun:sql supports MySQL natively.
 
+By default, the table `db_schema` will be created in the database and used to track schema state. This can be changed if necessary by providing an alternative table name as the third paramater.
+
+```ts
+await db_update_schema_sqlite(db, './schema', 'my_schema_table');
+```
+
 Database initiation and schema updating can be streamlined with the `db_init_schema_DRIVER` functions. The following examples are equivalent to the above ones.
 
 ```ts
