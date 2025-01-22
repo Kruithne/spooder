@@ -1550,7 +1550,26 @@ Each revision should be clearly marked with a comment containing the revision nu
 
 Everything following a revision header is considered part of that revision until the next revision header or the end of the file, allowing for multiple SQL statements to be included in a single revision.
 
-When calling `db_update_schema_sqlite`, unapplied revisions will be applied in ascending order (regardless of order within the file) until the schema is up-to-date. 
+When calling `db_update_schema_sqlite`, unapplied revisions will be applied in ascending order (regardless of order within the file) until the schema is up-to-date.
+
+It is acceptable to omit keys. This can be useful to prevent repitition when managing stored procedures, views or functions.
+
+```sql
+-- example of repetitive declaration
+
+-- [1] create view
+CREATE VIEW `view_test` AS SELECT * FROM `table_a` WHERE col = 'foo';
+
+-- [2] change view
+DROP VIEW IF EXISTS `view_test`;
+CREATE VIEW `view_test` AS SELECT * FROM `table_b` WHERE col = 'foo';
+```
+Instead of unnecessarily including each full revision of a procedure, view or function in the schema file, simply store the most up-to-date one and increment the version.
+```sql
+-- [2] create view
+CREATE OR REPLACE VIEW `view_test` AS SELECT * FROM `table_b` WHERE col = 'foo';
+```
+
 
 Schema revisions are tracked in a table called `db_schema` which is created automatically if it does not exist with the following schema.
 
