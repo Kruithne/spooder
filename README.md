@@ -1471,12 +1471,6 @@ const db = await mysql.createConnection({
 > [!IMPORTANT]
 > MySQL requires the optional dependency `mysql2` to be installed - this is not automatically installed with spooder. This will be replaced when bun:sql supports MySQL natively.
 
-By default, the table `db_schema` will be created in the database and used to track schema state. This can be changed if necessary by providing an alternative table name as the third paramater.
-
-```ts
-await db_update_schema_sqlite(db, './schema', 'my_schema_table');
-```
-
 Database initiation and schema updating can be streamlined with the `db_init_schema_DRIVER` functions. The following examples are equivalent to the above ones.
 
 ```ts
@@ -1556,13 +1550,21 @@ Each revision should be clearly marked with a comment containing the revision nu
 
 Everything following a revision header is considered part of that revision until the next revision header or the end of the file, allowing for multiple SQL statements to be included in a single revision.
 
-When calling `db_update_schema_sqlite`, unapplied revisions will be applied in ascending order (regardless of order within the file) until the schema is up-to-date. Schema revisions are tracked in a table called `db_schema` which is created automatically if it does not exist with the following schema.
+When calling `db_update_schema_sqlite`, unapplied revisions will be applied in ascending order (regardless of order within the file) until the schema is up-to-date. 
+
+Schema revisions are tracked in a table called `db_schema` which is created automatically if it does not exist with the following schema.
 
 ```sql
 CREATE TABLE db_schema (
 	db_schema_table_name TEXT PRIMARY KEY,
 	db_schema_version INTEGER
 );
+```
+
+The table used for schema tracking can be changed if necessary by providing an alternative table name as the third paramater.
+
+```ts
+await db_update_schema_sqlite(db, './schema', 'my_schema_table');
 ```
 
 >[!IMPORTANT]
