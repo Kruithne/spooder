@@ -246,6 +246,46 @@ export async function generate_hash_subs(length = 7, prefix = 'hash=', hashes?: 
 	return hash_map;
 }
 
+interface DependencyTarget {
+	file_name: string;
+	deps: string[];
+}
+
+function order_schema_dep_tree<T extends DependencyTarget>(deps: T[]): T[] {
+	const visited = new Set<string>();
+	const temp = new Set<string>();
+	const result: T[] = [];
+	const map = new Map(deps.map(d => [d.file_name, d]));
+ 
+	function visit(node: T): void {
+		if (temp.has(node.file_name))
+			throw new Error(`Cyclic dependency {${node.file_name}}`);
+ 
+		if (visited.has(node.file_name))
+			return;
+ 
+		temp.add(node.file_name);
+ 
+		for (const dep of node.deps) {
+			const dep_node = map.get(dep);
+			if (!dep_node)
+				throw new Error(`Missing dependency {${dep}}`);
+			
+			visit(dep_node as T);
+		}
+ 
+		temp.delete(node.file_name);
+		visited.add(node.file_name);
+		result.push(node);
+	}
+ 
+	for (const dep of deps)
+		if (!visited.has(dep.file_name))
+			visit(dep);
+ 
+	return result;
+ }
+
 type Row_DBSchema = { db_schema_table_name: string, db_schema_version: number };
 type SchemaVersionMap = Map<string, number>;
 
@@ -268,23 +308,31 @@ async function db_load_schema(schema_dir: string, schema_versions: SchemaVersion
 		const schema_path = path.join(schema_file_ent.parentPath, schema_file);
 		const schema = await fs.readFile(schema_path, 'utf8');
 
+		const deps = new Array<string>();
+
 		const revisions = new Map();
 		let current_rev_id = 0;
 		let current_rev = '';
 
 		for (const line of schema.split(/\r?\n/)) {
-			const rev_start = line.match(/^--\s*\[(\d+)\]/);
-			if (rev_start !== null) {
-				// New chunk definition detected, store the current chunk and start a new one.
-				if (current_rev_id > 0) {
-					revisions.set(current_rev_id, current_rev);
-					current_rev = '';
-				}
+			const line_identifier = line.match(/^--\s*\[(\d+|deps)\]/);
+			if (line_identifier !== null) {
+				if (line_identifier[1] === 'deps') {
+					// Line contains schema dependencies, example: -- [deps] schema_b.sql,schema_c.sql
+					const deps_raw = line.substring(line.indexOf('deps') + 4);
+					deps.push(...deps_raw.split(',').map(e => e.trim().toLowerCase()));
+				} else {
+					// New chunk definition detected, store the current chunk and start a new one.
+					if (current_rev_id > 0) {
+						revisions.set(current_rev_id, current_rev);
+						current_rev = '';
+					}
 
-				const rev_number = parseInt(rev_start[1]);
-				if (isNaN(rev_number) || rev_number < 1)
-					throw new Error(rev_number + ' is not a valid revision number in ' + schema_file_lower);
-				current_rev_id = rev_number;
+					const rev_number = parseInt(line_identifier[1]);
+					if (isNaN(rev_number) || rev_number < 1)
+						throw new Error(rev_number + ' is not a valid revision number in ' + schema_file_lower);
+					current_rev_id = rev_number;
+				}
 			} else {
 				// Append to existing revision.
 				current_rev += line + '\n';
@@ -300,16 +348,21 @@ async function db_load_schema(schema_dir: string, schema_versions: SchemaVersion
 			continue;
 		}
 
+		if (deps.length > 0)
+			log('[{db}] {%s} dependencies: %s', schema_file, deps.map(e => '{' + e +'}').join(', '));
+
 		const current_schema_version = schema_versions.get(schema_name) ?? 0;
 		schema_out.push({
 			revisions,
+			file_name: schema_file_lower,
 			name: schema_name,
 			current_version: current_schema_version,
+			deps,
 			chunk_keys: Array.from(revisions.keys()).filter(chunk_id => chunk_id > current_schema_version).sort((a, b) => a - b)
 		});
 	}
 
-	return schema_out;
+	return order_schema_dep_tree(schema_out);
 }
 
 export async function db_update_schema_sqlite(db: Database, schema_dir: string, schema_table_name = 'db_schema') {

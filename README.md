@@ -1602,6 +1602,20 @@ try {
 }
 ```
 
+### Schema Dependencies
+By default, schema files are executed in the order they are provided by the operating system (generally alphabetically).
+
+If you have a schema file that depends on one or more other schema files to be executed before it (for example, using foreign keys), you can specify dependencies.
+
+```sql
+-- [deps] table_b_schema.sql, table_c_schema.sql
+-- [1] create table_a
+CREATE ...
+```
+
+>[!IMPORTANT]
+> Cyclic or missing dependencies will throw an error.
+
 ## Legal
 This software is provided as-is with no warranty or guarantee. The authors of this project are not responsible or liable for any problems caused by using this software or any part thereof. Use of this software does not entitle you to any support or assistance from the authors of this project.
 
