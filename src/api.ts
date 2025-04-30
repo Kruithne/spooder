@@ -279,12 +279,12 @@ function order_schema_dep_tree<T extends DependencyTarget>(deps: T[]): T[] {
 		result.push(node);
 	}
  
-	for (const dep of [...deps].reverse())
+	for (const dep of deps)
 		if (!visited.has(dep.file_name))
 			visit(dep);
  
 	return result;
-}
+ }
 
 type Row_DBSchema = { db_schema_table_name: string, db_schema_version: number };
 type SchemaVersionMap = Map<string, number>;
@@ -319,7 +319,7 @@ async function db_load_schema(schema_dir: string, schema_versions: SchemaVersion
 			if (line_identifier !== null) {
 				if (line_identifier[1] === 'deps') {
 					// Line contains schema dependencies, example: -- [deps] schema_b.sql,schema_c.sql
-					const deps_raw = line.substring(line.indexOf('deps') + 4);
+					const deps_raw = line.substring(line.indexOf(']') + 1);
 					deps.push(...deps_raw.split(',').map(e => e.trim().toLowerCase()));
 				} else {
 					// New chunk definition detected, store the current chunk and start a new one.
