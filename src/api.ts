@@ -276,14 +276,14 @@ function order_schema_dep_tree<T extends DependencyTarget>(deps: T[]): T[] {
  
 		temp.delete(node.file_name);
 		visited.add(node.file_name);
-		result.push(node);
+		result.unshift(node);
 	}
  
 	for (const dep of deps)
 		if (!visited.has(dep.file_name))
 			visit(dep);
  
-	return result.reverse();
+	return result;
  }
 
 type Row_DBSchema = { db_schema_table_name: string, db_schema_version: number };
