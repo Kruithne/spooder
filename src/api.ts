@@ -283,7 +283,7 @@ function order_schema_dep_tree<T extends DependencyTarget>(deps: T[]): T[] {
 		if (!visited.has(dep.file_name))
 			visit(dep);
  
-	return result;
+	return result.reverse();
  }
 
 type Row_DBSchema = { db_schema_table_name: string, db_schema_version: number };
