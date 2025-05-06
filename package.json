@@ -1,7 +1,7 @@
 {
 	"name": "spooder",
 	"type": "module",
-	"version": "4.5.13",
+	"version": "4.6.0",
 	"exports": {
 		".": {
 			"bun": "./src/api.ts",
