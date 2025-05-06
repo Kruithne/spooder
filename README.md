@@ -1471,18 +1471,18 @@ const db = await mysql.createConnection({
 > [!IMPORTANT]
 > MySQL requires the optional dependency `mysql2` to be installed - this is not automatically installed with spooder. This will be replaced when bun:sql supports MySQL natively.
 
-Database initiation and schema updating can be streamlined with the `db_init_schema_DRIVER` functions. The following examples are equivalent to the above ones.
+Database initiation and schema updating can be streamlined with the `db_init_DRIVER` functions. The following examples are equivalent to the above ones.
 
 ```ts
 // sqlite example
-import { db_init_schema_sqlite } from 'spooder';
-const db = await db_init_schema_sqlite('./database.sqlite', './schema');
+import { db_init_sqlite } from 'spooder';
+const db = await db_init_sqlite('./database.sqlite', './schema');
 ```
 
 ```ts
 // mysql example
-import { db_init_schema_mysql } from 'spooder';
-const db = await db_init_schema_mysql({
+import { db_init_mysql } from 'spooder';
+const db = await db_init_mysql({
 	// connection options
 	// see https://github.com/mysqljs/mysql#connection-options
 }, './schema');
@@ -1490,14 +1490,14 @@ const db = await db_init_schema_mysql({
 
 ### Pooling
 
-MySQL supports connection pooling. spooder allows you to create a connection pool instead of a single connection.
+Providing `true` to the `pool` parameter of `db_init_mysql` will return a connection pool instead of a single connection.
 
 ```ts
-import { db_init_schema_mysql_pool } from 'spooder';
-const pool = await db_init_schema_mysql_pool({
+import { db_init_mysql } from 'spooder';
+const pool = await db_init_mysql({
 	// connection options
 	connectionLimit: 10
-});
+}, './schema', true);
 
 const connection = await pool.getConnection();
 ```

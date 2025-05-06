@@ -449,15 +449,18 @@ export async function db_update_schema_mysql(db: mysql_types.Connection, schema_
 	await db.commit();
 }
 
-export async function db_init_schema_sqlite(db_path: string, schema_dir: string): Promise<Database> {
+export async function db_init_sqlite(db_path: string, schema_dir?: string): Promise<Database> {
 	const db = new Database(db_path, { create: true });
-	await db_update_schema_sqlite(db, schema_dir);
+
+	if (schema_dir !== undefined)
+		await db_update_schema_sqlite(db, schema_dir);
+
 	return db;
 }
 
-async function _db_init_schema_mysql(db_info: mysql_types.ConnectionOptions, schema_dir: string, pool = false): Promise<mysql_types.Pool | mysql_types.Connection> {
+export async function db_init_mysql<T extends boolean = false>(db_info: mysql_types.ConnectionOptions, schema_dir?: string, pool: T = false as T): Promise<T extends true ? mysql_types.Pool : mysql_types.Connection> {
 	if (mysql === undefined)
-		throw new Error('{db_init_schema_mysql} cannot be called without optional dependency {mysql2} installed');
+		throw new Error('db_init_mysql cannot be called without optional dependency {mysql2} installed');
 
 	// required for parsing multiple statements from schema files
 	db_info.multipleStatements = true;
@@ -466,24 +469,20 @@ async function _db_init_schema_mysql(db_info: mysql_types.ConnectionOptions, sch
 		const pool = mysql.createPool(db_info);
 		const connection = await pool.getConnection();
 
-		await db_update_schema_mysql(connection, schema_dir);
+		if (schema_dir !== undefined)
+			await db_update_schema_mysql(connection, schema_dir);
+
 		connection.release();
 
-		return pool;
+		return pool as any;
 	} else {
 		const connection = await mysql.createConnection(db_info);
-		await db_update_schema_mysql(connection, schema_dir);
+
+		if (schema_dir !== undefined)
+			await db_update_schema_mysql(connection, schema_dir);
 		
-		return connection;
+		return connection as any;
 	}
-}
-
-export async function db_init_schema_mysql_pool(db_info: mysql_types.ConnectionOptions, schema_dir: string): Promise<mysql_types.Pool> {
-	return await _db_init_schema_mysql(db_info, schema_dir, true) as mysql_types.Pool;
-}
-
-export async function db_init_schema_mysql(db_info: mysql_types.ConnectionOptions, schema_dir: string): Promise<mysql_types.Connection> {
-	return await _db_init_schema_mysql(db_info, schema_dir, false) as mysql_types.Connection;
 }
 
 export type CookieOptions = {
