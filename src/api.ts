@@ -570,7 +570,7 @@ type Resolvable<T> = T | Promise<T>;
 type PromiseType<T extends Promise<any>> = T extends Promise<infer U> ? U : never;
 
 // The following types cover JSON serializable objects/classes.
-export type JsonPrimitive = string | number | boolean | null;
+export type JsonPrimitive = string | number | boolean | null | undefined;
 export type JsonArray = JsonSerializable[];
 
 export interface JsonObject {
