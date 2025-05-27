@@ -2,20 +2,20 @@
 	"name": "spooder",
 	"type": "module",
 	"version": "4.6.0",
+	"module": "./src/api.ts",
+	"bin": {
+		"spooder": "./src/cli.ts"
+	},
 	"exports": {
 		".": {
 			"bun": "./src/api.ts",
 			"import": "./src/api.ts"
 		}
 	},
-	"module": "./src/api.ts",
 	"devDependencies": {
 		"@types/bun": "^1.1.8"
 	},
 	"optionalDependencies": {
 		"mysql2": "^3.11.0"
-	},
-	"bin": {
-		"spooder": "./src/cli.ts"
 	}
 }
