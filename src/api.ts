@@ -945,7 +945,10 @@ export function serve(port: number, hostname?: string) {
 				const hmac = crypto.createHmac('sha256', secret);
 				hmac.update(JSON.stringify(body));
 
-				if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from('sha256=' + hmac.digest('hex'))))
+				const sig_buffer = new Uint8Array(Buffer.from(signature));
+				const hmac_buffer = new Uint8Array(Buffer.from('sha256=' + hmac.digest('hex')));
+
+				if (!crypto.timingSafeEqual(sig_buffer, hmac_buffer))
 					return 401; // Unauthorized
 
 				return handler(body);

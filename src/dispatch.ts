@@ -54,7 +54,7 @@ async function save_cache_table(table: Map<bigint, number>, cache_file_path: str
 	}
 
 	await new Promise(resolve => fs.mkdir(path.dirname(cache_file_path), { recursive: true }, resolve));
-	await Bun.write(cache_file_path, data);
+	await Bun.write(cache_file_path, data.buffer);
 }
 
 async function check_cache_table(key: string, repository: string, expiry: number): Promise<boolean> {
@@ -211,6 +211,6 @@ export async function dispatch_report(report_title: string, report_body: Array<u
 			issue_labels: config.canary.labels
 		});
 	} catch (e) {
-		log('[{canary error}] ' + (e as Error)?.message ?? 'unspecified error');
+		log('[{canary error}] ' + (e as Error).message);
 	}
 }
