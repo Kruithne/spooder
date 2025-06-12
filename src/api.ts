@@ -5,24 +5,8 @@ import fs from 'node:fs/promises';
 import { log } from './utils';
 import crypto from 'crypto';
 import { Blob } from 'node:buffer';
-import { Database } from 'bun:sqlite';
-import type * as mysql_types from 'mysql2/promise';
 
-let mysql: typeof mysql_types | undefined;
-try {
-	mysql = await import('mysql2/promise') as typeof mysql_types;
-} catch (e) {
-	// mysql2 optional dependency not installed.
-	// this dependency will be replaced once bun:sql supports mysql.
-	// db_update_schema_mysql and db_init_schema_mysql will throw.
-}
-
-export const HTTP_STATUS_CODE = http.STATUS_CODES;
-
-// Create enum containing HTTP methods
-type HTTP_METHOD = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS' | 'CONNECT' | 'TRACE';
-type HTTP_METHODS = HTTP_METHOD|HTTP_METHOD[];
-
+// region error handling
 export class ErrorWithMetadata extends Error {
 	constructor(message: string, public metadata: Record<string, unknown>) {
 		super(message);
@@ -104,16 +88,6 @@ export async function caution(err_message_or_obj: string | object, ...err: objec
 	await handle_error('caution: ', err_message_or_obj, ...err);
 }
 
-type WebsocketAcceptReturn = object | boolean;
-type WebsocketHandlers = {
-	accept?: (req: Request) => WebsocketAcceptReturn | Promise<WebsocketAcceptReturn>,
-	message?: (ws: WebSocket, message: string) => void,
-	message_json?: (ws: WebSocket, message: JsonSerializable) => void,
-	open?: (ws: WebSocket) => void,
-	close?: (ws: WebSocket, code: number, reason: string) => void,
-	drain?: (ws: WebSocket) => void
-};
-
 type CallableFunction = (...args: any[]) => any;
 type Callable = Promise<any> | CallableFunction;
 
@@ -127,7 +101,9 @@ export async function safe(target_fn: Callable) {
 		caution(e as Error);
 	}
 }
+// endregion
 
+// region templates
 type ReplacerFn = (key: string) => string | Array<string> | undefined;
 type AsyncReplaceFn = (key: string) => Promise<string | Array<string> | undefined>;
 type Replacements = Record<string, string | Array<string>> | ReplacerFn | AsyncReplaceFn;
@@ -245,245 +221,7 @@ export async function generate_hash_subs(length = 7, prefix = 'hash=', hashes?: 
 
 	return hash_map;
 }
-
-interface DependencyTarget {
-	file_name: string;
-	deps: string[];
-}
-
-function order_schema_dep_tree<T extends DependencyTarget>(deps: T[]): T[] {
-	const visited = new Set<string>();
-	const temp = new Set<string>();
-	const result: T[] = [];
-	const map = new Map(deps.map(d => [d.file_name, d]));
- 
-	function visit(node: T): void {
-		if (temp.has(node.file_name))
-			throw new Error(`Cyclic dependency {${node.file_name}}`);
- 
-		if (visited.has(node.file_name))
-			return;
- 
-		temp.add(node.file_name);
- 
-		for (const dep of node.deps) {
-			const dep_node = map.get(dep);
-			if (!dep_node)
-				throw new Error(`Missing dependency {${dep}}`);
-			
-			visit(dep_node as T);
-		}
- 
-		temp.delete(node.file_name);
-		visited.add(node.file_name);
-		result.push(node);
-	}
- 
-	for (const dep of deps)
-		if (!visited.has(dep.file_name))
-			visit(dep);
- 
-	return result;
- }
-
-type Row_DBSchema = { db_schema_table_name: string, db_schema_version: number };
-type SchemaVersionMap = Map<string, number>;
-
-async function db_load_schema(schema_dir: string, schema_versions: SchemaVersionMap) {
-	const schema_out = [];
-	const schema_files = await fs.readdir(schema_dir, { recursive: true, withFileTypes: true });
-
-	for (const schema_file_ent of schema_files) {
-		if (schema_file_ent.isDirectory())
-			continue;
-
-		const schema_file = schema_file_ent.name;
-		const schema_file_lower = schema_file.toLowerCase();
-		if (!schema_file_lower.endsWith('.sql'))
-			continue;
-
-		log('[{db}] parsing schema file {%s}', schema_file_lower);
-
-		const schema_name = path.basename(schema_file_lower, '.sql');
-		const schema_path = path.join(schema_file_ent.parentPath, schema_file);
-		const schema = await fs.readFile(schema_path, 'utf8');
-
-		const deps = new Array<string>();
-
-		const revisions = new Map();
-		let current_rev_id = 0;
-		let current_rev = '';
-
-		for (const line of schema.split(/\r?\n/)) {
-			const line_identifier = line.match(/^--\s*\[(\d+|deps)\]/);
-			if (line_identifier !== null) {
-				if (line_identifier[1] === 'deps') {
-					// Line contains schema dependencies, example: -- [deps] schema_b.sql,schema_c.sql
-					const deps_raw = line.substring(line.indexOf(']') + 1);
-					deps.push(...deps_raw.split(',').map(e => e.trim().toLowerCase()));
-				} else {
-					// New chunk definition detected, store the current chunk and start a new one.
-					if (current_rev_id > 0) {
-						revisions.set(current_rev_id, current_rev);
-						current_rev = '';
-					}
-
-					const rev_number = parseInt(line_identifier[1]);
-					if (isNaN(rev_number) || rev_number < 1)
-						throw new Error(rev_number + ' is not a valid revision number in ' + schema_file_lower);
-					current_rev_id = rev_number;
-				}
-			} else {
-				// Append to existing revision.
-				current_rev += line + '\n';
-			}
-		}
-
-		// There may be something left in current_chunk once we reach end of the file.
-		if (current_rev_id > 0)
-			revisions.set(current_rev_id, current_rev);
-
-		if (revisions.size === 0) {
-			log('[{db}] {%s} contains no valid revisions', schema_file);
-			continue;
-		}
-
-		if (deps.length > 0)
-			log('[{db}] {%s} dependencies: %s', schema_file, deps.map(e => '{' + e +'}').join(', '));
-
-		const current_schema_version = schema_versions.get(schema_name) ?? 0;
-		schema_out.push({
-			revisions,
-			file_name: schema_file_lower,
-			name: schema_name,
-			current_version: current_schema_version,
-			deps,
-			chunk_keys: Array.from(revisions.keys()).filter(chunk_id => chunk_id > current_schema_version).sort((a, b) => a - b)
-		});
-	}
-
-	return order_schema_dep_tree(schema_out);
-}
-
-export async function db_update_schema_sqlite(db: Database, schema_dir: string, schema_table_name = 'db_schema') {
-	log('[{db}] updating database schema for {%s}', db.filename);
-
-	const schema_versions = new Map();
-
-	try {
-		const query = db.query('SELECT db_schema_table_name, db_schema_version FROM ' + schema_table_name);
-		for (const row of query.all() as Array<Row_DBSchema>)
-			schema_versions.set(row.db_schema_table_name, row.db_schema_version);
-	} catch (e) {
-		log('[{db}] creating {%s} table', schema_table_name);
-		db.run(`CREATE TABLE ${schema_table_name} (db_schema_table_name TEXT PRIMARY KEY, db_schema_version INTEGER)`);
-	}
-	
-	db.transaction(async () => {
-		const update_schema_query = db.prepare(`
-			INSERT INTO ${schema_table_name} (db_schema_version, db_schema_table_name) VALUES (?1, ?2)
-			ON CONFLICT(db_schema_table_name) DO UPDATE SET db_schema_version = EXCLUDED.db_schema_version
-		`);
-
-		const schemas = await db_load_schema(schema_dir, schema_versions);
-
-		for (const schema of schemas) {
-			let newest_schema_version = schema.current_version;
-			for (const rev_id of schema.chunk_keys) {
-				const revision = schema.revisions.get(rev_id);
-				log('[{db}] applying revision {%d} to {%s}', rev_id, schema.name);
-				db.transaction(() => db.run(revision))();
-				newest_schema_version = rev_id;
-			}
-	
-			if (newest_schema_version > schema.current_version) {
-				log('[{db}] updated table {%s} to revision {%d}', schema.name, newest_schema_version);
-				update_schema_query.run(newest_schema_version, schema.name);
-			}
-		}
-	})();
-}
-
-export async function db_update_schema_mysql(db: mysql_types.Connection, schema_dir: string, schema_table_name = 'db_schema') {
-	if (mysql === undefined)
-		throw new Error('{db_update_schema_mysql} cannot be called without optional dependency {mysql2} installed');
-
-	log('[{db}] updating database schema for {%s}', db.config.database);
-
-	const schema_versions = new Map();
-
-	try {
-		const [rows] = await db.query('SELECT db_schema_table_name, db_schema_version FROM ' + schema_table_name);
-		for (const row of rows as Array<Row_DBSchema>)
-			schema_versions.set(row.db_schema_table_name, row.db_schema_version);
-	} catch (e) {
-		log('[{db}] creating {%s} table', schema_table_name);
-		await db.query(`CREATE TABLE ${schema_table_name} (db_schema_table_name VARCHAR(255) PRIMARY KEY, db_schema_version INT)`);
-	}
-
-	await db.beginTransaction();
-	
-	const update_schema_query = await db.prepare(`
-		INSERT INTO ${schema_table_name} (db_schema_version, db_schema_table_name) VALUES (?, ?)
-		ON DUPLICATE KEY UPDATE db_schema_version = VALUES(db_schema_version);
-	`);
-
-	const schemas = await db_load_schema(schema_dir, schema_versions);
-	for (const schema of schemas) {
-		let newest_schema_version = schema.current_version;
-		for (const rev_id of schema.chunk_keys) {
-			const revision = schema.revisions.get(rev_id);
-			log('[{db}] applying revision {%d} to {%s}', rev_id, schema.name);
-
-			await db.query(revision);
-			newest_schema_version = rev_id;
-		}
-
-		if (newest_schema_version > schema.current_version) {
-			log('[{db}] updated table {%s} to revision {%d}', schema.name, newest_schema_version);
-			
-			await update_schema_query.execute([newest_schema_version, schema.name]);
-		}
-	}
-
-	await db.commit();
-}
-
-export async function db_init_sqlite(db_path: string, schema_dir?: string): Promise<Database> {
-	const db = new Database(db_path, { create: true });
-
-	if (schema_dir !== undefined)
-		await db_update_schema_sqlite(db, schema_dir);
-
-	return db;
-}
-
-export async function db_init_mysql<T extends boolean = false>(db_info: mysql_types.ConnectionOptions, schema_dir?: string, pool: T = false as T): Promise<T extends true ? mysql_types.Pool : mysql_types.Connection> {
-	if (mysql === undefined)
-		throw new Error('db_init_mysql cannot be called without optional dependency {mysql2} installed');
-
-	// required for parsing multiple statements from schema files
-	db_info.multipleStatements = true;
-
-	if (pool) {
-		const pool = mysql.createPool(db_info);
-		const connection = await pool.getConnection();
-
-		if (schema_dir !== undefined)
-			await db_update_schema_mysql(connection, schema_dir);
-
-		connection.release();
-
-		return pool as any;
-	} else {
-		const connection = await mysql.createConnection(db_info);
-
-		if (schema_dir !== undefined)
-			await db_update_schema_mysql(connection, schema_dir);
-		
-		return connection as any;
-	}
-}
+// endregion
 
 export type CookieOptions = {
 	same_site?: 'Strict' | 'Lax' | 'None',
@@ -540,6 +278,13 @@ export function get_cookies(source: Request | Response, decode: boolean = false)
 
 	return parsed_cookies;
 }
+
+// region serving
+export const HTTP_STATUS_CODE = http.STATUS_CODES;
+
+// Create enum containing HTTP methods
+type HTTP_METHOD = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS' | 'CONNECT' | 'TRACE';
+type HTTP_METHODS = HTTP_METHOD|HTTP_METHOD[];
 
 export function apply_range(file: BunFile, request: Request): BunFile {
 	const range_header = request.headers.get('range');
@@ -686,6 +431,16 @@ function is_valid_method(method: HTTP_METHODS, req: Request): boolean {
 
 	return req.method === method;
 }
+
+type WebsocketAcceptReturn = object | boolean;
+type WebsocketHandlers = {
+	accept?: (req: Request) => WebsocketAcceptReturn | Promise<WebsocketAcceptReturn>,
+	message?: (ws: WebSocket, message: string) => void,
+	message_json?: (ws: WebSocket, message: JsonSerializable) => void,
+	open?: (ws: WebSocket) => void,
+	close?: (ws: WebSocket, code: number, reason: string) => void,
+	drain?: (ws: WebSocket) => void
+};
 
 export function serve(port: number, hostname?: string) {
 	const routes = new Array<[string[], RequestHandler, HTTP_METHODS]>();
@@ -1053,3 +808,257 @@ export function serve(port: number, hostname?: string) {
 		}
 	};
 }
+// endregion
+
+// region database
+import { Database } from 'bun:sqlite';
+import type * as mysql_types from 'mysql2/promise';
+
+let mysql: typeof mysql_types | undefined;
+try {
+	mysql = await import('mysql2/promise') as typeof mysql_types;
+} catch (e) {
+	// mysql2 optional dependency not installed.
+	// this dependency will be replaced once bun:sql supports mysql.
+	// db_update_schema_mysql and db_init_schema_mysql will throw.
+}
+
+interface DependencyTarget {
+	file_name: string;
+	deps: string[];
+}
+
+function order_schema_dep_tree<T extends DependencyTarget>(deps: T[]): T[] {
+	const visited = new Set<string>();
+	const temp = new Set<string>();
+	const result: T[] = [];
+	const map = new Map(deps.map(d => [d.file_name, d]));
+ 
+	function visit(node: T): void {
+		if (temp.has(node.file_name))
+			throw new Error(`Cyclic dependency {${node.file_name}}`);
+ 
+		if (visited.has(node.file_name))
+			return;
+ 
+		temp.add(node.file_name);
+ 
+		for (const dep of node.deps) {
+			const dep_node = map.get(dep);
+			if (!dep_node)
+				throw new Error(`Missing dependency {${dep}}`);
+			
+			visit(dep_node as T);
+		}
+ 
+		temp.delete(node.file_name);
+		visited.add(node.file_name);
+		result.push(node);
+	}
+ 
+	for (const dep of deps)
+		if (!visited.has(dep.file_name))
+			visit(dep);
+ 
+	return result;
+ }
+
+type Row_DBSchema = { db_schema_table_name: string, db_schema_version: number };
+type SchemaVersionMap = Map<string, number>;
+
+async function db_load_schema(schema_dir: string, schema_versions: SchemaVersionMap) {
+	const schema_out = [];
+	const schema_files = await fs.readdir(schema_dir, { recursive: true, withFileTypes: true });
+
+	for (const schema_file_ent of schema_files) {
+		if (schema_file_ent.isDirectory())
+			continue;
+
+		const schema_file = schema_file_ent.name;
+		const schema_file_lower = schema_file.toLowerCase();
+		if (!schema_file_lower.endsWith('.sql'))
+			continue;
+
+		log('[{db}] parsing schema file {%s}', schema_file_lower);
+
+		const schema_name = path.basename(schema_file_lower, '.sql');
+		const schema_path = path.join(schema_file_ent.parentPath, schema_file);
+		const schema = await fs.readFile(schema_path, 'utf8');
+
+		const deps = new Array<string>();
+
+		const revisions = new Map();
+		let current_rev_id = 0;
+		let current_rev = '';
+
+		for (const line of schema.split(/\r?\n/)) {
+			const line_identifier = line.match(/^--\s*\[(\d+|deps)\]/);
+			if (line_identifier !== null) {
+				if (line_identifier[1] === 'deps') {
+					// Line contains schema dependencies, example: -- [deps] schema_b.sql,schema_c.sql
+					const deps_raw = line.substring(line.indexOf(']') + 1);
+					deps.push(...deps_raw.split(',').map(e => e.trim().toLowerCase()));
+				} else {
+					// New chunk definition detected, store the current chunk and start a new one.
+					if (current_rev_id > 0) {
+						revisions.set(current_rev_id, current_rev);
+						current_rev = '';
+					}
+
+					const rev_number = parseInt(line_identifier[1]);
+					if (isNaN(rev_number) || rev_number < 1)
+						throw new Error(rev_number + ' is not a valid revision number in ' + schema_file_lower);
+					current_rev_id = rev_number;
+				}
+			} else {
+				// Append to existing revision.
+				current_rev += line + '\n';
+			}
+		}
+
+		// There may be something left in current_chunk once we reach end of the file.
+		if (current_rev_id > 0)
+			revisions.set(current_rev_id, current_rev);
+
+		if (revisions.size === 0) {
+			log('[{db}] {%s} contains no valid revisions', schema_file);
+			continue;
+		}
+
+		if (deps.length > 0)
+			log('[{db}] {%s} dependencies: %s', schema_file, deps.map(e => '{' + e +'}').join(', '));
+
+		const current_schema_version = schema_versions.get(schema_name) ?? 0;
+		schema_out.push({
+			revisions,
+			file_name: schema_file_lower,
+			name: schema_name,
+			current_version: current_schema_version,
+			deps,
+			chunk_keys: Array.from(revisions.keys()).filter(chunk_id => chunk_id > current_schema_version).sort((a, b) => a - b)
+		});
+	}
+
+	return order_schema_dep_tree(schema_out);
+}
+
+export async function db_update_schema_sqlite(db: Database, schema_dir: string, schema_table_name = 'db_schema') {
+	log('[{db}] updating database schema for {%s}', db.filename);
+
+	const schema_versions = new Map();
+
+	try {
+		const query = db.query('SELECT db_schema_table_name, db_schema_version FROM ' + schema_table_name);
+		for (const row of query.all() as Array<Row_DBSchema>)
+			schema_versions.set(row.db_schema_table_name, row.db_schema_version);
+	} catch (e) {
+		log('[{db}] creating {%s} table', schema_table_name);
+		db.run(`CREATE TABLE ${schema_table_name} (db_schema_table_name TEXT PRIMARY KEY, db_schema_version INTEGER)`);
+	}
+	
+	db.transaction(async () => {
+		const update_schema_query = db.prepare(`
+			INSERT INTO ${schema_table_name} (db_schema_version, db_schema_table_name) VALUES (?1, ?2)
+			ON CONFLICT(db_schema_table_name) DO UPDATE SET db_schema_version = EXCLUDED.db_schema_version
+		`);
+
+		const schemas = await db_load_schema(schema_dir, schema_versions);
+
+		for (const schema of schemas) {
+			let newest_schema_version = schema.current_version;
+			for (const rev_id of schema.chunk_keys) {
+				const revision = schema.revisions.get(rev_id);
+				log('[{db}] applying revision {%d} to {%s}', rev_id, schema.name);
+				db.transaction(() => db.run(revision))();
+				newest_schema_version = rev_id;
+			}
+	
+			if (newest_schema_version > schema.current_version) {
+				log('[{db}] updated table {%s} to revision {%d}', schema.name, newest_schema_version);
+				update_schema_query.run(newest_schema_version, schema.name);
+			}
+		}
+	})();
+}
+
+export async function db_update_schema_mysql(db: mysql_types.Connection, schema_dir: string, schema_table_name = 'db_schema') {
+	if (mysql === undefined)
+		throw new Error('{db_update_schema_mysql} cannot be called without optional dependency {mysql2} installed');
+
+	log('[{db}] updating database schema for {%s}', db.config.database);
+
+	const schema_versions = new Map();
+
+	try {
+		const [rows] = await db.query('SELECT db_schema_table_name, db_schema_version FROM ' + schema_table_name);
+		for (const row of rows as Array<Row_DBSchema>)
+			schema_versions.set(row.db_schema_table_name, row.db_schema_version);
+	} catch (e) {
+		log('[{db}] creating {%s} table', schema_table_name);
+		await db.query(`CREATE TABLE ${schema_table_name} (db_schema_table_name VARCHAR(255) PRIMARY KEY, db_schema_version INT)`);
+	}
+
+	await db.beginTransaction();
+	
+	const update_schema_query = await db.prepare(`
+		INSERT INTO ${schema_table_name} (db_schema_version, db_schema_table_name) VALUES (?, ?)
+		ON DUPLICATE KEY UPDATE db_schema_version = VALUES(db_schema_version);
+	`);
+
+	const schemas = await db_load_schema(schema_dir, schema_versions);
+	for (const schema of schemas) {
+		let newest_schema_version = schema.current_version;
+		for (const rev_id of schema.chunk_keys) {
+			const revision = schema.revisions.get(rev_id);
+			log('[{db}] applying revision {%d} to {%s}', rev_id, schema.name);
+
+			await db.query(revision);
+			newest_schema_version = rev_id;
+		}
+
+		if (newest_schema_version > schema.current_version) {
+			log('[{db}] updated table {%s} to revision {%d}', schema.name, newest_schema_version);
+			
+			await update_schema_query.execute([newest_schema_version, schema.name]);
+		}
+	}
+
+	await db.commit();
+}
+
+export async function db_init_sqlite(db_path: string, schema_dir?: string): Promise<Database> {
+	const db = new Database(db_path, { create: true });
+
+	if (schema_dir !== undefined)
+		await db_update_schema_sqlite(db, schema_dir);
+
+	return db;
+}
+
+export async function db_init_mysql<T extends boolean = false>(db_info: mysql_types.ConnectionOptions, schema_dir?: string, pool: T = false as T): Promise<T extends true ? mysql_types.Pool : mysql_types.Connection> {
+	if (mysql === undefined)
+		throw new Error('db_init_mysql cannot be called without optional dependency {mysql2} installed');
+
+	// required for parsing multiple statements from schema files
+	db_info.multipleStatements = true;
+
+	if (pool) {
+		const pool = mysql.createPool(db_info);
+		const connection = await pool.getConnection();
+
+		if (schema_dir !== undefined)
+			await db_update_schema_mysql(connection, schema_dir);
+
+		connection.release();
+
+		return pool as any;
+	} else {
+		const connection = await mysql.createConnection(db_info);
+
+		if (schema_dir !== undefined)
+			await db_update_schema_mysql(connection, schema_dir);
+		
+		return connection as any;
+	}
+}
+// endregion
