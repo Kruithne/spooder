@@ -1003,11 +1003,9 @@ export function serve(port: number, hostname?: string) {
 				const KEEP_ALIVE_INTERVAL = 15000;
 		
 				const stream = new ReadableStream({
-					// @ts-ignore Bun implements a "direct" mode which does not exist in the spec.
 					type: 'direct',
 		
 					async pull(controller) {
-						// @ts-ignore `controller` in "direct" mode is ReadableStreamDirectController.
 						stream_controller = controller as ReadableStreamDirectController;
 						
 						while (!req.signal.aborted) {
