@@ -707,7 +707,6 @@ export function serve(port: number, hostname?: string) {
 	
 		// Content-type/content-length are automatically set for blobs.
 		if (response instanceof Blob)
-			// @ts-ignore Response does accept Blob in Bun, typing disagrees.
 			return new Response(response, { status: status_code });
 
 		// Status codes can be returned from some handlers.
