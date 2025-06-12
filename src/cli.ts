@@ -3,6 +3,10 @@ import { get_config } from './config';
 import { parse_command_line, log, strip_color_codes } from './utils';
 import { dispatch_report } from './dispatch';
 
+let restart_delay = 100;
+let restart_attempts = 0;
+let restart_success_timer: Timer | null = null;
+
 async function start_server() {
 	log('start_server');
 
@@ -104,15 +108,38 @@ async function start_server() {
 		}
 	}
 
-	const auto_restart_ms = config.auto_restart;
-	if (auto_restart_ms > -1) {
+	if (config.auto_restart) {
 		if (is_dev_mode) {
 			log('[{dev}] auto-restart is {disabled} in {dev mode}');
 			process.exit(proc_exit_code ?? 0);
-		} else {
-			log('restarting server in {%dms}', auto_restart_ms);
-			setTimeout(start_server, auto_restart_ms);
+		} else if (proc_exit_code !== 0) {
+			if (restart_success_timer) {
+				clearTimeout(restart_success_timer);
+				restart_success_timer = null;
+			}
+			
+			if (config.auto_restart_attempts !== -1 && restart_attempts >= config.auto_restart_attempts) {
+				log('maximum restart attempts ({%d}) reached, stopping auto-restart', config.auto_restart_attempts);
+				process.exit(proc_exit_code ?? 0);
+			}
+			
+			restart_attempts++;
+			const current_delay = Math.min(restart_delay, config.auto_restart_max);
+			
+			log('restarting server in {%dms} (attempt {%d}/{%s}, delay capped at {%dms})', current_delay, restart_attempts, config.auto_restart_attempts === -1 ? '∞' : config.auto_restart_attempts, config.auto_restart_max);
+			
+			setTimeout(() => {
+				restart_delay = Math.min(restart_delay * 2, config.auto_restart_max);
+				restart_success_timer = setTimeout(() => {
+					restart_delay = 100;
+					restart_attempts = 0;
+					restart_success_timer = null;
+				}, config.auto_restart_grace);
+				start_server();
+			}, current_delay);
 		}
+	} else {
+		log('auto-restart is {disabled}, exiting');
 	}
 }
 

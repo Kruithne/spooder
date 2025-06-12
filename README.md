@@ -179,17 +179,26 @@ if (process.env.SPOODER_ENV === 'dev') {
 > [!NOTE]
 > This feature is not enabled by default.
 
-In the event that the server process exits, regardless of exit code, `spooder` can automatically restart it after a short delay. To enable this feature specify the restart delay in milliseconds as `auto_restart` in the configuration.
+In the event that the server process exits with a non-zero exit code, `spooder` can automatically restart it using an exponential backoff strategy. To enable this feature set `auto_restart` to `true` in the configuration.
 
 ```json
 {
 	"spooder": {
-		"auto_restart": 5000
+		"auto_restart": true,
+		"auto_restart_max": 30000,
+		"auto_restart_attempts": 10
 	}
 }
 ```
 
-If set to `0`, the server will be restarted immediately without delay. If set to `-1`, the server will not be restarted at all.
+### Configuration Options
+
+- **`auto_restart`** (boolean, default: `false`): Enable or disable the auto-restart feature
+- **`auto_restart_max`** (number, default: `30000`): Maximum delay in milliseconds between restart attempts
+- **`auto_restart_attempts`** (number, default: `-1`): Maximum number of restart attempts before giving up. Set to `-1` for unlimited attempts
+- **`auto_restart_grace`** (number, default: `30000`): Period of time after which the backoff protocol disables if the server remains stable.
+
+If the server exits with a zero exit code (successful termination), auto-restart will not trigger.
 
 <a id="cli-auto-update"></a>
 ## CLI > Auto Update
