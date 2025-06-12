@@ -725,7 +725,10 @@ export function serve(port: number, hostname?: string) {
 		let status_code = 200;
 
 		try {
-			const route_array = url.pathname.split('/').filter(e => !(e === '..' || e === '.'));
+			let pathname = url.pathname;
+			if (pathname.length > 1 && pathname.endsWith('/'))
+				pathname = pathname.slice(0, -1);
+			const route_array = pathname.split('/').filter(e => !(e === '..' || e === '.'));
 			let handler: RequestHandler | undefined;
 			let methods: HTTP_METHODS | undefined;
 
@@ -873,6 +876,8 @@ export function serve(port: number, hostname?: string) {
 	return {
 		/** Register a handler for a specific route. */
 		route: (path: string, handler: RequestHandler, method: HTTP_METHODS = 'GET'): void => {
+			if (path.length > 1 && path.endsWith('/'))
+				path = path.slice(0, -1);
 			routes.push([path.split('/'), handler, method]);
 		},
 
