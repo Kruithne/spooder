@@ -1415,6 +1415,14 @@ const db = await db_init_mysql({
 }, './schema');
 ```
 
+Passing `undefined` in place of the schema directory allows initiation of the database without processing schema. This can be useful for programatic schema application, such as in a worker environment, where you do not want consecutive initiations to apply schema.
+
+```ts
+const db_pool = await db_init_mysql({
+	// connection options
+}, Bun.isMainThread ? './db/schema' : undefined, true);
+```
+
 ### Pooling
 
 Providing `true` to the `pool` parameter of `db_init_mysql` will return a connection pool instead of a single connection.
