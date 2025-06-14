@@ -272,9 +272,10 @@ In addition to being skipped in [dev mode](#cli-dev-mode), updates can also be s
 
 `canary` is a feature in `spooder` which allows server problems to be raised as issues in your repository on GitHub.
 
-To enable this feature, you will need to create a GitHub App and configure it:
+To enable this feature, you will need a GitHub app which has access to your repository and a corresponding private key. If you do not already have those, instructions can be found below.
 
-### 1. Create a GitHub App
+<details>
+<summary>GitHub App Setup</summary>
 
 Create a new GitHub App either on your personal account or on an organization. The app will need the following permissions:
 
@@ -293,8 +294,9 @@ openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in private-key.pem -out 
 ```
 
 Each server that intends to use the canary feature will need to have the private key installed somewhere the server process can access it.
+</details>
 
-### 2. Add package.json configuration
+### Configure Canary
 
 ```json
 "spooder": {
@@ -312,7 +314,7 @@ The repository name must in the full-name format `owner/repo` (e.g. `facebook/re
 
 The `labels` property can be used to provide a list of labels to automatically add to the issue. This property is optional and can be omitted.
 
-### 3. Setup environment variables
+### Setup Environment Variables
 
 The following two environment variables must be defined on the server.
 
@@ -328,7 +330,7 @@ SPOODER_CANARY_KEY=/home/bond/.ssh/id_007_pcks8.key
 > [!NOTE]
 > Since `spooder` uses the Bun runtime, you can use the `.env.local` file in the project root directory to set these environment variables per-project.
 
-### 4. Use canary
+### Using Canary
 
 Once configured, `spooder` will automatically raise an issue when the server exits with a non-zero exit code. 
 
