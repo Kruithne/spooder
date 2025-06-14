@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
-import { log } from './utils';
+import { log_create_logger } from './api';
+
+const log = log_create_logger('canary');
 
 type InstallationResponse = Array<{
 	id: number,
@@ -117,5 +119,5 @@ export async function create_github_issue(issue: Issue): Promise<void> {
 	check_response_is_ok(issue_res, 'cannot create GitHub issue');
 
 	const json_issue = await issue_res.json() as IssueResponse;
-	log('[{canary}] raised issue {#%d} in {%s}: %s', json_issue.number, repository.full_name, json_issue.url);
+	log(`raised issue {${json_issue.number}} in {${repository.full_name}}: ${json_issue.url}`);
 }

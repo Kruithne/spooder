@@ -1,39 +1,42 @@
 #!/usr/bin/env bun
 import { get_config } from './config';
-import { parse_command_line, log, strip_color_codes } from './utils';
+import { parse_command_line, strip_color_codes } from './utils';
 import { dispatch_report } from './dispatch';
+import { log_create_logger } from './api';
+
+const log_cli = log_create_logger('spooder_cli');
 
 let restart_delay = 100;
 let restart_attempts = 0;
 let restart_success_timer: Timer | null = null;
 
 async function start_server() {
-	log('start_server');
+	log_cli('start_server');
 
 	const argv = process.argv.slice(2);
 	const is_dev_mode = argv.includes('--dev');
 	const skip_updates = argv.includes('--no-update');
 
 	if (is_dev_mode)
-		log('[{dev}] spooder has been started in {dev mode}');
+		log_cli('[{dev}] spooder has been started in {dev mode}');
 
 	const config = await get_config();
 
 	if (is_dev_mode) {
-		log('[{update}] skipping update commands in {dev mode}');
+		log_cli('[{update}] skipping update commands in {dev mode}');
 	} else if (skip_updates) {
-		log('[{update}] skipping update commands due to {--no-update} flag');
+		log_cli('[{update}] skipping update commands due to {--no-update} flag');
 	} else {
 		const update_commands = config.update;
 		const n_update_commands = update_commands.length;
 
 		if (n_update_commands > 0) {
-			log('running {%d} update commands', n_update_commands);
+			log_cli(`running {${n_update_commands}} updated commands`);
 
 			for (let i = 0; i < n_update_commands; i++) {
 				const config_update_command = update_commands[i];
 
-				log('[{%d}] %s', i, config_update_command);
+				log_cli(`[{${i}}] ${config_update_command}`);
 
 				const update_proc = Bun.spawn(parse_command_line(config_update_command), {
 					cwd: process.cwd(),
@@ -43,10 +46,10 @@ async function start_server() {
 
 				await update_proc.exited;
 
-				log('[{%d}] exited with code {%d}', i, update_proc.exitCode);
+				log_cli(`[{${i}}] exited with code {${update_proc.exitCode}}`);
 
 				if (update_proc.exitCode !== 0) {
-					log('aborting update due to non-zero exit code from [%d]', i);
+					log_cli(`aborting update due to non-zero exit code from [${i}]`);
 					break;
 				}
 			}
@@ -92,15 +95,15 @@ async function start_server() {
 	}
 	
 	const proc_exit_code = await proc.exited;
-	log('server exited with code {%s}', proc_exit_code);
+	log_cli(`server exited with code {${proc_exit_code}}`);
 	
 	if (proc_exit_code !== 0) {
 		const console_output = include_crash_history ? strip_color_codes(stream_history.join('\n')) : undefined;
 
 		if (is_dev_mode) {
-			log('[{dev}] crash: server exited unexpectedly (exit code {%d})', proc_exit_code);
-			log('[{dev}] without {--dev}, this would raise a canary report');
-			log('[{dev}] console output:\n%s', console_output);
+			log_cli(`[{dev}] crash: server exited unexpectedly (exit code {${proc_exit_code}}`);
+			log_cli(`[{dev}] without {--dev}, this would raise a canary report`);
+			log_cli(`[{dev}] console output:\n${console_output}`);
 		} else {
 			dispatch_report('crash: server exited unexpectedly', [{
 				proc_exit_code, console_output
@@ -110,7 +113,7 @@ async function start_server() {
 
 	if (config.auto_restart) {
 		if (is_dev_mode) {
-			log('[{dev}] auto-restart is {disabled} in {dev mode}');
+			log_cli(`[{dev}] auto-restart is {disabled} in {dev mode}`);
 			process.exit(proc_exit_code ?? 0);
 		} else if (proc_exit_code !== 0) {
 			if (restart_success_timer) {
@@ -119,14 +122,15 @@ async function start_server() {
 			}
 			
 			if (config.auto_restart_attempts !== -1 && restart_attempts >= config.auto_restart_attempts) {
-				log('maximum restart attempts ({%d}) reached, stopping auto-restart', config.auto_restart_attempts);
+				log_cli(`maximum restart attempts ({${config.auto_restart_attempts}}) reached, stopping auto-restart`);
 				process.exit(proc_exit_code ?? 0);
 			}
 			
 			restart_attempts++;
 			const current_delay = Math.min(restart_delay, config.auto_restart_max);
 			
-			log('restarting server in {%dms} (attempt {%d}/{%s}, delay capped at {%dms})', current_delay, restart_attempts, config.auto_restart_attempts === -1 ? '∞' : config.auto_restart_attempts, config.auto_restart_max);
+			const max_attempt_str = config.auto_restart_attempts === -1 ? '∞' : config.auto_restart_attempts;
+			log_cli(`restarting server in {${current_delay}ms} (attempt {${restart_attempts}}/{${max_attempt_str}}, delay capped at {${config.auto_restart_max}ms})`);
 			
 			setTimeout(() => {
 				restart_delay = Math.min(restart_delay * 2, config.auto_restart_max);
@@ -139,7 +143,7 @@ async function start_server() {
 			}, current_delay);
 		}
 	} else {
-		log('auto-restart is {disabled}, exiting');
+		log_cli(`auto-restart is {disabled}, exiting`);
 	}
 }
 

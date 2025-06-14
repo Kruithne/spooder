@@ -17,6 +17,45 @@ It consists of two components, the `CLI` and the `API`.
 - The `CLI` is responsible for keeping the server process running, applying updates in response to source control changes, and automatically raising issues on GitHub via the canary feature.
 - The `API` provides a minimal building-block style API for developing servers, with a focus on simplicity and performance.
 
+# Installation
+
+```bash
+# Installing globally for CLI runner usage.
+bun add spooder --global
+
+# Install into local package for API usage.
+bun add spooder
+```
+
+# Configuration
+
+Both the `CLI` and the API are configured in the same way by providing a `spooder` object in your `package.json` file.
+
+```json
+{
+	"spooder": {
+		"auto_restart": 5000,
+		"update": [
+			"git pull",
+			"bun install"
+		],
+		"canary": {
+			"account": "",
+			"repository": "",
+			"labels": [],
+			"crash_console_history": 64,
+			"throttle": 86400,
+			"sanitize": true
+		}
+	}
+}
+```
+
+If there are any issues with the provided configuration, a warning will be printed to the console but will not halt execution. `spooder` will always fall back to default values where invalid configuration is provided.
+
+> [!NOTE]
+> Configuration warnings **do not** raise `caution` events with the `spooder` canary functionality.
+
 # CLI
 
 The `CLI` component of `spooder` is a global command-line tool for running server processes.
@@ -33,6 +72,11 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 # API
 
 `spooder` exposes a simple yet powerful API for developing servers. The API is designed to be minimal to leave control in the hands of the developer and not add overhead for features you may not need.
+
+- [API > Cheatsheet](#api-cheatsheet)
+- [API > Logging](#api-logging)
+
+### Old API Documentation
 
 - [API > Serving](#api-serving)
 	- [`serve(port: number, hostname?: string): Server`](#api-serving-serve)
@@ -77,44 +121,8 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 	- [`get_cookies(source: Request | Response): Record<string, string>`](#api-state-management-get-cookies)
 - [API > Database Schema](#api-database-schema)
 
-# Installation
 
-```bash
-# Installing globally for CLI runner usage.
-bun add spooder --global
-
-# Install into local package for API usage.
-bun add spooder
-```
-
-# Configuration
-
-Both the `CLI` and the API are configured in the same way by providing a `spooder` object in your `package.json` file.
-
-```json
-{
-	"spooder": {
-		"auto_restart": 5000,
-		"update": [
-			"git pull",
-			"bun install"
-		],
-		"canary": {
-			"account": "",
-			"repository": "",
-			"labels": [],
-			"crash_console_history": 64,
-			"throttle": 86400,
-			"sanitize": true
-		}
-	}
-}
-```
-
-If there are any issues with the provided configuration, a warning will be printed to the console but will not halt execution. `spooder` will always fall back to default values where invalid configuration is provided.
-
-> [!NOTE]
-> Configuration warnings **do not** raise `caution` events with the `spooder` canary functionality.
+# CLI
 
 <a id="cli-usage"></a>
 ## CLI > Usage
@@ -472,6 +480,56 @@ In addition to the information provided by the developer, `spooder` also include
 	}
 }
 ```
+
+# API
+
+<a id="api-cheatsheet"></a>
+## API > Cheatsheet
+
+```ts
+// logging
+log(message: string);
+log_create_logger(prefix: string, color: ColorInput);
+log_list(input: any[], delimiter = ', ');
+```
+
+<a id="api-logging"></a>
+## API > Logging
+
+### 🔧 `log(message: string)`
+
+Print a message to the console using the default logger. Wrapping text segments in curly braces will highlight those segments with colour.
+
+```ts
+log('Hello, {world}!');
+// > [info] Hello, world!
+```
+
+### 🔧 `log_create_logger(prefix: string, color: ColorInput)`
+
+Create a `log()` function with a custom prefix and highlight colour.
+
+```ts
+const db_log = log_create_logger('db', 'pink');
+db_log('Creating table {users}...');
+```
+
+> [!INFO]
+> For information about `ColorInput`, see the [Bun Color API](https://bun.sh/docs/api/color).
+
+
+### 🔧 `log_list(input: any[], delimiter = ', ')`
+
+Utility function that joins an array of items together with each element wrapped in highlighting syntax for logging.
+
+```ts
+const fruit = ['apple', 'orange', 'peach'];
+log(`Fruit must be one of ${fruit.map(e => `{${e}}`).join(', ')}`);
+log(`Fruit must be one of ${log_list(fruit)}`);
+```
+
+
+# Old API Documentation Below (WIP)
 
 <a id="api-serving"></a>
 ## API > Serving

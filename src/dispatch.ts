@@ -1,9 +1,11 @@
 import { get_config } from './config';
 import { create_github_issue } from './github';
-import { log } from './utils';
+import { log_create_logger } from './api';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+
+const log_canary = log_create_logger('canary');
 
 async function load_local_env(): Promise<Map<string, string>> {
 	const env = new Map<string, string>();
@@ -93,9 +95,9 @@ async function check_cache_table(key: string, repository: string, expiry: number
 			}
 		}
 	} catch (e) {
-		log('[{canary}] failed to read canary cache file {%s}', cache_file_path);
-		log('[{canary}] error: ' + (e as Error).message);
-		log('[{canary}] resolve this issue to prevent spamming GitHub with canary reports');
+		log_canary(`failed to read canary cache file {${cache_file_path}}`);
+		log_canary(`error: ${(e as Error).message}`);
+		log_canary('resolve this issue to prevent spamming GitHub with canary reports');
 	}
 
 	if (cache_table.has(key_hash)) {
@@ -159,13 +161,13 @@ export async function dispatch_report(report_title: string, report_body: Array<u
 		const canary_repostiory = config.canary.repository;
 
 		if (canary_account.length === 0|| canary_repostiory.length === 0) {
-			log('[{canary}] report dispatch failed; no account/repository configured');
+			log_canary(`report dispatch failed; no account/repository configured`);
 			return;
 		}
 
 		const is_cached = await check_cache_table(report_title, canary_repostiory, config.canary.throttle);
 		if (is_cached) {
-			log('[{canary}] throttled canary report: {%s}', report_title);
+			log_canary(`throttled canary report: {${report_title}}`);
 			return;
 		}
 
@@ -211,6 +213,6 @@ export async function dispatch_report(report_title: string, report_body: Array<u
 			issue_labels: config.canary.labels
 		});
 	} catch (e) {
-		log('[{canary error}] ' + (e as Error).message);
+		log_canary((e as Error).message);
 	}
 }

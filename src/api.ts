@@ -2,9 +2,29 @@ import { dispatch_report } from './dispatch';
 import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { log } from './utils';
 import crypto from 'crypto';
 import { Blob } from 'node:buffer';
+
+// region logging
+const ANSI_RESET = '\x1b[0m';
+
+export function log_create_logger(label: string, color: ColorInput = '#16b39e') {
+	const ansi = Bun.color(color, 'ansi-256') ?? '\x1b[38;5;6m';
+	const prefix = `[${ansi}${label}${ANSI_RESET}] `;
+
+	return (message: string) => {
+		process.stdout.write(prefix + message.replace(/\{([^}]+)\}/g, `${ansi}$1${ANSI_RESET}\n`));
+	};
+}
+
+export function log_list(input: any[], delimiter = ',') {
+	return input.map(e => `{${e}}`).join(delimiter);
+}
+
+const log_spooder = log_create_logger('spooder', '#16b39e');
+export const log = log_create_logger('info', 'blue');
+
+// endregion
 
 // region error handling
 export class ErrorWithMetadata extends Error {
@@ -71,9 +91,9 @@ async function handle_error(prefix: string, err_message_or_obj: string | object,
 	}
 
 	if (process.env.SPOODER_ENV === 'dev') {
-		log('[{dev}] dispatch_report %s', prefix + error_message);
-		log('[{dev}] without {--dev}, this would raise a canary report');
-		log('[{dev}] %o', final_err);
+		log_spooder(`[{dev}] dispatch_report ${prefix + error_message}`);
+		log_spooder('[{dev}] without {--dev}, this would raise a canary report');
+		log_spooder(`[{dev}] ${final_err}`);
 	} else {
 		await dispatch_report(prefix + error_message, final_err);
 	}
@@ -421,7 +441,7 @@ function print_request_info(req: Request, res: Response, url: URL, request_time:
 	const time_fmt = request_time < 100 ? '\x1b[32m' : request_time < 500 ? '\x1b[33m' : '\x1b[31m';
 	const request_time_str = time_fmt + request_time + 'ms\x1b[0m';
 
-	log('[%s] {%s} %s %s [{%s}]', status_code, req.method, url.pathname, search_params, request_time_str);
+	log_spooder(`[${status_code}] {${req.method}} ${url.pathname} ${search_params} [{${request_time_str}}]`);
 	return res;
 }
 
@@ -462,6 +482,7 @@ export function serve(port: number, hostname?: string) {
 	
 		// Content-type/content-length are automatically set for blobs.
 		if (response instanceof Blob)
+			// @ts-ignore Response does accept Blob in Bun, typing disagrees.
 			return new Response(response, { status: status_code });
 
 		// Status codes can be returned from some handlers.
@@ -625,7 +646,7 @@ export function serve(port: number, hostname?: string) {
 		}
 	});
 
-	log('server started on port {%d} (host: {%s})', port, hostname ?? 'unspecified');
+	log_spooder(`server started on port {${port}} (host: {${hostname ?? 'unspecified'})`);
 
 	return {
 		/** Register a handler for a specific route. */
@@ -813,6 +834,7 @@ export function serve(port: number, hostname?: string) {
 // region database
 import { Database } from 'bun:sqlite';
 import type * as mysql_types from 'mysql2/promise';
+import { ColorInput } from 'bun';
 
 let mysql: typeof mysql_types | undefined;
 try {
@@ -822,6 +844,8 @@ try {
 	// this dependency will be replaced once bun:sql supports mysql.
 	// db_update_schema_mysql and db_init_schema_mysql will throw.
 }
+
+const db_log = log_create_logger('db', '#16b39e');
 
 interface DependencyTarget {
 	file_name: string;
@@ -879,7 +903,7 @@ async function db_load_schema(schema_dir: string, schema_versions: SchemaVersion
 		if (!schema_file_lower.endsWith('.sql'))
 			continue;
 
-		log('[{db}] parsing schema file {%s}', schema_file_lower);
+		db_log(`parsing schema file {${schema_file_lower}}`);
 
 		const schema_name = path.basename(schema_file_lower, '.sql');
 		const schema_path = path.join(schema_file_ent.parentPath, schema_file);
@@ -921,12 +945,12 @@ async function db_load_schema(schema_dir: string, schema_versions: SchemaVersion
 			revisions.set(current_rev_id, current_rev);
 
 		if (revisions.size === 0) {
-			log('[{db}] {%s} contains no valid revisions', schema_file);
+			db_log(`{${schema_file}} contains no valid revisions`);
 			continue;
 		}
 
 		if (deps.length > 0)
-			log('[{db}] {%s} dependencies: %s', schema_file, deps.map(e => '{' + e +'}').join(', '));
+			db_log(`{${schema_file}} dependencies: ${log_list(deps)}`);
 
 		const current_schema_version = schema_versions.get(schema_name) ?? 0;
 		schema_out.push({
@@ -943,7 +967,7 @@ async function db_load_schema(schema_dir: string, schema_versions: SchemaVersion
 }
 
 export async function db_update_schema_sqlite(db: Database, schema_dir: string, schema_table_name = 'db_schema') {
-	log('[{db}] updating database schema for {%s}', db.filename);
+	db_log(`updating database schema for {${db.filename}}`);
 
 	const schema_versions = new Map();
 
@@ -952,7 +976,7 @@ export async function db_update_schema_sqlite(db: Database, schema_dir: string, 
 		for (const row of query.all() as Array<Row_DBSchema>)
 			schema_versions.set(row.db_schema_table_name, row.db_schema_version);
 	} catch (e) {
-		log('[{db}] creating {%s} table', schema_table_name);
+		db_log(`creating {${schema_table_name}}`);
 		db.run(`CREATE TABLE ${schema_table_name} (db_schema_table_name TEXT PRIMARY KEY, db_schema_version INTEGER)`);
 	}
 	
@@ -968,13 +992,13 @@ export async function db_update_schema_sqlite(db: Database, schema_dir: string, 
 			let newest_schema_version = schema.current_version;
 			for (const rev_id of schema.chunk_keys) {
 				const revision = schema.revisions.get(rev_id);
-				log('[{db}] applying revision {%d} to {%s}', rev_id, schema.name);
+				db_log(`applying revision {${rev_id}} to {${schema.name}}`);
 				db.transaction(() => db.run(revision))();
 				newest_schema_version = rev_id;
 			}
 	
 			if (newest_schema_version > schema.current_version) {
-				log('[{db}] updated table {%s} to revision {%d}', schema.name, newest_schema_version);
+				db_log(`updated table {${schema.name}} to revision {${newest_schema_version}}`);
 				update_schema_query.run(newest_schema_version, schema.name);
 			}
 		}
@@ -985,7 +1009,7 @@ export async function db_update_schema_mysql(db: mysql_types.Connection, schema_
 	if (mysql === undefined)
 		throw new Error('{db_update_schema_mysql} cannot be called without optional dependency {mysql2} installed');
 
-	log('[{db}] updating database schema for {%s}', db.config.database);
+	db_log(`updating database schema for {${db.config.database}}`);
 
 	const schema_versions = new Map();
 
@@ -994,7 +1018,7 @@ export async function db_update_schema_mysql(db: mysql_types.Connection, schema_
 		for (const row of rows as Array<Row_DBSchema>)
 			schema_versions.set(row.db_schema_table_name, row.db_schema_version);
 	} catch (e) {
-		log('[{db}] creating {%s} table', schema_table_name);
+		db_log(`creating {${schema_table_name}}`);
 		await db.query(`CREATE TABLE ${schema_table_name} (db_schema_table_name VARCHAR(255) PRIMARY KEY, db_schema_version INT)`);
 	}
 
@@ -1010,15 +1034,14 @@ export async function db_update_schema_mysql(db: mysql_types.Connection, schema_
 		let newest_schema_version = schema.current_version;
 		for (const rev_id of schema.chunk_keys) {
 			const revision = schema.revisions.get(rev_id);
-			log('[{db}] applying revision {%d} to {%s}', rev_id, schema.name);
+			db_log(`applying revision {${rev_id}} to {${schema.name}}`);
 
 			await db.query(revision);
 			newest_schema_version = rev_id;
 		}
 
 		if (newest_schema_version > schema.current_version) {
-			log('[{db}] updated table {%s} to revision {%d}', schema.name, newest_schema_version);
-			
+			db_log(`updated table {${schema.name}} to revision {${newest_schema_version}}`);
 			await update_schema_query.execute([newest_schema_version, schema.name]);
 		}
 	}

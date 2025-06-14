@@ -1,5 +1,7 @@
 import path from 'node:path';
-import { log } from './utils';
+import { log_create_logger } from './api';
+
+const log_config = log_create_logger('config');
 
 const internal_config = {
 	run: 'bun run index.ts',
@@ -33,7 +35,7 @@ function validate_config_option(source: ConfigObject, target: ConfigObject, root
 			const actual_type = typeof value;
 
 			if (actual_type !== expected_type) {
-				log('ignoring invalid configuration value {%s} (expected {%s}, got {%s})', key_name, expected_type, actual_type);
+				log_config(`ignoring invalid configuration value {${key_name}} (expected {${expected_type}}, got {${actual_type}})`);
 				continue;
 			}
 
@@ -43,14 +45,14 @@ function validate_config_option(source: ConfigObject, target: ConfigObject, root
 
 				if (is_default_array) {
 					if (!is_actual_array) {
-						log('ignoring invalid configuration value {%s} (expected array)', key_name);
+						log_config(`ignoring invalid configuration value {${key_name}} (expected array)`);
 						continue;
 					}
 
 					source[key as keyof Config] = value as Config[keyof Config];
 				} else {
 					if (is_actual_array) {
-						log('ignoring invalid configuration value `%s` (expected object)', key_name);
+						log_config(`ignoring invalid configuration value '${key_name}' (expected object)`);
 						continue;
 					}
 
@@ -60,7 +62,7 @@ function validate_config_option(source: ConfigObject, target: ConfigObject, root
 				source[key as keyof Config] = value as Config[keyof Config];
 			}
 		} else {
-			log('ignoring unknown configuration key {%s}', key_name);	
+			log_config(`ignoring unknown configuration key {${key_name}}`);
 		}
 	}
 }
@@ -71,13 +73,13 @@ async function load_config(): Promise<Config> {
 		const json = await config_file.json();
 
 		if (json.spooder === null || typeof json.spooder !== 'object') {
-			log('failed to parse spooder configuration in {package.json}, using defaults');
+			log_config('failed to parse spooder configuration in {package.json}, using defaults');
 			return internal_config;
 		}
 
 		validate_config_option(internal_config, json.spooder, 'spooder');
 	} catch (e) {
-		log('failed to read {package.json}, using configuration defaults');
+		log_config('failed to read {package.json}, using configuration defaults');
 	}
 
 	return internal_config;
