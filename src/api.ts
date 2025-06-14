@@ -4,6 +4,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import crypto from 'crypto';
 import { Blob } from 'node:buffer';
+import { ColorInput } from 'bun';
 
 // region logging
 const ANSI_RESET = '\x1b[0m';
@@ -834,7 +835,6 @@ export function serve(port: number, hostname?: string) {
 // region database
 import { Database } from 'bun:sqlite';
 import type * as mysql_types from 'mysql2/promise';
-import { ColorInput } from 'bun';
 
 let mysql: typeof mysql_types | undefined;
 try {
