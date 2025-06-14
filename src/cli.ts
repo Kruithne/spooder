@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 import { get_config } from './config';
-import { parse_command_line, strip_color_codes } from './utils';
 import { dispatch_report } from './dispatch';
 import { log_create_logger } from './api';
 
@@ -9,6 +8,50 @@ const log_cli = log_create_logger('spooder_cli');
 let restart_delay = 100;
 let restart_attempts = 0;
 let restart_success_timer: Timer | null = null;
+
+function strip_color_codes(str: string): string {
+	return str.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+function parse_command_line(command: string): string[] {
+	const args = [];
+	let current_arg = '';
+	let in_quotes = false;
+	let in_escape = false;
+
+	for (let i = 0; i < command.length; i++) {
+		const char = command[i];
+
+		if (in_escape) {
+			current_arg += char;
+			in_escape = false;
+			continue;
+		}
+
+		if (char === '\\') {
+			in_escape = true;
+			continue;
+		}
+
+		if (char === '"') {
+			in_quotes = !in_quotes;
+			continue;
+		}
+
+		if (char === ' ' && !in_quotes) {
+			args.push(current_arg);
+			current_arg = '';
+			continue;
+		}
+
+		current_arg += char;
+	}
+
+	if (current_arg.length > 0)
+		args.push(current_arg);
+
+	return args;
+}
 
 async function start_server() {
 	log_cli('start_server');

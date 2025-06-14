@@ -1,12 +1,134 @@
 import { get_config } from './config';
-import { create_github_issue } from './github';
 import { log_create_logger } from './api';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const log_canary = log_create_logger('canary');
+const log = log_create_logger('canary');
 
+// region github
+type GitHubInstallationResponse = Array<{
+	id: number,
+	account: {
+		login: string
+	},
+	access_tokens_url: string,
+	repositories_url: string
+}>;
+
+type GitHubAccessTokenResponse = {
+	token: string;
+};
+
+type GitHubRepositoryResponse = {
+	repositories: Array<{
+		full_name: string,
+		name: string,
+		url: string,
+		owner: {
+			login: string
+		}
+	}>
+};
+
+type GitHubIssueResponse = {
+	number: number,
+	url: string
+};
+
+type GitHubIssue = {
+	app_id: number,
+	private_key: string,
+	login_name: string,
+	repository_name: string,
+	issue_title: string,
+	issue_body: string
+	issue_labels?: Array<string>
+};
+
+function github_generate_jwt(app_id: number, private_key: string): string {
+	const encoded_header = Buffer.from(JSON.stringify({
+		alg: 'RS256',
+		typ: 'JWT'
+	})).toString('base64');
+
+	const encoded_payload = Buffer.from(JSON.stringify({
+		iat: Math.floor(Date.now() / 1000),
+		exp: Math.floor(Date.now() / 1000) + 60,
+		iss: app_id
+	})).toString('base64');
+
+	const sign = crypto.createSign('RSA-SHA256');
+	sign.update(encoded_header + '.' + encoded_payload);
+
+	return encoded_header + '.' + encoded_payload + '.' + sign.sign(private_key, 'base64');
+}
+
+async function github_request_endpoint(url: string, bearer: string, method: string = 'GET', body?: object): Promise<Response> {
+	return fetch(url, {
+		method,
+		body: body ? JSON.stringify(body) : undefined,
+		headers: {
+			Authorization: 'Bearer ' + bearer,
+			Accept: 'application/vnd.github.v3+json'
+		}
+	});
+}
+
+function github_assert_res(res: Response, message: string): void {
+	if (!res.ok)
+		throw new Error(message + ' (' + res.status + ' ' + res.statusText + ')');
+}
+
+async function github_create_issue(issue: GitHubIssue): Promise<void> {
+	const jwt = github_generate_jwt(issue.app_id, issue.private_key);
+	const app_res = await github_request_endpoint('https://api.github.com/app', jwt);
+
+	github_assert_res(app_res, 'cannot authenticate GitHub app ' + issue.app_id);
+
+	const res_installs = await github_request_endpoint('https://api.github.com/app/installations', jwt);
+	github_assert_res(res_installs, 'cannot fetch GitHub app installations');
+
+	const json_installs = await res_installs.json() as GitHubInstallationResponse;
+
+	const login_name = issue.login_name.toLowerCase();
+	const install = json_installs.find((install) => install.account.login.toLowerCase() === login_name);
+
+	if (!install)
+		throw new Error('spooder-bot is not installed on account ' + login_name);
+
+	const res_access_token = await github_request_endpoint(install.access_tokens_url, jwt, 'POST');
+	github_assert_res(res_access_token, 'cannot fetch GitHub app access token');
+
+	const json_access_token = await res_access_token.json() as GitHubAccessTokenResponse;
+	const access_token = json_access_token.token;
+
+	const repositories = await github_request_endpoint(install.repositories_url, access_token);
+	github_assert_res(repositories, 'cannot fetch GitHub app repositories');
+
+	const repositories_json = await repositories.json() as GitHubRepositoryResponse;
+
+	const repository_name = issue.repository_name.toLowerCase();
+	const repository = repositories_json.repositories.find((repository) => repository.full_name.toLowerCase() === repository_name);
+
+	if (!repository)
+		throw new Error('spooder-bot is not installed on repository ' + repository_name);
+
+	const issue_res = await github_request_endpoint(repository.url + '/issues', access_token, 'POST', {
+		title: issue.issue_title,
+		body: issue.issue_body,
+		labels: issue.issue_labels
+	});
+
+	github_assert_res(issue_res, 'cannot create GitHub issue');
+
+	const json_issue = await issue_res.json() as GitHubIssueResponse;
+	log(`raised issue {${json_issue.number}} in {${repository.full_name}}: ${json_issue.url}`);
+}
+// endregion
+
+// region canary
 async function load_local_env(): Promise<Map<string, string>> {
 	const env = new Map<string, string>();
 
@@ -95,9 +217,9 @@ async function check_cache_table(key: string, repository: string, expiry: number
 			}
 		}
 	} catch (e) {
-		log_canary(`failed to read canary cache file {${cache_file_path}}`);
-		log_canary(`error: ${(e as Error).message}`);
-		log_canary('resolve this issue to prevent spamming GitHub with canary reports');
+		log(`failed to read canary cache file {${cache_file_path}}`);
+		log(`error: ${(e as Error).message}`);
+		log('resolve this issue to prevent spamming GitHub with canary reports');
 	}
 
 	if (cache_table.has(key_hash)) {
@@ -161,13 +283,13 @@ export async function dispatch_report(report_title: string, report_body: Array<u
 		const canary_repostiory = config.canary.repository;
 
 		if (canary_account.length === 0|| canary_repostiory.length === 0) {
-			log_canary(`report dispatch failed; no account/repository configured`);
+			log(`report dispatch failed; no account/repository configured`);
 			return;
 		}
 
 		const is_cached = await check_cache_table(report_title, canary_repostiory, config.canary.throttle);
 		if (is_cached) {
-			log_canary(`throttled canary report: {${report_title}}`);
+			log(`throttled canary report: {${report_title}}`);
 			return;
 		}
 
@@ -203,7 +325,7 @@ export async function dispatch_report(report_title: string, report_body: Array<u
 
 		issue_body = '```json\n' + issue_body + '\n```\n\nℹ️ *This issue has been created automatically in response to a server panic, caution or crash.*';
 
-		await create_github_issue({
+		await github_create_issue({
 			app_id,
 			private_key: await key_file.text(),
 			repository_name: canary_repostiory,
@@ -213,6 +335,7 @@ export async function dispatch_report(report_title: string, report_body: Array<u
 			issue_labels: config.canary.labels
 		});
 	} catch (e) {
-		log_canary((e as Error).message);
+		log((e as Error).message);
 	}
 }
+// endregion
