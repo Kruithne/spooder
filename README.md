@@ -31,14 +31,25 @@ bun add spooder
 
 Both the `CLI` and the API are configured in the same way by providing a `spooder` object in your `package.json` file.
 
+Below is a full map of the available configuration options in their default states. All configuration options are **optional**.
+
 ```json
 {
 	"spooder": {
-		"auto_restart": 5000,
+
+		// see CLI > Auto Restart
+		"auto_restart": true,
+		"auto_restart_max": 30000,
+		"auto_restart_attempts": 10,
+		"auto_restart_grace": 30000,
+
+		// see CLI > Auto Update
 		"update": [
 			"git pull",
 			"bun install"
 		],
+
+		// see CLI > Canary
 		"canary": {
 			"account": "",
 			"repository": "",
@@ -194,7 +205,8 @@ In the event that the server process exits with a non-zero exit code, `spooder` 
 	"spooder": {
 		"auto_restart": true,
 		"auto_restart_max": 30000,
-		"auto_restart_attempts": 10
+		"auto_restart_attempts": 10,
+		"auto_restart_grace": 30000
 	}
 }
 ```
