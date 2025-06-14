@@ -505,6 +505,61 @@ In addition to the information provided by the developer, `spooder` also include
 log(message: string);
 log_create_logger(prefix: string, color: ColorInput);
 log_list(input: any[], delimiter = ', ');
+
+// http
+serve(port: number, hostname?: string): Server;
+server.stop(immediate: boolean): Promise<void>;
+
+// routing
+server.route(path: string, handler: RequestHandler, method?: HTTP_METHODS);
+server.unroute(path: string);
+
+// fallback handlers
+server.handle(status_code: number, handler: RequestHandler);
+server.default(handler: DefaultHandler);
+server.error(handler: ErrorHandler);
+server.on_slow_request(callback: SlowRequestCallback, threshold?: number);
+server.allow_slow_request(req: Request);
+
+// utility
+validate_req_json(handler: JSONRequestHandler);
+apply_range(file: BunFile, request: Request): HandlerReturnType;
+
+// directory serving
+server.dir(path: string, dir: string, handler?: DirHandler, method?: HTTP_METHODS);
+
+// server-sent events
+server.sse(path: string, handler: ServerSentEventHandler);
+
+// webhooks
+server.webhook(secret: string, path: string, handler: WebhookHandler);
+
+// websockets
+server.websocket(path: string, handlers: WebsocketHandlers);
+
+// error handling
+ErrorWithMetadata(message: string, metadata: object);
+caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>;
+panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>;
+safe(fn: Callable): Promise<void>;
+
+// templates
+parse_template(template: string, replacements: Record<string, string>, drop_missing?: boolean): Promise<string>;
+generate_hash_subs(length?: number, prefix?: string, hashes?: Record<string, string>): Promise<Record<string, string>>;
+get_git_hashes(length: number): Promise<Record<string, string>>;
+
+// state management
+set_cookie(res: Response, name: string, value: string, options?: CookieOptions);
+get_cookies(source: Request | Response, decode?: boolean): Record<string, string>;
+
+// database
+db_update_schema_sqlite(db: Database, schema_dir: string, schema_table?: string): Promise<void>;
+db_update_schema_mysql(db: Connection, schema_dir: string, schema_table?: string): Promise<void>;
+db_init_sqlite(db_path: string, schema_dir: string, schema_table?: string): Promise<Database>;
+db_init_mysql(options: ConnectionOptions, schema_dir: string, pool?: boolean, schema_table?: string): Promise<Connection | Pool>;
+
+// constants
+HTTP_STATUS_CODE: Record<number, string>;
 ```
 
 <a id="api-logging"></a>
