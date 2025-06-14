@@ -510,10 +510,6 @@ parse_template(template: string, replacements: Record<string, string>, drop_miss
 generate_hash_subs(length?: number, prefix?: string, hashes?: Record<string, string>): Promise<Record<string, string>>;
 get_git_hashes(length: number): Promise<Record<string, string>>;
 
-// state management
-set_cookie(res: Response, name: string, value: string, options?: CookieOptions);
-get_cookies(source: Request | Response, decode?: boolean): Record<string, string>;
-
 // database
 db_update_schema_sqlite(db: Database, schema_dir: string, schema_table?: string): Promise<void>;
 db_update_schema_mysql(db: Connection, schema_dir: string, schema_table?: string): Promise<void>;
