@@ -86,52 +86,14 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 
 - [API > Cheatsheet](#api-cheatsheet)
 - [API > Logging](#api-logging)
-
-### Old API Documentation
-
-- [API > Serving](#api-serving)
-	- [`serve(port: number, hostname?: string): Server`](#api-serving-serve)
-- [API > Routing](#api-routing)
-	- [`server.route(path: string, handler: RequestHandler, method: HTTP_METHODS)`](#api-routing-server-route)
-	- [`server.unroute(path: string)`](#api-routing-server-unroute)
-	- [HTTP Methods](#api-routing-methods)
-	- [Redirection Routes](#api-routing-redirection-routes)
-	- [Status Code Text](#api-routing-status-code-text)
-- [API > Routing > RequestHandler](#api-routing-request-handler)
-- [API > Routing > Fallback Handling](#api-routing-fallback-handlers)
-	- [`server.handle(status_code: number, handler: RequestHandler)`](#api-routing-server-handle)
-	- [`server.default(handler: DefaultHandler)`](#api-routing-server-default)
-	- [`server.error(handler: ErrorHandler)`](#api-routing-server-error)
-- [API > Routing > Slow Requests](#api-routing-slow-requests)
-	- [`server.on_slow_request(callback: SlowRequestCallback, threshold: number)`](#api-routing-server-on-slow-request)
-	- [`server.allow_slow_request(req: Request)`](#api-routing-server-allow-slow-request)
-- [API > Routing > Validation](#api-routing-validation)
-	- [`validate_req_json(handler: JSONRequestHandler)`](#api-routing-validate-req-json)
-- [API > Routing > Directory Serving](#api-routing-directory-serving)
-	- [`server.dir(path: string, dir: string, handler?: DirHandler, method: HTTP_METHODS)`](#api-routing-server-dir)
-- [API > Routing > Server-Sent Events](#api-routing-server-sent-events)
-	- [`server.sse(path: string, handler: ServerSentEventHandler)`](#api-routing-server-sse)
-- [API > Routing > Webhooks](#api-routing-webhooks)
-	- [`server.webhook(secret: string, path: string, handler: WebhookHandler)`](#api-routing-server-webhook)
-- [API > Routing > WebSockets](#api-routing-websockets)
-	- [`server.websocket(path: string, handlers: WebsocketHandlers)`](#api-routing-server-websocket)
-- [API > Server Control](#api-server-control)
-	- [`server.stop(immediate: boolean)`](#api-server-control-server-stop)
+- [API > HTTP](#api-http)
+	- [API > HTTP > Directory Serving](#api-http-directory)
+	- [API > HTTP > Server-Sent Events (SSE)](#api-http-sse)
+	- [API > HTTP > Webhooks](#api-http-webhooks)
+	- [API > HTTP > Websocket Server](#api-http-websockets)
 - [API > Error Handling](#api-error-handling)
-	- [`ErrorWithMetadata(message: string, metadata: object)`](#api-error-handling-error-with-metadata)
-	- [`caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-caution)
-	- [`panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`](#api-error-handling-panic)
-	- [`safe(fn: Callable): Promise<void>`](#api-error-handling-safe)
-- [API > Content](#api-content)
-	- [`parse_template(template: string, replacements: Record<string, string>, drop_missing: boolean): string`](#api-content-parse-template)
-	- [`generate_hash_subs(length: number, prefix: string, hashes?: Record<string, string>): Promise<Record<string, string>>`](#api-content-generate-hash-subs)
-	- [`get_git_hashes(length: number): Promise<Record<string, string>>`](#api-content-get-git-hashes)
-	- [`apply_range(file: BunFile, request: Request): HandlerReturnType`](#api-content-apply-range)
-- [API > State Management](#api-state-management)
-	- [`set_cookie(res: Response, name: string, value: string, options?: CookieOptions)`](#api-state-management-set-cookie)
-	- [`get_cookies(source: Request | Response): Record<string, string>`](#api-state-management-get-cookies)
+- [API > Templating](#api-templating)
 - [API > Database Schema](#api-database-schema)
-
 
 # CLI
 
@@ -507,7 +469,7 @@ log_create_logger(prefix: string, color: ColorInput);
 log_list(input: any[], delimiter = ', ');
 
 // http
-serve(port: number, hostname?: string): Server;
+http_serve(port: number, hostname?: string): Server;
 server.stop(immediate: boolean): Promise<void>;
 
 // routing
@@ -523,7 +485,7 @@ server.allow_slow_request(req: Request);
 
 // utility
 validate_req_json(handler: JSONRequestHandler);
-apply_range(file: BunFile, request: Request): HandlerReturnType;
+http_apply_range(file: BunFile, request: Request): HandlerReturnType;
 
 // directory serving
 server.dir(path: string, dir: string, handler?: DirHandler, method?: HTTP_METHODS);
@@ -566,7 +528,6 @@ HTTP_STATUS_CODE: Record<number, string>;
 ## API > Logging
 
 ### 🔧 `log(message: string)`
-
 Print a message to the console using the default logger. Wrapping text segments in curly braces will highlight those segments with colour.
 
 ```ts
@@ -575,7 +536,6 @@ log('Hello, {world}!');
 ```
 
 ### 🔧 `log_create_logger(prefix: string, color: ColorInput)`
-
 Create a `log()` function with a custom prefix and highlight colour.
 
 ```ts
@@ -588,7 +548,6 @@ db_log('Creating table {users}...');
 
 
 ### 🔧 `log_list(input: any[], delimiter = ', ')`
-
 Utility function that joins an array of items together with each element wrapped in highlighting syntax for logging.
 
 ```ts
@@ -597,22 +556,17 @@ log(`Fruit must be one of ${fruit.map(e => `{${e}}`).join(', ')}`);
 log(`Fruit must be one of ${log_list(fruit)}`);
 ```
 
+<a id="api-http"></a>
+## API > HTTP
 
-# Old API Documentation Below (WIP)
-
-<a id="api-serving"></a>
-## API > Serving
-
-<a id="api-serving-serve"></a>
-### `serve(port: number, hostname?: string): Server`
-
+### `http_serve(port: number, hostname?: string): Server`
 Bootstrap a server on the specified port (and optional hostname).
 
 ```ts
 import { serve } from 'spooder';
 
-const server = serve(8080); // port only
-const server = serve(3000, '0.0.0.0'); // optional hostname
+const server = http_serve(8080); // port only
+const server = http_serve(3000, '0.0.0.0'); // optional hostname
 ```
 
 By default, the server responds with:
@@ -625,10 +579,28 @@ Content-Type: text/plain;charset=utf-8
 Not Found
 ```
 
-<a id="api-routing"></a>
-## API > Routing
+### 🔧 `server.stop(immediate: boolean)`
 
-<a id="api-routing-server-route"></a>
+Stop the server process immediately, terminating all in-flight requests.
+
+```ts
+server.stop(true);
+```
+
+Stop the server process gracefully, waiting for all in-flight requests to complete.
+
+```ts
+server.stop(false);
+```
+
+`server.stop()` returns a promise, which if awaited, resolves when all pending connections have been completed.
+```ts
+await server.stop(false);
+// do something now all connections are done
+```
+
+### Routing
+
 ### 🔧 `server.route(path: string, handler: RequestHandler)`
 
 Register a handler for a specific path.
@@ -639,7 +611,6 @@ server.route('/test/route', (req, url) => {
 });
 ```
 
-<a id="api-routing-server-unrouote"></a>
 ### 🔧 `server.unroute(path: string)`
 
 Unregister a specific route.
@@ -649,7 +620,6 @@ server.route('/test/route', () => {});
 server.unroute('/test/route');
 ```
 
-<a id="api-routing-methods"></a>
 ### HTTP Methods
 
 By default, `spooder` will register routes defined with `server.route()` and `server.dir()` as `GET` routes. Requests to these routes with other methods will return `405 Method Not Allowed`.
@@ -675,7 +645,6 @@ server.route('/test/route', (req, url) => {
 > [!NOTE]
 > Routes defined with .sse() or .webhook() are always registered as 'GET' and 'POST' respectively and cannot be configured.
 
-<a id="api-routing-redirection-routes"></a>
 ### Redirection Routes
 
 `spooder` does not provide a built-in redirection handler since it's trivial to implement one using [`Response.redirect`](https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static), part of the standard Web API.
@@ -684,7 +653,6 @@ server.route('/test/route', (req, url) => {
 server.route('/redirect', () => Response.redirect('/redirected', 301));
 ```
 
-<a id="api-routing-status-code-text"></a>
 ### Status Code Text
 
 `spooder` exposes `HTTP_STATUS_CODE` to convieniently access status code text.
@@ -699,8 +667,7 @@ server.default((req, status_code) => {
 });
 ```
 
-<a id="api-routing-request-handler"></a>
-## API > Routing > RequestHandler
+### RequestHandler
 
 `RequestHandler` is a function that accepts a [`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request) object and a [`URL`](https://developer.mozilla.org/en-US/docs/Web/API/URL) object and returns a `HandlerReturnType`.
 
@@ -723,8 +690,7 @@ server.default((req, status_code) => {
 > [!NOTE]
 > Returning `Bun.file()` directly is the most efficient way to serve static files as it uses system calls to stream the file directly to the client without loading into user-space.
 
-<a id="api-routing-query-parameters"></a>
-## API > Routing > Query Parameters
+### Query Parameters
 
 Query parameters can be accessed from the `searchParams` property on the `URL` object.
 
@@ -754,8 +720,7 @@ server.route('/test/:param', (req, url) => {
 });
 ```
 
-<a id="api-routing-wildcards"></a>
-## API > Routing > Wildcards
+### Wildcards
 
 Wildcards can be used to match any path that starts with a given path.
 
@@ -778,10 +743,8 @@ server.route('/test', () => 200);
 // Accessing /test returns 301 here, because /* matches /test first.
 ```
 
-<a id="api-routing-fallback-handlers"></a>
-## API > Routing > Fallback Handlers
+### Fallback Handlers
 
-<a id="api-routing-server-handle"></a>
 ### 🔧 `server.handle(status_code: number, handler: RequestHandler)`
 Register a custom handler for a specific status code.
 ```ts
@@ -790,7 +753,6 @@ server.handle(500, (req) => {
 });
 ```
 
-<a id="api-routing-server-default"></a>
 ### 🔧 `server.default(handler: DefaultHandler)`
 Register a handler for all unhandled response codes.
 > [!NOTE]
@@ -801,7 +763,6 @@ server.default((req, status_code) => {
 });
 ```
 
-<a id="api-routing-server-error"></a>
 ### 🔧 `server.error(handler: ErrorHandler)`
 Register a handler for uncaught errors.
 
@@ -826,10 +787,8 @@ server.error((err, req, url) => {
 });
 ```
 
-<a id="api-routing-slow-requests"></a>
-## API > Routing > Slow Requests
+### Slow Requests
 
-<a id="api-routing-server-on-slow-request"></a>
 ### 🔧 `server.on_slow_request(callback: SlowRequestCallback, threshold: number)`
 
 `server.on_slow_request` can be used to register a callback for requests that take an undesirable amount of time to process.
@@ -850,7 +809,6 @@ server.on_slow_request(async (req, time, url) => {
 > [!NOTE]
 > The callback is not awaited internally, so you can use `async/await` freely without blocking the server/request.
 
-<a id="api-routing-server-allow-slow-request"></a>
 ### 🔧 `server.allow_slow_request(req: Request)`
 
 In some scenarios, mitigation throttling or heavy workloads may cause slow requests intentionally. To prevent these triggering a caution, requests can be marked as slow.
@@ -871,63 +829,9 @@ server.route('/test', async (req) => {
 > [!NOTE]
 > This will have no effect if a handler hasn't been registered with `on_slow_request`.
 
-<a id="api-routing-validation"></a>
-## API > Routing > Validation
+<a id="api-http-directory"></a>
+## HTTP > Directory Serving
 
-<a id="api-routing-validate-req-json"></a>
-### 🔧 `validate_req_json(handler: JSONRequestHandler)`
-
-In the scenario that you're expecting an endpoint to receive JSON data, you might set up a handler like this:
-
-```ts
-server.route('/api/endpoint', async (req, url) => {
-	const json = await req.json();
-	// do something with json.
-	return 200;
-})
-```
-
-The problem with this is that if the request body is not valid JSON, the server will throw an error (potentially triggering canary reports) and return a `500` response.
-
-What should instead happen is something like this:
-
-```ts
-server.route('/api/endpoint', async (req, url) => {
-	// check content-type header
-	if (req.headers.get('Content-Type') !== 'application/json')
-		return 400;
-
-	try {
-		const json = await req.json();
-		if (json === null || typeof json !== 'object' || Array.isArray(json))
-			return 400;
-
-		// do something with json.
-		return 200;
-	} catch (err) {
-		return 400;
-	}
-})
-```
-
-As you can see this is quite verbose and adds a lot of boilerplate to your handlers. `validate_req_json` can be used to simplify this.
-
-```ts
-server.route('/api/endpoint', validate_req_json(async (req, url, json) => {
-	// do something with json.
-	return 200;
-}));
-```
-
-This behaves the same as the code above, where a `400` status code is returned if the `Content-Type` header is not `application/json` or if the request body is not valid JSON, and no error is thrown.
-
-> [!NOTE]
-> While arrays and other primitives are valid JSON, `validate_req_json` will only pass objects to the handler, since they are the most common use case for JSON request bodies and it removes the need to validate that in the handler. If you need to use arrays or other primitives, either box them in an object or provide your own validation.
-
-<a id="api-routing-directory-serving"></a>
-## API > Routing > Directory Serving
-
-<a id="api-routing-server-dir"></a>
 ### 🔧 `server.dir(path: string, dir: string, handler?: DirHandler)`
 Serve files from a directory.
 ```ts
@@ -956,7 +860,7 @@ function default_directory_handler(file_path: string, file: BunFile, stat: DirSt
 	if (stat.isDirectory())
 		return 401; // Unauthorized
 
-	return apply_range(file, request);
+	return http_apply_range(file, request);
 }
 ```
 
@@ -964,7 +868,7 @@ function default_directory_handler(file_path: string, file: BunFile, stat: DirSt
 > Uncaught `ENOENT` errors thrown from the directory handler will return a `404` response, other errors will return a `500` response.
 
 > [!NOTE]
-> The call to `apply_range` in the default directory handler will automatically slice the file based on the [`Range`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Range) header. This function is also exposed as part of the `spooder` API for use in your own handlers.
+> The call to `http_apply_range` in the default directory handler will automatically slice the file based on the [`Range`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Range) header. This function is also exposed as part of the `spooder` API for use in your own handlers.
 
 Provide your own directory handler for fine-grained control.
 
@@ -999,10 +903,32 @@ server.dir('/static', '/static', async (file_path, file) => {
 });
 ```
 
-<a id="api-routing-server-sse"></a>
-## API > Routing > Server-Sent Events
+### 🔧 `http_apply_range(file: BunFile, request: Request): HandlerReturnType`
 
-<a id="api-routing-server-sse"></a>
+`http_apply_range` parses the `Range` header for a request and slices the file accordingly. This is used internally by `server.dir()` and exposed for convenience.
+
+```ts
+server.route('/test', (req, url) => {
+	const file = Bun.file('./test.txt');
+	return http_apply_range(file, req);
+});
+```
+
+```http
+GET /test HTTP/1.1
+Range: bytes=0-5
+
+HTTP/1.1 206 Partial Content
+Content-Length: 6
+Content-Range: bytes 0-5/6
+Content-Type: text/plain;charset=utf-8
+
+Hello,
+```
+
+<a id="api-http-sse"></a>
+## HTTP > Server-Sent Events (SSE)
+
 ### 🔧 `server.sse(path: string, handler: ServerSentEventHandler)`
 
 Setup a [server-sent event](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) stream.
@@ -1040,10 +966,9 @@ server.sse('/sse', (req, url, client) => {
 });
 ```
 
-<a id="api-routing-webhooks"></a>
-## API > Routing > Webhooks
+<a id="api-http-webhooks"></a>
+## HTTP > Webhooks
 
-<a id="api-routing-server-webhook"></a>
 ### 🔧 `server.webhook(secret: string, path: string, handler: WebhookHandler)`
 
 Setup a webhook handler.
@@ -1065,10 +990,9 @@ A webhook callback will only be called if the following critera is met by a requ
 > [!NOTE]
 > Constant-time comparison is used to prevent timing attacks when comparing the HMAC signature.
 
-<a id="api-routing-websockets"></a>
-## API > Routing > WebSockets
+<a id="api-http-websockets"></a>
+## HTTP > Websocket Server
 
-<a id="api-routing-server-websocket"></a>
 ### 🔧 `server.websocket(path: string, handlers: WebSocketHandlers)`
 
 Register a route which handles websocket connections.
@@ -1121,34 +1045,9 @@ server.websocket('/path/to/websocket', {
 > [!IMPORTANT]
 > While it is possible to register multiple routes for websockets, the only handler which is unique per route is `accept()`. The last handlers provided to any route (with the exception of `accept()`) will apply to ALL websocket routes. This is a limitation in Bun.
 
-<a id="api-server-control"></a>
-## API > Server Control
-
-<a id="api-server-control-stop"></a>
-### 🔧 `server.stop(immediate: boolean)`
-
-Stop the server process immediately, terminating all in-flight requests.
-
-```ts
-server.stop(true);
-```
-
-Stop the server process gracefully, waiting for all in-flight requests to complete.
-
-```ts
-server.stop(false);
-```
-
-`server.stop()` returns a promise, which if awaited, resolves when all pending connections have been completed.
-```ts
-await server.stop(false);
-// do something now all connections are done
-```
-
 <a id="api-error-handling"></a>
 ## API > Error Handling
 
-<a id="api-error-handling-error-with-metadata"></a>
 ### 🔧 `ErrorWithMetadata(message: string, metadata: object)`
 
 The `ErrorWithMetadata` class allows you to attach metadata to errors, which can be used for debugging purposes when errors are dispatched to the canary.
@@ -1163,7 +1062,6 @@ Functions and promises contained in the metadata will be resolved and the return
 throw new ErrorWithMetadata('Something went wrong', { foo: () => 'bar' });
 ```
 
-<a id="api-error-handling-caution"></a>
 ### 🔧 `caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>`
 
 Raise a warning issue on GitHub. This is useful for non-fatal issues which you want to be notified about.
@@ -1222,7 +1120,6 @@ await caution('Error with number ' + some_important_value);
 await caution('Error with number', { some_important_value });
 ```
 
-<a id="api-error-handling-panic"></a>
 ### 🔧 `panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>`
 
 This behaves the same as `caution()` with the difference that once `panic()` has raised the issue, it will exit the process with a non-zero exit code.
@@ -1242,7 +1139,6 @@ try {
 }
 ```
 
-<a id="api-error-handling-safe"></a>
 ### 🔧 `safe(fn: Callable): Promise<void>`
 
 `safe()` is a utility function that wraps a "callable" and calls `caution()` if it throws an error.
@@ -1266,10 +1162,9 @@ await safe(() => {
 });
 ```
 
-<a id="api-content"></a>
-## API > Content
+<a id="api-templating"></a>
+## API > Templating
 
-<a id="api-content-parse-template"></a>
 ### 🔧 `parse_template(template: string, replacements: Replacements, drop_missing: boolean): Promise<string>`
 
 Replace placeholders in a template string with values from a replacement object.
@@ -1408,7 +1303,6 @@ await parse_template(..., {
 {$for}Loop <div>{$test}</div>{/for}
 ```
 
-<a id="api-content-generate-hash-subs"></a>
 ### 🔧 `generate_hash_subs(length: number, prefix: string, hashes?: Record<string, string>): Promise<Record<string, string>>`
 
 Generate a replacement table for mapping file paths to hashes in templates. This is useful for cache-busting static assets.
@@ -1453,7 +1347,6 @@ server.route('/test', (req, url) => {
 });
 ```
 
-<a id="api-content-get-git-hashes"></a>
 ### 🔧 ``get_git_hashes(length: number): Promise<Record<string, string>>``
 
 Internally, `generate_hash_subs()` uses `get_git_hashes()` to retrieve the hash table from git. This function is exposed for convenience.
@@ -1474,104 +1367,6 @@ const subs = await generate_hash_subs(7, undefined, hashes);
 
 // hashes[0] -> { 'docs/project-logo.png': '754d9ea' }
 // subs[0] -> { 'hash=docs/project-logo.png': '754d9ea' }
-```
-
-<a id="api-apply-range"></a>
-### 🔧 `apply_range(file: BunFile, request: Request): HandlerReturnType`
-
-`apply_range` parses the `Range` header for a request and slices the file accordingly. This is used internally by `server.dir()` and exposed for convenience.
-
-```ts
-server.route('/test', (req, url) => {
-	const file = Bun.file('./test.txt');
-	return apply_range(file, req);
-});
-```
-
-```http
-GET /test HTTP/1.1
-Range: bytes=0-5
-
-HTTP/1.1 206 Partial Content
-Content-Length: 6
-Content-Range: bytes 0-5/6
-Content-Type: text/plain;charset=utf-8
-
-Hello,
-```
-
-<a id="api-state-management"></a>
-## API > State Management
-
-<a id="api-state-management-set-cookie"></a>
-### 🔧 `set_cookie(res: Response, name: string, value: string, options?: CookieOptions)`
-
-Set a cookie onto a `Response` object.
-
-```ts
-const res = new Response('Cookies!', { status: 200 });
-set_cookie(res, 'my_test_cookie', 'my_cookie_value');
-```
-
-```http
-HTTP/1.1 200 OK
-Set-Cookie: my_test_cookie=my_cookie_value
-Content-Length: 8
-
-Cookies!
-```
-
-> [!IMPORTANT]
-> Spooder does not URL encode cookies by default. This can result in invalid cookies if they contain special characters. See `encode` option on `CookieOptions` below.
-
-```ts
-type CookieOptions = {
-	same_site?: 'Strict' | 'Lax' | 'None',
-	secure?: boolean,
-	http_only?: boolean,
-	path?: string,
-	expires?: number,
-	encode?: boolean,
-	max_age?: number
-};
-```
-
-Most of the options that can be provided as `CookieOptions` are part of the standard `Set-Cookie` header. See [HTTP Cookies - MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies).
-
-Passing `encode` as `true` will URL encode the cookie value.
-
-```ts
-set_cookie(res, 'my_test_cookie', 'my cookie value', { encode: true });
-```
-
-```http
-Set-Cookie: my_test_cookie=my%20cookie%20value
-```
-
-<a id="api-state-management-get-cookies"></a>
-### 🔧 `get_cookies(source: Request | Response, decode: boolean = false): Record<string, string>`
-
-Get cookies from a `Request` or `Response` object.
-
-```http
-GET /test HTTP/1.1
-Cookie: my_test_cookie=my_cookie_value
-```
-
-```ts
-const cookies = get_cookies(req);
-{ my_test_cookie: 'my_cookie_value' }
-```
-
-Cookies are not URL decoded by default. This can be enabled by passing `true` as the second parameter.
-
-```http
-GET /test HTTP/1.1
-Cookie: my_test_cookie=my%20cookie%20value
-```
-```ts
-const cookies = get_cookies(req, true);
-{ my_test_cookie: 'my cookie value' }
 ```
 
 <a id="api-database-schema"></a>

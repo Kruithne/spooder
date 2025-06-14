@@ -307,7 +307,7 @@ export const HTTP_STATUS_CODE = http.STATUS_CODES;
 type HTTP_METHOD = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS' | 'CONNECT' | 'TRACE';
 type HTTP_METHODS = HTTP_METHOD|HTTP_METHOD[];
 
-export function apply_range(file: BunFile, request: Request): BunFile {
+export function http_apply_range(file: BunFile, request: Request): BunFile {
 	const range_header = request.headers.get('range');
 	if (range_header !== null) {
 		const regex = /bytes=(\d*)-(\d*)/;
@@ -380,7 +380,7 @@ function default_directory_handler(file_path: string, file: BunFile, stat: DirSt
 	if (stat.isDirectory())
 		return 401; // Unauthorized
 
-	return apply_range(file, request);
+	return http_apply_range(file, request);
 }
 
 function route_directory(route_path: string, dir: string, handler: DirHandler): RequestHandler {
@@ -463,7 +463,7 @@ type WebsocketHandlers = {
 	drain?: (ws: WebSocket) => void
 };
 
-export function serve(port: number, hostname?: string) {
+export function http_serve(port: number, hostname?: string) {
 	const routes = new Array<[string[], RequestHandler, HTTP_METHODS]>();
 	const handlers = new Map<number, StatusCodeHandler>();
 	
