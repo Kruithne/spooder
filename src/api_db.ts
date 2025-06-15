@@ -1,20 +1,11 @@
 import { Database } from 'bun:sqlite';
-import type * as mysql_types from 'mysql2/promise';
 import { log_create_logger, log_list } from './api';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 
-let mysql: typeof mysql_types | undefined;
-try {
-	mysql = await import('mysql2/promise') as typeof mysql_types;
-} catch (e) {
-	// mysql2 optional dependency not installed.
-	// this dependency will be replaced once bun:sql supports mysql.
-	// db_update_schema_mysql and db_init_schema_mysql will throw.
-}
-
 const db_log = log_create_logger('db', '#16b39e');
 
+// region schema
 interface DependencyTarget {
 	file_name: string;
 	deps: string[];
@@ -133,44 +124,17 @@ async function db_load_schema(schema_dir: string, schema_versions: SchemaVersion
 
 	return order_schema_dep_tree(schema_out);
 }
+// endregion
 
-export async function db_update_schema_sqlite(db: Database, schema_dir: string, schema_table_name = 'db_schema') {
-	db_log(`updating database schema for {${db.filename}}`);
-
-	const schema_versions = new Map();
-
-	try {
-		const query = db.query('SELECT db_schema_table_name, db_schema_version FROM ' + schema_table_name);
-		for (const row of query.all() as Array<Row_DBSchema>)
-			schema_versions.set(row.db_schema_table_name, row.db_schema_version);
-	} catch (e) {
-		db_log(`creating {${schema_table_name}}`);
-		db.run(`CREATE TABLE ${schema_table_name} (db_schema_table_name TEXT PRIMARY KEY, db_schema_version INTEGER)`);
-	}
-	
-	db.transaction(async () => {
-		const update_schema_query = db.prepare(`
-			INSERT INTO ${schema_table_name} (db_schema_version, db_schema_table_name) VALUES (?1, ?2)
-			ON CONFLICT(db_schema_table_name) DO UPDATE SET db_schema_version = EXCLUDED.db_schema_version
-		`);
-
-		const schemas = await db_load_schema(schema_dir, schema_versions);
-
-		for (const schema of schemas) {
-			let newest_schema_version = schema.current_version;
-			for (const rev_id of schema.chunk_keys) {
-				const revision = schema.revisions.get(rev_id);
-				db_log(`applying revision {${rev_id}} to {${schema.name}}`);
-				db.transaction(() => db.run(revision))();
-				newest_schema_version = rev_id;
-			}
-	
-			if (newest_schema_version > schema.current_version) {
-				db_log(`updated table {${schema.name}} to revision {${newest_schema_version}}`);
-				update_schema_query.run(newest_schema_version, schema.name);
-			}
-		}
-	})();
+// region mysql
+import type * as mysql_types from 'mysql2/promise';
+let mysql: typeof mysql_types | undefined;
+try {
+	mysql = await import('mysql2/promise') as typeof mysql_types;
+} catch (e) {
+	// mysql2 optional dependency not installed.
+	// this dependency will be replaced once bun:sql supports mysql.
+	// db_update_schema_mysql and db_init_schema_mysql will throw.
 }
 
 export async function db_update_schema_mysql(db: mysql_types.Connection, schema_dir: string, schema_table_name = 'db_schema') {
@@ -217,15 +181,6 @@ export async function db_update_schema_mysql(db: mysql_types.Connection, schema_
 	await db.commit();
 }
 
-export async function db_init_sqlite(db_path: string, schema_dir?: string): Promise<Database> {
-	const db = new Database(db_path, { create: true });
-
-	if (schema_dir !== undefined)
-		await db_update_schema_sqlite(db, schema_dir);
-
-	return db;
-}
-
 export async function db_init_mysql<T extends boolean = false>(db_info: mysql_types.ConnectionOptions, schema_dir?: string, pool: T = false as T): Promise<T extends true ? mysql_types.Pool : mysql_types.Connection> {
 	if (mysql === undefined)
 		throw new Error('db_init_mysql cannot be called without optional dependency {mysql2} installed');
@@ -252,3 +207,54 @@ export async function db_init_mysql<T extends boolean = false>(db_info: mysql_ty
 		return connection as any;
 	}
 }
+// endregion
+
+// region sqlite
+export async function db_update_schema_sqlite(db: Database, schema_dir: string, schema_table_name = 'db_schema') {
+	db_log(`updating database schema for {${db.filename}}`);
+
+	const schema_versions = new Map();
+
+	try {
+		const query = db.query('SELECT db_schema_table_name, db_schema_version FROM ' + schema_table_name);
+		for (const row of query.all() as Array<Row_DBSchema>)
+			schema_versions.set(row.db_schema_table_name, row.db_schema_version);
+	} catch (e) {
+		db_log(`creating {${schema_table_name}}`);
+		db.run(`CREATE TABLE ${schema_table_name} (db_schema_table_name TEXT PRIMARY KEY, db_schema_version INTEGER)`);
+	}
+	
+	db.transaction(async () => {
+		const update_schema_query = db.prepare(`
+			INSERT INTO ${schema_table_name} (db_schema_version, db_schema_table_name) VALUES (?1, ?2)
+			ON CONFLICT(db_schema_table_name) DO UPDATE SET db_schema_version = EXCLUDED.db_schema_version
+		`);
+
+		const schemas = await db_load_schema(schema_dir, schema_versions);
+
+		for (const schema of schemas) {
+			let newest_schema_version = schema.current_version;
+			for (const rev_id of schema.chunk_keys) {
+				const revision = schema.revisions.get(rev_id);
+				db_log(`applying revision {${rev_id}} to {${schema.name}}`);
+				db.transaction(() => db.run(revision))();
+				newest_schema_version = rev_id;
+			}
+	
+			if (newest_schema_version > schema.current_version) {
+				db_log(`updated table {${schema.name}} to revision {${newest_schema_version}}`);
+				update_schema_query.run(newest_schema_version, schema.name);
+			}
+		}
+	})();
+}
+
+export async function db_init_sqlite(db_path: string, schema_dir?: string): Promise<Database> {
+	const db = new Database(db_path, { create: true });
+
+	if (schema_dir !== undefined)
+		await db_update_schema_sqlite(db, schema_dir);
+
+	return db;
+}
+// endregion
