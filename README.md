@@ -33,7 +33,7 @@ Both the `CLI` and the API are configured in the same way by providing a `spoode
 
 Below is a full map of the available configuration options in their default states. All configuration options are **optional**.
 
-```json
+```jsonc
 {
 	"spooder": {
 
