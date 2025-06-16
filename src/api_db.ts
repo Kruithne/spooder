@@ -205,6 +205,16 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 	const instance = pool ? mysql.createPool(db_info) : await mysql.createConnection(db_info);
 	let error_mode = db_error_mode.SILENT_FAILURE;
 
+	function db_handle_error(error: unknown, return_value: any, title: string) {
+		if (error_mode === db_error_mode.THROW_EXCEPTION)
+			throw error;
+
+		if (error_mode === db_error_mode.CANARY_CAUTION)
+			caution(`mysql: ${title}`, { error });
+
+		return return_value;
+	}
+
 	return {
 		instance,
 		
@@ -225,13 +235,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 				const [result] = await instance.query<ResultSetHeader>(sql, values);
 				return result.insertId ?? -1;
 			} catch (error) {
-				if (error_mode === db_error_mode.THROW_EXCEPTION)
-					throw error;
-
-				if (error_mode === db_error_mode.CANARY_CAUTION)
-					caution('sql: insert failed', { error });
-
-				return -1;
+				return db_handle_error(error, -1, 'insert failed');
 			}
 		},
 
@@ -249,13 +253,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 				const [result] = await instance.query<ResultSetHeader>(sql, values);
 				return result.insertId ?? -1;
 			} catch (error) {
-				if (error_mode === db_error_mode.THROW_EXCEPTION)
-					throw error;
-
-				if (error_mode === db_error_mode.CANARY_CAUTION)
-					caution('sql: insert_object failed', { error, obj });
-
-				return -1;
+				return db_handle_error(error, -1, 'insert_object failed');
 			}
 		},
 
@@ -268,13 +266,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 				const [result] = await instance.query<ResultSetHeader>(sql, values);
 				return result.affectedRows;
 			} catch (error) {
-				if (error_mode === db_error_mode.THROW_EXCEPTION)
-					throw error;
-
-				if (error_mode === db_error_mode.CANARY_CAUTION)
-					caution('sql: execute failed', { error });
-
-				return -1;
+				return db_handle_error(error, -1, 'execute failed');
 			}
 		},
 
@@ -287,13 +279,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 				const [rows] = await instance.execute(sql, values);
 				return rows as T[];
 			} catch (error) {
-				if (error_mode === db_error_mode.THROW_EXCEPTION)
-					throw error;
-
-				if (error_mode === db_error_mode.CANARY_CAUTION)
-					caution('sql: get_all failed', { error });
-
-				return [];
+				return db_handle_error(error, [], 'get_all failed');
 			}
 		},
 
@@ -307,13 +293,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 				const typed_rows = rows as T[];
 				return typed_rows[0] ?? null;
 			} catch (error) {
-				if (error_mode === db_error_mode.THROW_EXCEPTION)
-					throw error;
-
-				if (error_mode === db_error_mode.CANARY_CAUTION)
-					caution('sql: get_single failed', { error });
-
-				return null;
+				return db_handle_error(error, null, 'get_single failed');
 			}
 		},
 
@@ -326,13 +306,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 				const [rows] = await instance.execute(sql, values) as RowDataPacket[][];
 				return rows.map((e: any) => e[column]) as T[];
 			} catch (error) {
-				if (error_mode === db_error_mode.THROW_EXCEPTION)
-					throw error;
-
-				if (error_mode === db_error_mode.CANARY_CAUTION)
-					caution('sql: get_column_array failed', { error });
-
-				return [];
+				return db_handle_error(error, [], 'get_column_array failed');
 			}
 		},
 
@@ -347,13 +321,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 				const result = await instance.execute<RowDataPacket[][]>(sql, args);
 				return result[0][0] as T[];
 			} catch (error) {
-				if (error_mode === db_error_mode.THROW_EXCEPTION)
-					throw error;
-
-				if (error_mode === db_error_mode.CANARY_CAUTION)
-					caution('sql: call failed', { error });
-
-				return [];
+				return db_handle_error(error, [], 'call failed');
 			}
 		},
 
@@ -381,12 +349,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 					if (page_rows.length < page_size)
 						break;
 				} catch (error) {
-					if (error_mode === db_error_mode.THROW_EXCEPTION)
-						throw error;
-
-					if (error_mode === db_error_mode.CANARY_CAUTION)
-						caution('sql: get_paged failed', { error, offset: current_offset });
-
+					db_handle_error(error, undefined, 'get_paged failed');
 					return;
 				}
 			}
@@ -402,13 +365,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 				const typed_rows = rows as RowDataPacket[];
 				return typed_rows[0]?.count ?? 0;
 			} catch (error) {
-				if (error_mode === db_error_mode.THROW_EXCEPTION)
-					throw error;
-
-				if (error_mode === db_error_mode.CANARY_CAUTION)
-					caution('sql: count failed', { error });
-
-				return 0;
+				return db_handle_error(error, 0, 'count failed');
 			}
 		},
 
@@ -422,13 +379,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 				const typed_rows = rows as RowDataPacket[];
 				return typed_rows[0]?.count ?? 0;
 			} catch (error) {
-				if (error_mode === db_error_mode.THROW_EXCEPTION)
-					throw error;
-
-				if (error_mode === db_error_mode.CANARY_CAUTION)
-					caution('sql: count_table failed', { error });
-
-				return 0;
+				return db_handle_error(error, 0, 'count_table failed');
 			}
 		},
 
@@ -442,13 +393,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 				const typed_rows = rows as RowDataPacket[];
 				return typed_rows.length > 0;
 			} catch (error) {
-				if (error_mode === db_error_mode.THROW_EXCEPTION)
-					throw error;
-
-				if (error_mode === db_error_mode.CANARY_CAUTION)
-					caution('sql: exists failed', { error });
-
-				return false;
+				return db_handle_error(error, false, 'exists failed');
 			}
 		},
 
@@ -463,13 +408,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 				const typed_rows = rows as RowDataPacket[];
 				return typed_rows.length > 0;
 			} catch (error) {
-				if (error_mode === db_error_mode.THROW_EXCEPTION)
-					throw error;
-
-				if (error_mode === db_error_mode.CANARY_CAUTION)
-					caution('sql: exists_by_id failed', { error });
-
-				return false;
+				return db_handle_error(error, false, 'exists_by_id failed');
 			}
 		},
 
@@ -492,13 +431,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 				const typed_rows = rows as RowDataPacket[];
 				return typed_rows.length > 0;
 			} catch (error) {
-				if (error_mode === db_error_mode.THROW_EXCEPTION)
-					throw error;
-
-				if (error_mode === db_error_mode.CANARY_CAUTION)
-					caution('sql: exists_by_fields failed', { error });
-
-				return false;
+				return db_handle_error(error, false, 'exists_by_fields failed');
 			}
 		},
 
@@ -516,13 +449,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 				const [result] = await instance.query<ResultSetHeader>(sql, [id]);
 				return result.affectedRows;
 			} catch (error) {
-				if (error_mode === db_error_mode.THROW_EXCEPTION)
-					throw error;
-
-				if (error_mode === db_error_mode.CANARY_CAUTION)
-					caution('sql: delete failed', { error });
-
-				return -1;
+				return db_handle_error(error, -1, 'delete failed');
 			}
 		}
 	};
