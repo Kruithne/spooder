@@ -11,14 +11,12 @@ export * from './api_db';
 // endregion
 
 // region logging
-const ANSI_RESET = '\x1b[0m';
-
 export function log_create_logger(label: string, color: ColorInput = '#16b39e') {
 	const ansi = Bun.color(color, 'ansi-256') ?? '\x1b[38;5;6m';
-	const prefix = `[${ansi}${label}${ANSI_RESET}] `;
+	const prefix = `[${ansi}${label}\x1b[0m] `;
 
 	return (message: string) => {
-		process.stdout.write(prefix + message.replace(/\{([^}]+)\}/g, `${ansi}$1${ANSI_RESET}\n`));
+		process.stdout.write(prefix + message.replace(/\{([^}]+)\}/g, `${ansi}$1\x1b[0m\n`));
 	};
 }
 
