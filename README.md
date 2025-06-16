@@ -1392,7 +1392,8 @@ import mysql from 'mysql2';
 const db = await mysql.createConnection({
 	// connection options
 	// see https://github.com/mysqljs/mysql#connection-options
-})
+});
+await db_update_schema_mysql(db, './schema');
 ```
 
 > [!IMPORTANT]
