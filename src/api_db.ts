@@ -194,7 +194,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 		instance,
 		is_pool: pool,
 
-		update_schema: async (schema_dir: string, schema_table_name = 'db_schema') => {
+		update_schema: async (schema_dir: string, schema_table_name: string = 'db_schema') => {
 			return db_update_schema_mysql(instance, schema_dir, schema_table_name);
 		}
 	};
@@ -247,7 +247,7 @@ export function db_sqlite(...args: ConstructorParameters<typeof Database>) {
 	return {
 		instance,
 
-		update_schema: async (schema_dir: string, schema_table_name: 'db_schema') => {
+		update_schema: async (schema_dir: string, schema_table_name: string = 'db_schema') => {
 			return db_update_schema_sqlite(instance, schema_dir, schema_table_name);
 		}
 	}
