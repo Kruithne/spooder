@@ -525,7 +525,20 @@ update_schema(db_dir: string, schema_table?: string): Promise<void>
 // db_mysql
 set_error_mode(mode: db_error_mode);
 update_schema(db_dir: string, schema_table?: string): Promise<void>
-insert(sql: string, values: any[]): Promise<number>;
+insert(sql: string, ...values: any): Promise<number>;
+insert_object(table: string, obj: Record<string, any>): Promise<number>;
+execute(sql: string, ...values: any): Promise<number>;
+get_all<T>(sql: string, ...values: any): Promise<T[]>;
+get_single<T>(sql: string, ...values: any): Promise<T | null>;
+get_column_array<T>(sql: string, column: string, ...values: any): Promise<T[]>;
+call<T>(func_name: string, ...args: any): Promise<T[]>;
+get_paged<T>(sql: string, values?: any[], page_size?: number): AsyncGenerator<T[]>;
+count(sql: string, ...values: any): Promise<number>;
+count_table(table_name: string): Promise<number>;
+exists(sql: string, ...values: any): Promise<boolean>;
+exists_by_id(table_name: string, id: string | number, column_name?: string): Promise<boolean>;
+exists_by_fields(table_name: string, fields: Record<string, string | number>): Promise<boolean>;
+delete(table_name: string, id: string | number, column_name?: string, limit?: number): Promise<number>;
 
 // database schema
 db_update_schema_sqlite(db: Database, schema_dir: string, schema_table?: string): Promise<void>;
@@ -1474,12 +1487,120 @@ const db = await db_mysql({ ... });
 await db.update_schema('./schema');
 ```
 
-### 🔧 ``db_mysql.insert(sql: string, values: any[]): Promise<number>``
+### 🔧 ``db_mysql.insert(sql: string, ...values: any): Promise<number>``
 
 Executes a query and returns the `LAST_INSERT_ID`. Returns `-1` in the event of an error or if `LAST_INSERT_ID` is not provided.
 
 ```ts
 const id = await db.insert('INSERT INTO tbl (name) VALUES(?)', 'test');
+```
+
+### 🔧 ``db_mysql.insert_object(table: string, obj: Record<string, any>): Promise<number>``
+
+Executes an insert query using object key/value mapping and returns the `LAST_INSERT_ID`. Returns `-1` in the event of an error.
+
+```ts
+const id = await db.insert_object('users', { name: 'John', email: 'john@example.com' });
+```
+
+### 🔧 ``db_mysql.execute(sql: string, ...values: any): Promise<number>``
+
+Executes a query and returns the number of affected rows. Returns `-1` in the event of an error.
+
+```ts
+const affected = await db.execute('UPDATE users SET name = ? WHERE id = ?', 'Jane', 1);
+```
+
+### 🔧 ``db_mysql.get_all<T>(sql: string, ...values: any): Promise<T[]>``
+
+Returns the complete query result set as an array. Returns empty array if no rows found or if query fails.
+
+```ts
+const users = await db.get_all<User>('SELECT * FROM users WHERE active = ?', true);
+```
+
+### 🔧 ``db_mysql.get_single<T>(sql: string, ...values: any): Promise<T | null>``
+
+Returns the first row from a query result set. Returns `null` if no rows found or if query fails.
+
+```ts
+const user = await db.get_single<User>('SELECT * FROM users WHERE id = ?', 1);
+```
+
+### 🔧 ``db_mysql.get_column_array<T>(sql: string, column: string, ...values: any): Promise<T[]>``
+
+Returns the query result as a single column array. Returns empty array if no rows found or if query fails.
+
+```ts
+const names = await db.get_column_array<string>('SELECT name FROM users', 'name');
+```
+
+### 🔧 ``db_mysql.call<T>(func_name: string, ...args: any): Promise<T[]>``
+
+Calls a stored procedure and returns the result set as an array. Returns empty array if no rows found or if query fails.
+
+```ts
+const results = await db.call<User>('get_active_users', true, 10);
+```
+
+### 🔧 ``db_mysql.get_paged<T>(sql: string, values?: any[], page_size?: number): AsyncGenerator<T[]>``
+
+Returns an async iterator that yields pages of database rows. Each page contains at most `page_size` rows (default 1000).
+
+```ts
+for await (const page of db.get_paged<User>('SELECT * FROM users', [], 100)) {
+	console.log(`Processing ${page.length} users`);
+}
+```
+
+### 🔧 ``db_mysql.count(sql: string, ...values: any): Promise<number>``
+
+Returns the value of `count` from a query. Returns `0` if query fails.
+
+```ts
+const userCount = await db.count('SELECT COUNT(*) AS count FROM users WHERE active = ?', true);
+```
+
+### 🔧 ``db_mysql.count_table(table_name: string): Promise<number>``
+
+Returns the total count of rows from a table. Returns `0` if query fails.
+
+```ts
+const totalUsers = await db.count_table('users');
+```
+
+### 🔧 ``db_mysql.exists(sql: string, ...values: any): Promise<boolean>``
+
+Returns `true` if the query returns any results. Returns `false` if no results found or if query fails.
+
+```ts
+const hasActiveUsers = await db.exists('SELECT 1 FROM users WHERE active = ? LIMIT 1', true);
+```
+
+### 🔧 ``db_mysql.exists_by_id(table_name: string, id: string | number, column_name?: string): Promise<boolean>``
+
+Returns `true` if the given ID exists in the given table. Returns `false` if not found or if query fails.
+
+```ts
+const userExists = await db.exists_by_id('users', 123);
+const userExists = await db.exists_by_id('users', 'john@example.com', 'email');
+```
+
+### 🔧 ``db_mysql.exists_by_fields(table_name: string, fields: Record<string, string | number>): Promise<boolean>``
+
+Returns `true` if a row matches the given fields. Returns `false` if not found or if query fails.
+
+```ts
+const userExists = await db.exists_by_fields('users', { name: 'John', active: 1 });
+```
+
+### 🔧 ``db_mysql.delete(table_name: string, id: string | number, column_name?: string, limit?: number): Promise<number>``
+
+Deletes rows from the specified table. Returns the number of affected rows or `-1` if query fails.
+
+```ts
+const deleted = await db.delete('users', 123);
+const deleted = await db.delete('users', 'john@example.com', 'email', 1);
 ```
 
 <a id="api-database-schema"></a>

@@ -233,6 +233,297 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 
 				return -1;
 			}
+		},
+
+		/**
+		 * Executes an insert query using object key/value mapping.
+		 * Returns the LAST_INSERT_ID or -1 if the query fails.
+		 */
+		insert_object: async (table: string, obj: Record<string, any>) => {
+			try {
+				const values = Object.values(obj);
+				let sql = 'INSERT INTO `' + table + '` (';
+				sql += Object.keys(obj).map(e => '`' + e + '`').join(', ');
+				sql += ') VALUES(' + values.map(() => '?').join(', ') + ')';
+
+				const [result] = await instance.query<ResultSetHeader>(sql, values);
+				return result.insertId ?? -1;
+			} catch (error) {
+				if (error_mode === db_error_mode.THROW_EXCEPTION)
+					throw error;
+
+				if (error_mode === db_error_mode.CANARY_CAUTION)
+					caution('sql: insert_object failed', { error, obj });
+
+				return -1;
+			}
+		},
+
+		/**
+		 * Executes a query and returns the number of affected rows.
+		 * Returns -1 if the query fails.
+		 */
+		execute: async (sql: string, ...values: any) => {
+			try {
+				const [result] = await instance.query<ResultSetHeader>(sql, values);
+				return result.affectedRows;
+			} catch (error) {
+				if (error_mode === db_error_mode.THROW_EXCEPTION)
+					throw error;
+
+				if (error_mode === db_error_mode.CANARY_CAUTION)
+					caution('sql: execute failed', { error });
+
+				return -1;
+			}
+		},
+
+		/**
+		 * Returns the complete query result set as an array.
+		 * Returns empty array if no rows found or if query fails.
+		 */
+		get_all: async <T = RowDataPacket>(sql: string, ...values: any): Promise<T[]> => {
+			try {
+				const [rows] = await instance.execute(sql, values);
+				return rows as T[];
+			} catch (error) {
+				if (error_mode === db_error_mode.THROW_EXCEPTION)
+					throw error;
+
+				if (error_mode === db_error_mode.CANARY_CAUTION)
+					caution('sql: get_all failed', { error });
+
+				return [];
+			}
+		},
+
+		/**
+		 * Returns the first row from a query result set.
+		 * Returns null if no rows found or if query fails.
+		 */
+		get_single: async <T = RowDataPacket>(sql: string, ...values: any): Promise<T | null> => {
+			try {
+				const [rows] = await instance.execute(sql, values);
+				const typed_rows = rows as T[];
+				return typed_rows[0] ?? null;
+			} catch (error) {
+				if (error_mode === db_error_mode.THROW_EXCEPTION)
+					throw error;
+
+				if (error_mode === db_error_mode.CANARY_CAUTION)
+					caution('sql: get_single failed', { error });
+
+				return null;
+			}
+		},
+
+		/**
+		 * Returns the query result as a single column array.
+		 * Returns empty array if no rows found or if query fails.
+		 */
+		get_column_array: async <T = any>(sql: string, column: string, ...values: any): Promise<T[]> => {
+			try {
+				const [rows] = await instance.execute(sql, values) as RowDataPacket[][];
+				return rows.map((e: any) => e[column]) as T[];
+			} catch (error) {
+				if (error_mode === db_error_mode.THROW_EXCEPTION)
+					throw error;
+
+				if (error_mode === db_error_mode.CANARY_CAUTION)
+					caution('sql: get_column_array failed', { error });
+
+				return [];
+			}
+		},
+
+		/**
+		 * Calls a stored procedure and returns the result set as an array.
+		 * Returns empty array if no rows found or if query fails.
+		 */
+		call: async <T = RowDataPacket>(func_name: string, ...args: any): Promise<T[]> => {
+			try {
+				const placeholders = args.map(() => '?').join(', ');
+				const sql = `CALL ${func_name}(${placeholders})`;
+				const result = await instance.execute<RowDataPacket[][]>(sql, args);
+				return result[0][0] as T[];
+			} catch (error) {
+				if (error_mode === db_error_mode.THROW_EXCEPTION)
+					throw error;
+
+				if (error_mode === db_error_mode.CANARY_CAUTION)
+					caution('sql: call failed', { error });
+
+				return [];
+			}
+		},
+
+		/**
+		 * Returns an async iterator that yields pages of database rows.
+		 * Each page contains at most `page_size` rows (default 1000).
+		 */
+		get_paged: async function* <T = RowDataPacket>(sql: string, values: any[] = [], page_size: number = 1000): AsyncGenerator<T[]> {
+			let current_offset = 0;
+			
+			while (true) {
+				try {
+					const paged_sql = `${sql} LIMIT ${page_size} OFFSET ${current_offset}`;
+					
+					const [rows] = await instance.execute(paged_sql, values);
+					const page_rows = rows as T[];
+					
+					if (page_rows.length === 0)
+						break;
+					
+					yield page_rows;
+					
+					current_offset += page_size;
+					
+					if (page_rows.length < page_size)
+						break;
+				} catch (error) {
+					if (error_mode === db_error_mode.THROW_EXCEPTION)
+						throw error;
+
+					if (error_mode === db_error_mode.CANARY_CAUTION)
+						caution('sql: get_paged failed', { error, offset: current_offset });
+
+					return;
+				}
+			}
+		},
+
+		/**
+		 * Returns the value of `count` from a query.
+		 * Returns 0 if query fails.
+		 */
+		count: async (sql: string, ...values: any): Promise<number> => {
+			try {
+				const [rows] = await instance.execute(sql, values);
+				const typed_rows = rows as RowDataPacket[];
+				return typed_rows[0]?.count ?? 0;
+			} catch (error) {
+				if (error_mode === db_error_mode.THROW_EXCEPTION)
+					throw error;
+
+				if (error_mode === db_error_mode.CANARY_CAUTION)
+					caution('sql: count failed', { error });
+
+				return 0;
+			}
+		},
+
+		/**
+		 * Returns the total count of rows from a table.
+		 * Returns 0 if query fails.
+		 */
+		count_table: async (table_name: string): Promise<number> => {
+			try {
+				const [rows] = await instance.execute('SELECT COUNT(*) AS `count` FROM `' + table_name + '`');
+				const typed_rows = rows as RowDataPacket[];
+				return typed_rows[0]?.count ?? 0;
+			} catch (error) {
+				if (error_mode === db_error_mode.THROW_EXCEPTION)
+					throw error;
+
+				if (error_mode === db_error_mode.CANARY_CAUTION)
+					caution('sql: count_table failed', { error });
+
+				return 0;
+			}
+		},
+
+		/**
+		 * Returns true if the query returns any results.
+		 * Returns false if no results found or if query fails.
+		 */
+		exists: async (sql: string, ...values: any): Promise<boolean> => {
+			try {
+				const [rows] = await instance.execute(sql, values);
+				const typed_rows = rows as RowDataPacket[];
+				return typed_rows.length > 0;
+			} catch (error) {
+				if (error_mode === db_error_mode.THROW_EXCEPTION)
+					throw error;
+
+				if (error_mode === db_error_mode.CANARY_CAUTION)
+					caution('sql: exists failed', { error });
+
+				return false;
+			}
+		},
+
+		/**
+		 * Returns true if the given ID exists in the given table.
+		 * Returns false if not found or if query fails.
+		 */
+		exists_by_id: async (table_name: string, id: string | number, column_name = 'id'): Promise<boolean> => {
+			try {
+				const sql = 'SELECT 1 FROM ' + table_name + ' WHERE `' + column_name + '` = ? LIMIT 1';
+				const [rows] = await instance.execute(sql, [id]);
+				const typed_rows = rows as RowDataPacket[];
+				return typed_rows.length > 0;
+			} catch (error) {
+				if (error_mode === db_error_mode.THROW_EXCEPTION)
+					throw error;
+
+				if (error_mode === db_error_mode.CANARY_CAUTION)
+					caution('sql: exists_by_id failed', { error });
+
+				return false;
+			}
+		},
+
+		/**
+		 * Returns true if a row matches the given fields.
+		 * Returns false if not found or if query fails.
+		 */
+		exists_by_fields: async (table_name: string, fields: Record<string, string | number>): Promise<boolean> => {
+			try {
+				const clauses = [];
+				const params = [];
+
+				for (const [key, value] of Object.entries(fields)) {
+					clauses.push('`' + key + '` = ?');
+					params.push(value);
+				}
+
+				const sql = 'SELECT 1 FROM ' + table_name + ' WHERE ' + clauses.join(' AND ') + ' LIMIT 1';
+				const [rows] = await instance.execute(sql, params);
+				const typed_rows = rows as RowDataPacket[];
+				return typed_rows.length > 0;
+			} catch (error) {
+				if (error_mode === db_error_mode.THROW_EXCEPTION)
+					throw error;
+
+				if (error_mode === db_error_mode.CANARY_CAUTION)
+					caution('sql: exists_by_fields failed', { error });
+
+				return false;
+			}
+		},
+
+		/**
+		 * Deletes rows from the specified table.
+		 * Returns the number of affected rows or -1 if query fails.
+		 */
+		delete: async (table_name: string, id: string | number, column_name = 'id', limit?: number): Promise<number> => {
+			try {
+				let sql = 'DELETE FROM ' + table_name + ' WHERE `' + column_name + '` = ?';
+
+				if (limit !== undefined)
+					sql += ' LIMIT ' + limit;
+
+				const [result] = await instance.query<ResultSetHeader>(sql, [id]);
+				return result.affectedRows;
+			} catch (error) {
+				if (error_mode === db_error_mode.THROW_EXCEPTION)
+					throw error;
+
+				if (error_mode === db_error_mode.CANARY_CAUTION)
+					caution('sql: delete failed', { error });
+
+				return -1;
+			}
 		}
 	};
 }
