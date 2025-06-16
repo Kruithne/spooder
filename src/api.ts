@@ -16,7 +16,7 @@ export function log_create_logger(label: string, color: ColorInput = '#16b39e') 
 	const prefix = `[${ansi}${label}\x1b[0m] `;
 
 	return (message: string) => {
-		process.stdout.write(prefix + message.replace(/\{([^}]+)\}/g, `${ansi}$1\x1b[0m\n`));
+		process.stdout.write(prefix + message.replace(/\{([^}]+)\}/g, `${ansi}$1\x1b[0m`) + '\n');
 	};
 }
 
