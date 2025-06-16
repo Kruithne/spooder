@@ -93,7 +93,11 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 	- [API > HTTP > Websocket Server](#api-http-websockets)
 - [API > Error Handling](#api-error-handling)
 - [API > Templating](#api-templating)
-- [API > Database Schema](#api-database-schema)
+- [API > Database](#api-database)
+	- [API > Database > Schema](#api-database-schema)
+	- [API > Database > Interface](#api-database-interface)
+		- [API > Database > Interface > SQLite](#api-database-interface-sqlite)
+		- [API > Database > Interface > MySQL](#api-database-interface-mysql)
 
 # CLI
 
@@ -510,11 +514,20 @@ parse_template(template: string, replacements: Record<string, string>, drop_miss
 generate_hash_subs(length?: number, prefix?: string, hashes?: Record<string, string>): Promise<Record<string, string>>;
 get_git_hashes(length: number): Promise<Record<string, string>>;
 
-// database
+// database interface
+db_sqlite(filename: string, options: number|object): db_sqlite;
+db_mysql(options: ConnectionOptions, pool: boolean): Promise<db_mysql>;
+
+// db_sqlite
+update_schema(db_dir: string, schema_table?: string): Promise<void>
+
+// db_mysql
+update_schema(db_dir: string, schema_table?: string): Promise<void>
+
+// database schema
 db_update_schema_sqlite(db: Database, schema_dir: string, schema_table?: string): Promise<void>;
 db_update_schema_mysql(db: Connection, schema_dir: string, schema_table?: string): Promise<void>;
-db_init_sqlite(db_path: string, schema_dir: string, schema_table?: string): Promise<Database>;
-db_init_mysql(options: ConnectionOptions, schema_dir: string, pool?: boolean, schema_table?: string): Promise<Connection | Pool>;
+
 
 // constants
 HTTP_STATUS_CODE: Record<number, string>;
@@ -1365,15 +1378,83 @@ const subs = await generate_hash_subs(7, undefined, hashes);
 // subs[0] -> { 'hash=docs/project-logo.png': '754d9ea' }
 ```
 
+<a id="api-database"></a>
+<a id="api-database-interface"></a>
+<a id="api-database-interface-sqlite"></a>
+## API > Database > Interface > SQLite
+
+`spooder` provides a simple **SQLIte** interface that acts as a wrapper around the Bun SQLite API. The construction parameters match the underlying API.
+
+```ts
+// see: https://bun.sh/docs/api/sqlite
+const db = db_sqlite(':memory:', { create: true });
+db.instance; // raw access to underlying sqlite instance.
+```
+
+### 🔧 ``db_sqlite.update_schema(schema_dir: string, schema_table: string): Promise<void>``
+
+`spooder` offers a database schema management system. The `update_schema()` function is a shortcut to call this on the underlying database.
+
+See [API > Database > Schema](#api-database-schema) for information on how schema updating works.
+
+```ts
+// without interface
+import { db_sqlite, db_update_schema_sqlite } from 'spooder';
+const db = db_sqlite('./my_database.sqlite');
+await db_update_schema_sqlite(db.instance, './schema');
+
+// with interface
+import { db_sqlite } from 'spooder';
+const db = db_sqlite('./my_database.sqlite');
+await db.update_schema('./schema');
+```
+
+<a id="api-database-interface-mysql"></a>
+## API > Database > Interface > MySQL
+
+`spooder` provides a simple **MySQL** interface that acts as a wrapper around the `mysql2` API. The connection options match the underlying API.
+
+> [!IMPORTANT]
+> MySQL requires the optional dependency `mysql2` to be installed - this is not automatically installed with spooder. This will be replaced when bun:sql supports MySQL natively.
+
+```ts
+// see: https://github.com/mysqljs/mysql#connection-options
+const db = await db_mysql({
+	// ...
+});
+db.instance; // raw access to underlying mysql2 instance.
+```
+
+### 🔧 ``db_mysql.update_schema(schema_dir: string, schema_table: string): Promise<void>``
+
+`spooder` offers a database schema management system. The `update_schema()` function is a shortcut to call this on the underlying database.
+
+See [API > Database > Schema](#api-database-schema) for information on how schema updating works.
+
+```ts
+// without interface
+import { db_mysql, db_update_schema_mysql } from 'spooder';
+const db = await db_mysql({ ... });
+await db_update_schema_mysql(db.instance, './schema');
+
+// with interface
+import { db_mysql } from 'spooder';
+const db = await db_mysql({ ... });
+await db.update_schema('./schema');
+```
+
 <a id="api-database-schema"></a>
-## API > Database Schema
+## API > Database > Schema
 
 `spooder` provides a straightforward API to manage database schema in revisions through source control.
 
-Database schema is updated with `db_update_schema_DRIVER` where `DRIVER` corresponds to the database driver being used.
+```ts
+// sqlite
+db_update_schema_sqlite(db: Database, schema_dir: string, schema_table?: string): Promise<void>;
 
-> [!NOTE]
-> Currently, only SQLite and MySQL are supported. This may be expanded once Bun supports more database drivers.
+// mysql
+db_update_schema_mysql(db: Connection, schema_dir: string, schema_table?: string): Promise<void>;
+```
 
 ```ts
 // sqlite example
@@ -1399,43 +1480,13 @@ await db_update_schema_mysql(db, './schema');
 > [!IMPORTANT]
 > MySQL requires the optional dependency `mysql2` to be installed - this is not automatically installed with spooder. This will be replaced when bun:sql supports MySQL natively.
 
-Database initiation and schema updating can be streamlined with the `db_init_DRIVER` functions. The following examples are equivalent to the above ones.
+### Interface API
+
+If you are already using the [database interface API](#api-database-interface) provided by `spooder`, you can call `update_schema()` directly on the interface.
 
 ```ts
-// sqlite example
-import { db_init_sqlite } from 'spooder';
-const db = await db_init_sqlite('./database.sqlite', './schema');
-```
-
-```ts
-// mysql example
-import { db_init_mysql } from 'spooder';
-const db = await db_init_mysql({
-	// connection options
-	// see https://github.com/mysqljs/mysql#connection-options
-}, './schema');
-```
-
-Passing `undefined` in place of the schema directory allows initiation of the database without processing schema. This can be useful for programatic schema application, such as in a worker environment, where you do not want consecutive initiations to apply schema.
-
-```ts
-const db_pool = await db_init_mysql({
-	// connection options
-}, Bun.isMainThread ? './db/schema' : undefined, true);
-```
-
-### Pooling
-
-Providing `true` to the `pool` parameter of `db_init_mysql` will return a connection pool instead of a single connection.
-
-```ts
-import { db_init_mysql } from 'spooder';
-const pool = await db_init_mysql({
-	// connection options
-	connectionLimit: 10
-}, './schema', true);
-
-const connection = await pool.getConnection();
+const db = await db_mysql({ ... });
+await db.update_schema('./schema');
 ```
 
 ### Schema Files
@@ -1486,7 +1537,7 @@ Each revision should be clearly marked with a comment containing the revision nu
 
 Everything following a revision header is considered part of that revision until the next revision header or the end of the file, allowing for multiple SQL statements to be included in a single revision.
 
-When calling `db_update_schema_sqlite`, unapplied revisions will be applied in ascending order (regardless of order within the file) until the schema is up-to-date.
+When calling `db_update_schema_*`, unapplied revisions will be applied in ascending order (regardless of order within the file) until the schema is up-to-date.
 
 It is acceptable to omit keys. This can be useful to prevent repitition when managing stored procedures, views or functions.
 
@@ -1526,7 +1577,7 @@ await db_update_schema_sqlite(db, './schema', 'my_schema_table');
 > The entire process is transactional. If an error occurs during the application of **any** revision for **any** table, the entire process will be rolled back and the database will be left in the state it was before the update was attempted.
 
 >[!IMPORTANT]
-> `db_update_schema_sqlite` will throw an error if the revisions cannot be parsed or applied for any reason. It is important you catch and handle appropriately.
+> `db_update_schema_*` will throw an error if the revisions cannot be parsed or applied for any reason. It is important you catch and handle appropriately.
 
 ```ts
 try {

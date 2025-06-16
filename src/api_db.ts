@@ -181,31 +181,23 @@ export async function db_update_schema_mysql(db: mysql_types.Connection, schema_
 	await db.commit();
 }
 
-export async function db_init_mysql<T extends boolean = false>(db_info: mysql_types.ConnectionOptions, schema_dir?: string, pool: T = false as T): Promise<T extends true ? mysql_types.Pool : mysql_types.Connection> {
+export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boolean = false) {
 	if (mysql === undefined)
-		throw new Error('db_init_mysql cannot be called without optional dependency {mysql2} installed');
+		throw new Error('db_mysql cannot be called without optional dependency {mysql2} installed');
 
 	// required for parsing multiple statements from schema files
 	db_info.multipleStatements = true;
 
-	if (pool) {
-		const pool = mysql.createPool(db_info);
-		const connection = await pool.getConnection();
+	const instance = pool ? mysql.createPool(db_info) : await mysql.createConnection(db_info);
 
-		if (schema_dir !== undefined)
-			await db_update_schema_mysql(connection, schema_dir);
+	return {
+		instance,
+		is_pool: pool,
 
-		connection.release();
-
-		return pool as any;
-	} else {
-		const connection = await mysql.createConnection(db_info);
-
-		if (schema_dir !== undefined)
-			await db_update_schema_mysql(connection, schema_dir);
-		
-		return connection as any;
-	}
+		update_schema: async (schema_dir: string, schema_table_name = 'db_schema') => {
+			return db_update_schema_mysql(instance, schema_dir, schema_table_name);
+		}
+	};
 }
 // endregion
 
@@ -249,12 +241,15 @@ export async function db_update_schema_sqlite(db: Database, schema_dir: string, 
 	})();
 }
 
-export async function db_init_sqlite(db_path: string, schema_dir?: string): Promise<Database> {
-	const db = new Database(db_path, { create: true });
+export function db_sqlite(...args: ConstructorParameters<typeof Database>) {
+	const instance = new Database(...args);
 
-	if (schema_dir !== undefined)
-		await db_update_schema_sqlite(db, schema_dir);
+	return {
+		instance,
 
-	return db;
+		update_schema: async (schema_dir: string, schema_table_name: 'db_schema') => {
+			return db_update_schema_sqlite(instance, schema_dir, schema_table_name);
+		}
+	}
 }
 // endregion
