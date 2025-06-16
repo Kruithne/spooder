@@ -536,6 +536,7 @@ get_paged<T>(sql: string, values?: any[], page_size?: number): AsyncGenerator<T[
 count(sql: string, ...values: any): Promise<number>;
 count_table(table_name: string): Promise<number>;
 exists(sql: string, ...values: any): Promise<boolean>;
+transaction(scope: (transaction: DatabaseInterface) => void | Promise<void>): Promise<boolean>;
 
 // database schema
 db_update_schema_sqlite(db: Database, schema_dir: string, schema_table?: string): Promise<void>;
@@ -1572,6 +1573,23 @@ Returns `true` if the query returns any results. Returns `false` if no results f
 
 ```ts
 const hasActiveUsers = await db.exists('SELECT 1 FROM users WHERE active = ? LIMIT 1', true);
+```
+
+### 🔧 ``db_mysql.transaction(scope: (transaction: DatabaseInterface) => void | Promise<void>): Promise<boolean>``
+
+Executes a callback function within a database transaction. The callback receives a transaction object with all the same database methods available. Returns `true` if the transaction was committed successfully, `false` if it was rolled back due to an error.
+
+```ts
+const success = await db.transaction(async (tx) => {
+	const userId = await tx.insert('INSERT INTO users (name) VALUES (?)', 'John');
+	await tx.insert('INSERT INTO user_profiles (user_id, bio) VALUES (?, ?)', userId, 'Hello world');
+});
+
+if (success) {
+	console.log('Transaction completed successfully');
+} else {
+	console.log('Transaction was rolled back');
+}
 ```
 
 <a id="api-database-schema"></a>

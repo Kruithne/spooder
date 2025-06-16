@@ -195,6 +195,183 @@ export async function db_update_schema_mysql(db: mysql_types.Connection, schema_
 	await db.commit();
 }
 
+type DatabaseInterface = ReturnType<typeof create_mysql_api>;
+
+function create_mysql_api(instance: mysql_types.Connection | mysql_types.Pool, error_handler: (error: unknown, return_value: any, title: string) => any) {
+	return {
+		/**
+		 * Executes a query and returns the LAST_INSERT_ID.
+		 * Returns -1 if the query fails or no LAST_INSERT_ID is available.
+		 */
+		insert: async (sql: string, ...values: any) => {
+			try {
+				const [result] = await instance.query<ResultSetHeader>(sql, values);
+				return result.insertId ?? -1;
+			} catch (error) {
+				return error_handler(error, -1, 'insert failed');
+			}
+		},
+
+		/**
+		 * Executes an insert query using object key/value mapping.
+		 * Returns the LAST_INSERT_ID or -1 if the query fails.
+		 */
+		insert_object: async (table: string, obj: Record<string, any>) => {
+			try {
+				const values = Object.values(obj);
+				let sql = 'INSERT INTO `' + table + '` (';
+				sql += Object.keys(obj).map(e => '`' + e + '`').join(', ');
+				sql += ') VALUES(' + values.map(() => '?').join(', ') + ')';
+
+				const [result] = await instance.query<ResultSetHeader>(sql, values);
+				return result.insertId ?? -1;
+			} catch (error) {
+				return error_handler(error, -1, 'insert_object failed');
+			}
+		},
+
+		/**
+		 * Executes a query and returns the number of affected rows.
+		 * Returns -1 if the query fails.
+		 */
+		execute: async (sql: string, ...values: any) => {
+			try {
+				const [result] = await instance.query<ResultSetHeader>(sql, values);
+				return result.affectedRows;
+			} catch (error) {
+				return error_handler(error, -1, 'execute failed');
+			}
+		},
+
+		/**
+		 * Returns the complete query result set as an array.
+		 * Returns empty array if no rows found or if query fails.
+		 */
+		get_all: async <T = RowDataPacket>(sql: string, ...values: any): Promise<T[]> => {
+			try {
+				const [rows] = await instance.execute(sql, values);
+				return rows as T[];
+			} catch (error) {
+				return error_handler(error, [], 'get_all failed');
+			}
+		},
+
+		/**
+		 * Returns the first row from a query result set.
+		 * Returns null if no rows found or if query fails.
+		 */
+		get_single: async <T = RowDataPacket>(sql: string, ...values: any): Promise<T | null> => {
+			try {
+				const [rows] = await instance.execute(sql, values);
+				const typed_rows = rows as T[];
+				return typed_rows[0] ?? null;
+			} catch (error) {
+				return error_handler(error, null, 'get_single failed');
+			}
+		},
+
+		/**
+		 * Returns the query result as a single column array.
+		 * Returns empty array if no rows found or if query fails.
+		 */
+		get_column_array: async <T = any>(sql: string, column: string, ...values: any): Promise<T[]> => {
+			try {
+				const [rows] = await instance.execute(sql, values) as RowDataPacket[][];
+				return rows.map((e: any) => e[column]) as T[];
+			} catch (error) {
+				return error_handler(error, [], 'get_column_array failed');
+			}
+		},
+
+		/**
+		 * Calls a stored procedure and returns the result set as an array.
+		 * Returns empty array if no rows found or if query fails.
+		 */
+		call: async <T = RowDataPacket>(func_name: string, ...args: any): Promise<T[]> => {
+			try {
+				const placeholders = args.map(() => '?').join(', ');
+				const sql = `CALL ${func_name}(${placeholders})`;
+				const result = await instance.execute<RowDataPacket[][]>(sql, args);
+				return result[0][0] as T[];
+			} catch (error) {
+				return error_handler(error, [], 'call failed');
+			}
+		},
+
+		/**
+		 * Returns an async iterator that yields pages of database rows.
+		 * Each page contains at most `page_size` rows (default 1000).
+		 */
+		get_paged: async function* <T = RowDataPacket>(sql: string, values: any[] = [], page_size: number = 1000): AsyncGenerator<T[]> {
+			let current_offset = 0;
+			
+			while (true) {
+				try {
+					const paged_sql = `${sql} LIMIT ${page_size} OFFSET ${current_offset}`;
+					
+					const [rows] = await instance.execute(paged_sql, values);
+					const page_rows = rows as T[];
+					
+					if (page_rows.length === 0)
+						break;
+					
+					yield page_rows;
+					
+					current_offset += page_size;
+					
+					if (page_rows.length < page_size)
+						break;
+				} catch (error) {
+					error_handler(error, undefined, 'get_paged failed');
+					return;
+				}
+			}
+		},
+
+		/**
+		 * Returns the value of `count` from a query.
+		 * Returns 0 if query fails.
+		 */
+		count: async (sql: string, ...values: any): Promise<number> => {
+			try {
+				const [rows] = await instance.execute(sql, values);
+				const typed_rows = rows as RowDataPacket[];
+				return typed_rows[0]?.count ?? 0;
+			} catch (error) {
+				return error_handler(error, 0, 'count failed');
+			}
+		},
+
+		/**
+		 * Returns the total count of rows from a table.
+		 * Returns 0 if query fails.
+		 */
+		count_table: async (table_name: string): Promise<number> => {
+			try {
+				const [rows] = await instance.execute('SELECT COUNT(*) AS `count` FROM `' + table_name + '`');
+				const typed_rows = rows as RowDataPacket[];
+				return typed_rows[0]?.count ?? 0;
+			} catch (error) {
+				return error_handler(error, 0, 'count_table failed');
+			}
+		},
+
+		/**
+		 * Returns true if the query returns any results.
+		 * Returns false if no results found or if query fails.
+		 */
+		exists: async (sql: string, ...values: any): Promise<boolean> => {
+			try {
+				const [rows] = await instance.execute(sql, values);
+				const typed_rows = rows as RowDataPacket[];
+				return typed_rows.length > 0;
+			} catch (error) {
+				return error_handler(error, false, 'exists failed');
+			}
+		}
+	};
+}
+
 export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boolean = false) {
 	if (mysql === undefined)
 		throw new Error('db_mysql cannot be called without optional dependency {mysql2} installed');
@@ -226,176 +403,29 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 			return db_update_schema_mysql(instance, schema_dir, schema_table_name);
 		},
 
-		/**
-		 * Executes a query and returns the LAST_INSERT_ID.
-		 * Returns -1 if the query fails or no LAST_INSERT_ID is available.
-		 */
-		insert: async (sql: string, ...values: any) => {
+		transaction: async (scope: (transaction: DatabaseInterface) => void | Promise<void>) => {
+			let connection: mysql_types.Connection = instance;
+
+			if (pool)
+				connection = await (instance as mysql_types.Pool).getConnection();
+
+			await connection.beginTransaction();
+
 			try {
-				const [result] = await instance.query<ResultSetHeader>(sql, values);
-				return result.insertId ?? -1;
+				const transaction_api = create_mysql_api(connection, db_handle_error);
+				await scope(transaction_api);
+				await connection.commit();
+				return true;
 			} catch (error) {
-				return db_handle_error(error, -1, 'insert failed');
+				await connection.rollback();
+				return db_handle_error(error, false, 'transaction failed');
+			} finally {
+				if (pool)
+					(connection as mysql_types.PoolConnection).release();
 			}
 		},
 
-		/**
-		 * Executes an insert query using object key/value mapping.
-		 * Returns the LAST_INSERT_ID or -1 if the query fails.
-		 */
-		insert_object: async (table: string, obj: Record<string, any>) => {
-			try {
-				const values = Object.values(obj);
-				let sql = 'INSERT INTO `' + table + '` (';
-				sql += Object.keys(obj).map(e => '`' + e + '`').join(', ');
-				sql += ') VALUES(' + values.map(() => '?').join(', ') + ')';
-
-				const [result] = await instance.query<ResultSetHeader>(sql, values);
-				return result.insertId ?? -1;
-			} catch (error) {
-				return db_handle_error(error, -1, 'insert_object failed');
-			}
-		},
-
-		/**
-		 * Executes a query and returns the number of affected rows.
-		 * Returns -1 if the query fails.
-		 */
-		execute: async (sql: string, ...values: any) => {
-			try {
-				const [result] = await instance.query<ResultSetHeader>(sql, values);
-				return result.affectedRows;
-			} catch (error) {
-				return db_handle_error(error, -1, 'execute failed');
-			}
-		},
-
-		/**
-		 * Returns the complete query result set as an array.
-		 * Returns empty array if no rows found or if query fails.
-		 */
-		get_all: async <T = RowDataPacket>(sql: string, ...values: any): Promise<T[]> => {
-			try {
-				const [rows] = await instance.execute(sql, values);
-				return rows as T[];
-			} catch (error) {
-				return db_handle_error(error, [], 'get_all failed');
-			}
-		},
-
-		/**
-		 * Returns the first row from a query result set.
-		 * Returns null if no rows found or if query fails.
-		 */
-		get_single: async <T = RowDataPacket>(sql: string, ...values: any): Promise<T | null> => {
-			try {
-				const [rows] = await instance.execute(sql, values);
-				const typed_rows = rows as T[];
-				return typed_rows[0] ?? null;
-			} catch (error) {
-				return db_handle_error(error, null, 'get_single failed');
-			}
-		},
-
-		/**
-		 * Returns the query result as a single column array.
-		 * Returns empty array if no rows found or if query fails.
-		 */
-		get_column_array: async <T = any>(sql: string, column: string, ...values: any): Promise<T[]> => {
-			try {
-				const [rows] = await instance.execute(sql, values) as RowDataPacket[][];
-				return rows.map((e: any) => e[column]) as T[];
-			} catch (error) {
-				return db_handle_error(error, [], 'get_column_array failed');
-			}
-		},
-
-		/**
-		 * Calls a stored procedure and returns the result set as an array.
-		 * Returns empty array if no rows found or if query fails.
-		 */
-		call: async <T = RowDataPacket>(func_name: string, ...args: any): Promise<T[]> => {
-			try {
-				const placeholders = args.map(() => '?').join(', ');
-				const sql = `CALL ${func_name}(${placeholders})`;
-				const result = await instance.execute<RowDataPacket[][]>(sql, args);
-				return result[0][0] as T[];
-			} catch (error) {
-				return db_handle_error(error, [], 'call failed');
-			}
-		},
-
-		/**
-		 * Returns an async iterator that yields pages of database rows.
-		 * Each page contains at most `page_size` rows (default 1000).
-		 */
-		get_paged: async function* <T = RowDataPacket>(sql: string, values: any[] = [], page_size: number = 1000): AsyncGenerator<T[]> {
-			let current_offset = 0;
-			
-			while (true) {
-				try {
-					const paged_sql = `${sql} LIMIT ${page_size} OFFSET ${current_offset}`;
-					
-					const [rows] = await instance.execute(paged_sql, values);
-					const page_rows = rows as T[];
-					
-					if (page_rows.length === 0)
-						break;
-					
-					yield page_rows;
-					
-					current_offset += page_size;
-					
-					if (page_rows.length < page_size)
-						break;
-				} catch (error) {
-					db_handle_error(error, undefined, 'get_paged failed');
-					return;
-				}
-			}
-		},
-
-		/**
-		 * Returns the value of `count` from a query.
-		 * Returns 0 if query fails.
-		 */
-		count: async (sql: string, ...values: any): Promise<number> => {
-			try {
-				const [rows] = await instance.execute(sql, values);
-				const typed_rows = rows as RowDataPacket[];
-				return typed_rows[0]?.count ?? 0;
-			} catch (error) {
-				return db_handle_error(error, 0, 'count failed');
-			}
-		},
-
-		/**
-		 * Returns the total count of rows from a table.
-		 * Returns 0 if query fails.
-		 */
-		count_table: async (table_name: string): Promise<number> => {
-			try {
-				const [rows] = await instance.execute('SELECT COUNT(*) AS `count` FROM `' + table_name + '`');
-				const typed_rows = rows as RowDataPacket[];
-				return typed_rows[0]?.count ?? 0;
-			} catch (error) {
-				return db_handle_error(error, 0, 'count_table failed');
-			}
-		},
-
-		/**
-		 * Returns true if the query returns any results.
-		 * Returns false if no results found or if query fails.
-		 */
-		exists: async (sql: string, ...values: any): Promise<boolean> => {
-			try {
-				const [rows] = await instance.execute(sql, values);
-				const typed_rows = rows as RowDataPacket[];
-				return typed_rows.length > 0;
-			} catch (error) {
-				return db_handle_error(error, false, 'exists failed');
-			}
-		}
+		...create_mysql_api(instance, db_handle_error)
 	};
 }
 // endregion
