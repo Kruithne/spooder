@@ -519,10 +519,13 @@ db_sqlite(filename: string, options: number|object): db_sqlite;
 db_mysql(options: ConnectionOptions, pool: boolean): Promise<db_mysql>;
 
 // db_sqlite
+set_error_mode(mode: db_error_mode);
 update_schema(db_dir: string, schema_table?: string): Promise<void>
 
 // db_mysql
+set_error_mode(mode: db_error_mode);
 update_schema(db_dir: string, schema_table?: string): Promise<void>
+insert(sql: string, values: any[]): Promise<number>;
 
 // database schema
 db_update_schema_sqlite(db: Database, schema_dir: string, schema_table?: string): Promise<void>;
@@ -1380,6 +1383,34 @@ const subs = await generate_hash_subs(7, undefined, hashes);
 
 <a id="api-database"></a>
 <a id="api-database-interface"></a>
+## API > Database > Interface
+
+### Error Mode
+
+By default, errors thrown from the database interfaces are silently caught and an error-value is returned from applicable functions. This behavior can be configured.
+
+```ts
+import { db_error_mode, db_mysql } from 'spooder';
+
+const db = await db_mysql({ ... });
+db.set_error_mode(db_error_mode.THROW_EXCEPTION);
+
+// available error modes
+db_error_mode = {
+	// does not throw, returns empty/error values 
+	// from applicable functions
+	SILENT_FAILURE: 0x0,
+
+	// will throw exceptions
+	THROW_EXCEPTION: 0x1,
+
+	// does not throw, returns empty/error values
+	// from applicable functions, raises a canary 
+	// caution, see CLI > Canary.
+	CANARY_CAUTION: 0x2,
+};
+```
+
 <a id="api-database-interface-sqlite"></a>
 ## API > Database > Interface > SQLite
 
@@ -1441,6 +1472,14 @@ await db_update_schema_mysql(db.instance, './schema');
 import { db_mysql } from 'spooder';
 const db = await db_mysql({ ... });
 await db.update_schema('./schema');
+```
+
+### 🔧 ``db_mysql.insert(sql: string, values: any[]): Promise<number>``
+
+Executes a query and returns the `LAST_INSERT_ID`. Returns `-1` in the event of an error or if `LAST_INSERT_ID` is not provided.
+
+```ts
+const id = await db.insert('INSERT INTO tbl (name) VALUES(?)', 'test');
 ```
 
 <a id="api-database-schema"></a>

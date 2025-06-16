@@ -1,9 +1,16 @@
 import { Database } from 'bun:sqlite';
-import { log_create_logger, log_list } from './api';
+import { log_create_logger, log_list, caution } from './api';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import type { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 const db_log = log_create_logger('db', '#16b39e');
+
+export const db_error_mode = {
+	SILENT_FAILURE: 0x0,
+	THROW_EXCEPTION: 0x1,
+	CANARY_CAUTION: 0x2,
+};
 
 // region schema
 interface DependencyTarget {
@@ -196,13 +203,36 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 	db_info.multipleStatements = true;
 
 	const instance = pool ? mysql.createPool(db_info) : await mysql.createConnection(db_info);
+	let error_mode = db_error_mode.SILENT_FAILURE;
 
 	return {
 		instance,
-		is_pool: pool,
+		
+		set_error_mode(mode: typeof db_error_mode[keyof typeof db_error_mode]) {
+			error_mode = mode;
+		},
 
 		update_schema: async (schema_dir: string, schema_table_name: string = 'db_schema') => {
 			return db_update_schema_mysql(instance, schema_dir, schema_table_name);
+		},
+
+		/**
+		 * Executes a query and returns the LAST_INSERT_ID.
+		 * Returns -1 if the query fails or no LAST_INSERT_ID is available.
+		 */
+		insert: async (sql: string, ...values: any) => {
+			try {
+				const [result] = await instance.query<ResultSetHeader>(sql, values);
+				return result.insertId ?? -1;
+			} catch (error) {
+				if (error_mode === db_error_mode.THROW_EXCEPTION)
+					throw error;
+
+				if (error_mode === db_error_mode.CANARY_CAUTION)
+					caution('sql: insert failed', { error });
+
+				return -1;
+			}
 		}
 	};
 }
