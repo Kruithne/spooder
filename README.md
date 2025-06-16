@@ -536,9 +536,6 @@ get_paged<T>(sql: string, values?: any[], page_size?: number): AsyncGenerator<T[
 count(sql: string, ...values: any): Promise<number>;
 count_table(table_name: string): Promise<number>;
 exists(sql: string, ...values: any): Promise<boolean>;
-exists_by_id(table_name: string, id: string | number, column_name?: string): Promise<boolean>;
-exists_by_fields(table_name: string, fields: Record<string, string | number>): Promise<boolean>;
-delete(table_name: string, id: string | number, column_name?: string, limit?: number): Promise<number>;
 
 // database schema
 db_update_schema_sqlite(db: Database, schema_dir: string, schema_table?: string): Promise<void>;
@@ -1575,32 +1572,6 @@ Returns `true` if the query returns any results. Returns `false` if no results f
 
 ```ts
 const hasActiveUsers = await db.exists('SELECT 1 FROM users WHERE active = ? LIMIT 1', true);
-```
-
-### 🔧 ``db_mysql.exists_by_id(table_name: string, id: string | number, column_name?: string): Promise<boolean>``
-
-Returns `true` if the given ID exists in the given table. Returns `false` if not found or if query fails.
-
-```ts
-const userExists = await db.exists_by_id('users', 123);
-const userExists = await db.exists_by_id('users', 'john@example.com', 'email');
-```
-
-### 🔧 ``db_mysql.exists_by_fields(table_name: string, fields: Record<string, string | number>): Promise<boolean>``
-
-Returns `true` if a row matches the given fields. Returns `false` if not found or if query fails.
-
-```ts
-const userExists = await db.exists_by_fields('users', { name: 'John', active: 1 });
-```
-
-### 🔧 ``db_mysql.delete(table_name: string, id: string | number, column_name?: string, limit?: number): Promise<number>``
-
-Deletes rows from the specified table. Returns the number of affected rows or `-1` if query fails.
-
-```ts
-const deleted = await db.delete('users', 123);
-const deleted = await db.delete('users', 'john@example.com', 'email', 1);
 ```
 
 <a id="api-database-schema"></a>

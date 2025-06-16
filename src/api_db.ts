@@ -395,62 +395,6 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 			} catch (error) {
 				return db_handle_error(error, false, 'exists failed');
 			}
-		},
-
-		/**
-		 * Returns true if the given ID exists in the given table.
-		 * Returns false if not found or if query fails.
-		 */
-		exists_by_id: async (table_name: string, id: string | number, column_name = 'id'): Promise<boolean> => {
-			try {
-				const sql = 'SELECT 1 FROM ' + table_name + ' WHERE `' + column_name + '` = ? LIMIT 1';
-				const [rows] = await instance.execute(sql, [id]);
-				const typed_rows = rows as RowDataPacket[];
-				return typed_rows.length > 0;
-			} catch (error) {
-				return db_handle_error(error, false, 'exists_by_id failed');
-			}
-		},
-
-		/**
-		 * Returns true if a row matches the given fields.
-		 * Returns false if not found or if query fails.
-		 */
-		exists_by_fields: async (table_name: string, fields: Record<string, string | number>): Promise<boolean> => {
-			try {
-				const clauses = [];
-				const params = [];
-
-				for (const [key, value] of Object.entries(fields)) {
-					clauses.push('`' + key + '` = ?');
-					params.push(value);
-				}
-
-				const sql = 'SELECT 1 FROM ' + table_name + ' WHERE ' + clauses.join(' AND ') + ' LIMIT 1';
-				const [rows] = await instance.execute(sql, params);
-				const typed_rows = rows as RowDataPacket[];
-				return typed_rows.length > 0;
-			} catch (error) {
-				return db_handle_error(error, false, 'exists_by_fields failed');
-			}
-		},
-
-		/**
-		 * Deletes rows from the specified table.
-		 * Returns the number of affected rows or -1 if query fails.
-		 */
-		delete: async (table_name: string, id: string | number, column_name = 'id', limit?: number): Promise<number> => {
-			try {
-				let sql = 'DELETE FROM ' + table_name + ' WHERE `' + column_name + '` = ?';
-
-				if (limit !== undefined)
-					sql += ' LIMIT ' + limit;
-
-				const [result] = await instance.query<ResultSetHeader>(sql, [id]);
-				return result.affectedRows;
-			} catch (error) {
-				return db_handle_error(error, -1, 'delete failed');
-			}
 		}
 	};
 }
