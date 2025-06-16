@@ -73,6 +73,7 @@ async function db_load_schema(schema_dir: string, schema_versions: SchemaVersion
 		const revisions = new Map();
 		let current_rev_id = 0;
 		let current_rev = '';
+		let current_rev_comment = '';
 
 		for (const line of schema.split(/\r?\n/)) {
 			const line_identifier = line.match(/^--\s*\[(\d+|deps)\]/);
@@ -84,14 +85,19 @@ async function db_load_schema(schema_dir: string, schema_versions: SchemaVersion
 				} else {
 					// New chunk definition detected, store the current chunk and start a new one.
 					if (current_rev_id > 0) {
-						revisions.set(current_rev_id, current_rev);
+						revisions.set(current_rev_id, { sql: current_rev, comment: current_rev_comment });
 						current_rev = '';
+						current_rev_comment = '';
 					}
 
 					const rev_number = parseInt(line_identifier[1]);
 					if (isNaN(rev_number) || rev_number < 1)
 						throw new Error(rev_number + ' is not a valid revision number in ' + schema_file_lower);
 					current_rev_id = rev_number;
+					
+					// Extract comment from the header line (everything after the closing bracket)
+					const comment_start = line.indexOf(']') + 1;
+					current_rev_comment = line.substring(comment_start).trim();
 				}
 			} else {
 				// Append to existing revision.
@@ -101,7 +107,7 @@ async function db_load_schema(schema_dir: string, schema_versions: SchemaVersion
 
 		// There may be something left in current_chunk once we reach end of the file.
 		if (current_rev_id > 0)
-			revisions.set(current_rev_id, current_rev);
+			revisions.set(current_rev_id, { sql: current_rev, comment: current_rev_comment });
 
 		if (revisions.size === 0) {
 			db_log(`{${schema_file}} contains no valid revisions`);
@@ -150,7 +156,7 @@ export async function db_update_schema_mysql(db: mysql_types.Connection, schema_
 		for (const row of rows as Array<Row_DBSchema>)
 			schema_versions.set(row.db_schema_table_name, row.db_schema_version);
 	} catch (e) {
-		db_log(`creating {${schema_table_name}}`);
+		db_log(`creating schema table {${schema_table_name}}`);
 		await db.query(`CREATE TABLE ${schema_table_name} (db_schema_table_name VARCHAR(255) PRIMARY KEY, db_schema_version INT)`);
 	}
 
@@ -166,9 +172,10 @@ export async function db_update_schema_mysql(db: mysql_types.Connection, schema_
 		let newest_schema_version = schema.current_version;
 		for (const rev_id of schema.chunk_keys) {
 			const revision = schema.revisions.get(rev_id);
-			db_log(`applying revision {${rev_id}} to {${schema.name}}`);
+			const comment_text = revision.comment ? ` "{${revision.comment}}"` : '';
+			db_log(`applying revision [{${rev_id}}]${comment_text} to {${schema.name}}`);
 
-			await db.query(revision);
+			await db.query(revision.sql);
 			newest_schema_version = rev_id;
 		}
 
@@ -212,7 +219,7 @@ export async function db_update_schema_sqlite(db: Database, schema_dir: string, 
 		for (const row of query.all() as Array<Row_DBSchema>)
 			schema_versions.set(row.db_schema_table_name, row.db_schema_version);
 	} catch (e) {
-		db_log(`creating {${schema_table_name}}`);
+		db_log(`creating schema table {${schema_table_name}}`);
 		db.run(`CREATE TABLE ${schema_table_name} (db_schema_table_name TEXT PRIMARY KEY, db_schema_version INTEGER)`);
 	}
 	
@@ -228,8 +235,9 @@ export async function db_update_schema_sqlite(db: Database, schema_dir: string, 
 			let newest_schema_version = schema.current_version;
 			for (const rev_id of schema.chunk_keys) {
 				const revision = schema.revisions.get(rev_id);
-				db_log(`applying revision {${rev_id}} to {${schema.name}}`);
-				db.transaction(() => db.run(revision))();
+				const comment_text = revision.comment ? ` "{${revision.comment}}"` : '';
+				db_log(`applying revision [{${rev_id}}]${comment_text} to {${schema.name}}`);
+				db.transaction(() => db.run(revision.sql))();
 				newest_schema_version = rev_id;
 			}
 	
