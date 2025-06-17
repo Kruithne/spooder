@@ -624,26 +624,6 @@ function route_directory(route_path: string, dir: string, handler_or_options: Di
 	};
 }
 
-export function validate_req_json(json_handler: JSONRequestHandler): RequestHandler {
-	return async (req: Request, url: URL) => {
-		try {
-			// validate content type header
-			if (req.headers.get('Content-Type') !== 'application/json')
-				return 400; // Bad Request
-
-			const json = await req.json();
-
-			// validate json is a plain object
-			if (json === null || typeof json !== 'object' || Array.isArray(json))
-				return 400; // Bad Request
-
-			return json_handler(req, url, json as JsonObject);
-		} catch (e) {
-			return 400; // Bad Request
-		}
-	};
-}
-
 function format_query_parameters(search_params: URLSearchParams): string {
 	let result_parts = [];
 
@@ -877,6 +857,29 @@ export function http_serve(port: number, hostname?: string) {
 			if (path.length > 1 && path.endsWith('/'))
 				path = path.slice(0, -1);
 			routes.push([path.split('/'), handler, method]);
+		},
+
+		/** Register a JSON endpoint with automatic content validation. */
+		json: (path: string, handler: JSONRequestHandler, method: HTTP_METHODS = 'POST'): void => {
+			const json_wrapper: RequestHandler = async (req: Request, url: URL) => {
+				try {
+					if (req.headers.get('Content-Type') !== 'application/json')
+						return 400; // Bad Request
+
+					const json = await req.json();
+					if (json === null || typeof json !== 'object' || Array.isArray(json))
+						return 400; // Bad Request
+
+					return handler(req, url, json as JsonObject);
+				} catch (e) {
+					return 400; // Bad Request
+				}
+			};
+
+			if (path.length > 1 && path.endsWith('/'))
+				path = path.slice(0, -1);
+			
+			routes.push([path.split('/'), json_wrapper, method]);
 		},
 
 		/** Unregister a specific route */

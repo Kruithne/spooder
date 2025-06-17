@@ -480,6 +480,7 @@ server.stop(immediate: boolean): Promise<void>;
 
 // routing
 server.route(path: string, handler: RequestHandler, method?: HTTP_METHODS);
+server.json(path: string, handler: JSONRequestHandler, method?: HTTP_METHODS);
 server.unroute(path: string);
 
 // fallback handlers
@@ -490,7 +491,6 @@ server.on_slow_request(callback: SlowRequestCallback, threshold?: number);
 server.allow_slow_request(req: Request);
 
 // http generics
-validate_req_json(handler: JSONRequestHandler);
 http_apply_range(file: BunFile, request: Request): HandlerReturnType;
 
 // directory serving
@@ -668,9 +668,37 @@ server.route('/test/route', () => {});
 server.unroute('/test/route');
 ```
 
+### 🔧 `server.json(path: string, handler: JSONRequestHandler, method?: HTTP_METHODS)`
+
+Register a JSON endpoint with automatic content validation. This method automatically validates that the request has the correct `Content-Type: application/json` header and that the request body contains a valid JSON object.
+
+```ts
+server.json('/api/users', (req, url, json) => {
+	// json is automatically parsed and validated as a plain object
+	const name = json.name;
+	const email = json.email;
+	
+	// Process the JSON data
+	return { success: true, id: 123 };
+});
+```
+
+By default, JSON routes are registered as `POST` endpoints, but this can be customized:
+
+```ts
+server.json('/api/data', (req, url, json) => {
+	return { received: json };
+}, 'PUT');
+```
+
+The handler will automatically return `400 Bad Request` if:
+- The `Content-Type` header is not `application/json`
+- The request body is not valid JSON
+- The JSON is not a plain object (e.g., it's an array, null, or primitive value)
+
 ### HTTP Methods
 
-By default, `spooder` will register routes defined with `server.route()` and `server.dir()` as `GET` routes. Requests to these routes with other methods will return `405 Method Not Allowed`.
+By default, `spooder` will register routes defined with `server.route()` and `server.dir()` as `GET` routes, while `server.json()` routes default to `POST`. Requests to these routes with other methods will return `405 Method Not Allowed`.
 
 > [!NOTE]
 > spooder does not automatically handle HEAD requests natively.
