@@ -1556,7 +1556,7 @@ for await (const page of db.get_paged<User>('SELECT * FROM users', [], 100)) {
 Returns the value of `count` from a query. Returns `0` if query fails.
 
 ```ts
-const userCount = await db.count('SELECT COUNT(*) AS count FROM users WHERE active = ?', true);
+const user_count = await db.count('SELECT COUNT(*) AS count FROM users WHERE active = ?', true);
 ```
 
 ### 🔧 ``db_mysql.count_table(table_name: string): Promise<number>``
@@ -1564,7 +1564,7 @@ const userCount = await db.count('SELECT COUNT(*) AS count FROM users WHERE acti
 Returns the total count of rows from a table. Returns `0` if query fails.
 
 ```ts
-const totalUsers = await db.count_table('users');
+const total_users = await db.count_table('users');
 ```
 
 ### 🔧 ``db_mysql.exists(sql: string, ...values: any): Promise<boolean>``
@@ -1572,7 +1572,7 @@ const totalUsers = await db.count_table('users');
 Returns `true` if the query returns any results. Returns `false` if no results found or if query fails.
 
 ```ts
-const hasActiveUsers = await db.exists('SELECT 1 FROM users WHERE active = ? LIMIT 1', true);
+const has_active_users = await db.exists('SELECT 1 FROM users WHERE active = ? LIMIT 1', true);
 ```
 
 ### 🔧 ``db_mysql.transaction(scope: (transaction: MySQLDatabaseInterface) => void | Promise<void>): Promise<boolean>``
@@ -1581,8 +1581,8 @@ Executes a callback function within a database transaction. The callback receive
 
 ```ts
 const success = await db.transaction(async (tx) => {
-	const userId = await tx.insert('INSERT INTO users (name) VALUES (?)', 'John');
-	await tx.insert('INSERT INTO user_profiles (user_id, bio) VALUES (?, ?)', userId, 'Hello world');
+	const user_id = await tx.insert('INSERT INTO users (name) VALUES (?)', 'John');
+	await tx.insert('INSERT INTO user_profiles (user_id, bio) VALUES (?, ?)', user_id, 'Hello world');
 });
 
 if (success) {
