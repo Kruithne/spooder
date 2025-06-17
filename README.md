@@ -99,6 +99,7 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 	- [API > Database > Interface](#api-database-interface)
 		- [API > Database > Interface > SQLite](#api-database-interface-sqlite)
 		- [API > Database > Interface > MySQL](#api-database-interface-mysql)
+- [API > Utilities](#api-utilities)
 
 # CLI
 
@@ -488,7 +489,7 @@ server.error(handler: ErrorHandler);
 server.on_slow_request(callback: SlowRequestCallback, threshold?: number);
 server.allow_slow_request(req: Request);
 
-// utility
+// http generics
 validate_req_json(handler: JSONRequestHandler);
 http_apply_range(file: BunFile, request: Request): HandlerReturnType;
 
@@ -561,6 +562,8 @@ transaction(scope: (transaction: MySQLDatabaseInterface) => void | Promise<void>
 db_update_schema_sqlite(db: Database, schema_dir: string, schema_table?: string): Promise<void>;
 db_update_schema_mysql(db: Connection, schema_dir: string, schema_table?: string): Promise<void>;
 
+// utilities
+filesize(bytes: number): string;
 
 // constants
 HTTP_STATUS_CODE: Record<number, string>;
@@ -2001,6 +2004,21 @@ CREATE ...
 
 >[!IMPORTANT]
 > Cyclic or missing dependencies will throw an error.
+
+<a id="api-utilities"></a>
+## API > Utilities
+
+### 🔧 ``filesize(bytes: number): string``
+
+Returns a human-readable string representation of a file size in bytes.
+
+```ts
+filesize(512); // > "512 bytes"
+filesize(1024); // > "1 kb"
+filesize(1048576); // > "1 mb"
+filesize(1073741824); // > "1 gb"
+filesize(1099511627776); // > "1 tb"
+```
 
 ## Legal
 This software is provided as-is with no warranty or guarantee. The authors of this project are not responsible or liable for any problems caused by using this software or any part thereof. Use of this software does not entitle you to any support or assistance from the authors of this project.
