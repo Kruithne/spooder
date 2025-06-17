@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Directory listing - {$title}</title>
+	<style>
+		body {
+			font-family: monospace;
+			margin: 40px;
+			background-color: #f8f9fa;
+		}
+
+		.container {
+			max-width: 800px;
+			margin: 0 auto;
+			background: white;
+			padding: 20px;
+			border-radius: 8px;
+			box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+		}
+
+		h1 {
+			color: #333;
+			border-bottom: 2px solid #eee;
+			padding-bottom: 10px;
+			margin: 0;
+		}
+
+		.entry {
+			display: block;
+			padding: 8px 0;
+			text-decoration: none;
+			color: #0066cc;
+			border-bottom: 1px solid #f0f0f0;
+		}
+
+		.entry:hover {
+			background-color: #f5f5f5;
+		}
+
+		.directory {
+			font-weight: bold;
+		}
+
+		.directory:before {
+			content: "📁 ";
+		}
+
+		.file:before {
+			content: "📄 ";
+		}
+	</style>
+</head>
+<body>
+	<div class="container">
+		<h1>{$path}</h1>
+		{$for:entries as entry}<a href="{$base_url}/{$entry.name}" class="entry {$entry.type}">{$entry.name}</a>{/for}
+	</div>
+</body>
+</html>

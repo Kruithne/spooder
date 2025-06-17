@@ -492,7 +492,7 @@ validate_req_json(handler: JSONRequestHandler);
 http_apply_range(file: BunFile, request: Request): HandlerReturnType;
 
 // directory serving
-server.dir(path: string, dir: string, handler?: DirHandler, method?: HTTP_METHODS);
+server.dir(path: string, dir: string, options?: DirOptions | DirHandler, method?: HTTP_METHODS);
 
 // server-sent events
 server.sse(path: string, handler: ServerSentEventHandler);
@@ -866,8 +866,9 @@ server.route('/test', async (req) => {
 <a id="api-http-directory"></a>
 ## HTTP > Directory Serving
 
-### 🔧 `server.dir(path: string, dir: string, handler?: DirHandler)`
+### 🔧 `server.dir(path: string, dir: string, options?: DirOptions | DirHandler)`
 Serve files from a directory.
+
 ```ts
 server.dir('/content', './public/content');
 ```
@@ -883,10 +884,45 @@ server.route('/test', () => 200);
 // Accessing /test returns 404 here because /files/test does not exist.
 ```
 
-By default, spooder will use the following default handler for serving directories.
+#### Directory Options
+
+You can configure directory behavior using the `DirOptions` interface:
 
 ```ts
-function default_directory_handler(file_path: string, file: BunFile, stat: DirStat, request: Request): HandlerReturnType {
+interface DirOptions {
+	ignore_hidden?: boolean;      // default: true
+	index_directories?: boolean;  // default: false  
+	support_ranges?: boolean;     // default: true
+}
+```
+
+**Options-based configuration:**
+```ts
+// Enable directory browsing with HTML listings
+server.dir('/files', './public', { index_directories: true });
+
+// Serve hidden files and disable range requests
+server.dir('/files', './public', { 
+	ignore_hidden: false, 
+	support_ranges: false 
+});
+
+// Full configuration
+server.dir('/files', './public', { 
+	ignore_hidden: true,
+	index_directories: true,
+	support_ranges: true 
+});
+```
+
+When `index_directories` is enabled, accessing a directory will return a styled HTML page listing the directory contents with file and folder icons.
+
+#### Custom Directory Handlers
+
+For complete control, provide a custom handler function:
+
+```ts
+server.dir('/static', '/static', (file_path, file, stat, request, url) => {
 	// ignore hidden files by default, return 404 to prevent file sniffing
 	if (path.basename(file_path).startsWith('.'))
 		return 404; // Not Found
@@ -895,19 +931,8 @@ function default_directory_handler(file_path: string, file: BunFile, stat: DirSt
 		return 401; // Unauthorized
 
 	return http_apply_range(file, request);
-}
+});
 ```
-
-> [!NOTE]
-> Uncaught `ENOENT` errors thrown from the directory handler will return a `404` response, other errors will return a `500` response.
-
-> [!NOTE]
-> The call to `http_apply_range` in the default directory handler will automatically slice the file based on the [`Range`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Range) header. This function is also exposed as part of the `spooder` API for use in your own handlers.
-
-Provide your own directory handler for fine-grained control.
-
-> [!IMPORTANT]
-> Providing your own handler will override the default handler defined above. Be sure to implement the same logic if you want to retain the default behavior.
 
 | Parameter | Type | Reference |
 | --- | --- | --- |
@@ -917,25 +942,21 @@ Provide your own directory handler for fine-grained control.
 | `request` | `Request` | https://developer.mozilla.org/en-US/docs/Web/API/Request |
 | `url` | `URL` | https://developer.mozilla.org/en-US/docs/Web/API/URL |
 
-```ts
-server.dir('/static', '/static', (file_path, file, stat, request, url) => {
-	// Implement custom logic.
-	return file; // HandlerReturnType
-});
-```
-
-> [!NOTE]
-> The directory handler function is only called for files that exist on disk - including directories.
-
 Asynchronous directory handlers are supported and will be awaited.
 
-```js
+```ts
 server.dir('/static', '/static', async (file_path, file) => {
 	let file_contents = await file.text();
 	// do something with file_contents
 	return file_contents;
 });
 ```
+
+> [!NOTE]
+> The directory handler function is only called for files that exist on disk - including directories.
+
+> [!NOTE]
+> Uncaught `ENOENT` errors thrown from the directory handler will return a `404` response, other errors will return a `500` response.
 
 ### 🔧 `http_apply_range(file: BunFile, request: Request): HandlerReturnType`
 
@@ -1290,20 +1311,27 @@ Contents contained inside an `if` block will be rendered providing the given val
 An `if` block is only removed if `drop_missing` is `true`, allowing them to persist through multiple passes of a template.
 
 
-`parse_template` supports looping arrays with the following syntax.
+`parse_template` supports looping arrays and objects with Vue-like syntax using the `as` keyword.
+
+#### Object/Array Looping with `as` Syntax
 
 ```html
-{$for:foo}My colour is %s{/for}
+{$for:items as item}<div>{$item.name}: {$item.value}</div>{/for}
 ```
+
 ```ts
 const template = `
 	<ul>
-		{$for:foo}<li>%s</li>{/for}
+		{$for:colors as color}<li class="{$color.type}">{$color.name}</li>{/for}
 	</ul>
 `;
 
 const replacements = {
-	foo: ['red', 'green', 'blue']
+	colors: [
+		{ name: 'red', type: 'warm' },
+		{ name: 'blue', type: 'cool' },
+		{ name: 'green', type: 'neutral' }
+	]
 };
 
 const html = await parse_template(template, replacements);
@@ -1311,10 +1339,40 @@ const html = await parse_template(template, replacements);
 
 ```html
 <ul>
-	<li>red</li>
-	<li>green</li>
-	<li>blue</li>
+	<li class="warm">red</li>
+	<li class="cool">blue</li>
+	<li class="neutral">green</li>
 </ul>
+```
+
+#### Dot Notation Property Access
+
+You can access nested object properties using dot notation:
+
+```ts
+const data = {
+	user: {
+		profile: { name: 'John', age: 30 },
+		settings: { theme: 'dark' }
+	}
+};
+
+await parse_template('Hello {$user.profile.name}, you prefer {$user.settings.theme} mode!', data);
+// Result: "Hello John, you prefer dark mode!"
+```
+
+#### Legacy Array Looping (Backward Compatibility)
+
+The older `%s` substitution syntax is still supported for simple string arrays:
+
+```html
+{$for:fruits}My fruit is %s{/for}
+```
+
+```ts
+const replacements = {
+	fruits: ['apple', 'orange', 'banana']
+};
 ```
 
 All placeholders inside a `{$for:}` loop are substituted, but only if the loop variable exists.
@@ -1334,7 +1392,7 @@ await parse_template(..., {
 
 ```html
 <div>Hello world!</div>
-{$for}Loop <div>{$test}</div>{/for}
+{$for:missing}<div>Loop {$test}</div>{/for}
 ```
 
 ### 🔧 `generate_hash_subs(length: number, prefix: string, hashes?: Record<string, string>): Promise<Record<string, string>>`

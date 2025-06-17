@@ -129,7 +129,20 @@ export async function safe(target_fn: Callable) {
 // region templates
 type ReplacerFn = (key: string) => string | Array<string> | undefined;
 type AsyncReplaceFn = (key: string) => Promise<string | Array<string> | undefined>;
-type Replacements = Record<string, string | Array<string>> | ReplacerFn | AsyncReplaceFn;
+type Replacements = Record<string, string | Array<string> | object | object[]> | ReplacerFn | AsyncReplaceFn;
+
+function get_nested_property(obj: any, path: string): any {
+	const keys = path.split('.');
+	let current = obj;
+	
+	for (const key of keys) {
+		if (current === null || current === undefined || typeof current !== 'object')
+			return undefined;
+		current = current[key];
+	}
+	
+	return current;
+}
 
 export async function parse_template(template: string, replacements: Replacements, drop_missing = false): Promise<string> {
 	let result = '';
@@ -150,7 +163,18 @@ export async function parse_template(template: string, replacements: Replacement
 			buffer_active = false;
 
 			if (buffer.startsWith('for:')) {
-				const loop_key = buffer.substring(4);
+				const for_content = buffer.substring(4);
+				const as_match = for_content.match(/^(.+?)\s+as\s+(\w+)$/);
+				
+				let loop_key: string;
+				let alias_name: string | null = null;
+				
+				if (as_match) {
+					loop_key = as_match[1].trim();
+					alias_name = as_match[2].trim();
+				} else {
+					loop_key = for_content.trim();
+				}
 
 				const loop_entries = is_replacer_fn ? await replacements(loop_key) : replacements[loop_key];
 				const loop_content_start_index = i + 1;
@@ -161,10 +185,34 @@ export async function parse_template(template: string, replacements: Replacement
 						result += '{$' + buffer + '}';
 				} else {
 					const loop_content = template.substring(loop_content_start_index, loop_close_index);
-					if (loop_entries !== undefined) {
+					if (loop_entries !== undefined && Array.isArray(loop_entries)) {
 						for (const loop_entry of loop_entries) {
-							const inner_content = loop_content.replaceAll('%s', loop_entry);
-							result += await parse_template(inner_content, replacements, drop_missing);
+							let scoped_replacements: Replacements;
+							
+							if (alias_name) {
+								if (typeof replacements === 'function') {
+									scoped_replacements = async (key: string) => {
+										if (key === alias_name) return loop_entry;
+										if (key.startsWith(alias_name + '.')) {
+											const prop_path = key.substring(alias_name.length + 1);
+											return get_nested_property(loop_entry, prop_path);
+										}
+										return await replacements(key);
+									};
+								} else {
+									scoped_replacements = {
+										...replacements,
+										[alias_name]: loop_entry
+									};
+								}
+							} else {
+								scoped_replacements = replacements;
+								const inner_content = loop_content.replaceAll('%s', typeof loop_entry === 'string' ? loop_entry : String(loop_entry));
+								result += await parse_template(inner_content, scoped_replacements, drop_missing);
+								continue;
+							}
+							
+							result += await parse_template(loop_content, scoped_replacements, drop_missing);
 						}
 					} else {
 						if (!drop_missing)
@@ -192,7 +240,25 @@ export async function parse_template(template: string, replacements: Replacement
 					i += if_content.length + 5;
 				}
 			} else {
-				const replacement = is_replacer_fn ? await replacements(buffer) : replacements[buffer];
+				let replacement;
+				
+				if (is_replacer_fn) {
+					replacement = await replacements(buffer);
+				} else {
+					if (buffer.includes('.')) {
+						const dot_index = buffer.indexOf('.');
+						const base_key = buffer.substring(0, dot_index);
+						const prop_path = buffer.substring(dot_index + 1);
+						const base_obj = replacements[base_key];
+						
+						if (base_obj !== undefined) {
+							replacement = get_nested_property(base_obj, prop_path);
+						}
+					} else {
+						replacement = replacements[buffer];
+					}
+				}
+				
 				if (replacement !== undefined)
 					result += replacement;
 				else if (!drop_missing)
@@ -318,6 +384,54 @@ type DirStat = PromiseType<ReturnType<typeof fs.stat>>;
 
 type DirHandler = (file_path: string, file: BunFile, stat: DirStat, request: Request, url: URL) => HandlerReturnType;
 
+interface DirOptions {
+	ignore_hidden?: boolean;
+	index_directories?: boolean;
+	support_ranges?: boolean;
+}
+
+let directory_index_template: string | null = null;
+
+async function get_directory_index_template(): Promise<string> {
+	if (directory_index_template === null) {
+		const template_path = path.join(import.meta.dir, 'template', 'directory_index.html');
+		const template_file = Bun.file(template_path);
+		directory_index_template = await template_file.text();
+	}
+	return directory_index_template;
+}
+
+async function generate_directory_index(file_path: string, request_path: string): Promise<Response> {
+	try {
+		const entries = await fs.readdir(file_path, { withFileTypes: true });
+		const filtered_entries = entries.filter(entry => !entry.name.startsWith('.'));
+		
+		const base_url = request_path.endsWith('/') ? request_path.slice(0, -1) : request_path;
+		const entry_data = filtered_entries.map(entry => ({
+			name: entry.name,
+			type: entry.isDirectory() ? 'directory' : 'file'
+		}));
+		
+		const template = await get_directory_index_template();
+		const html = await parse_template(template, {
+			title: path.basename(file_path) || 'Root',
+			path: request_path,
+			base_url: base_url,
+			entries: entry_data
+		}, true);
+		
+		return new Response(html, {
+			status: 200,
+			headers: { 'Content-Type': 'text/html' }
+		});
+	} catch (err) {
+		return new Response('Error reading directory', {
+			status: 500,
+			headers: { 'Content-Type': 'text/plain' }
+		});
+	}
+}
+
 function default_directory_handler(file_path: string, file: BunFile, stat: DirStat, request: Request): HandlerReturnType {
 	// ignore hidden files by default, return 404 to prevent file sniffing
 	if (path.basename(file_path).startsWith('.'))
@@ -329,7 +443,11 @@ function default_directory_handler(file_path: string, file: BunFile, stat: DirSt
 	return http_apply_range(file, request);
 }
 
-function route_directory(route_path: string, dir: string, handler: DirHandler): RequestHandler {
+function route_directory(route_path: string, dir: string, handler_or_options: DirHandler | DirOptions): RequestHandler {
+	const is_handler = typeof handler_or_options === 'function';
+	const handler = is_handler ? handler_or_options as DirHandler : null;
+	const options = is_handler ? { ignore_hidden: true, index_directories: false, support_ranges: true } : { ignore_hidden: true, index_directories: false, support_ranges: true, ...handler_or_options as DirOptions };
+
 	return async (req: Request, url: URL) => {
 		const file_path = path.join(dir, url.pathname.slice(route_path.length));
 
@@ -337,7 +455,21 @@ function route_directory(route_path: string, dir: string, handler: DirHandler): 
 			const file_stat = await fs.stat(file_path);
 			const bun_file = Bun.file(file_path);
 
-			return await handler(file_path, bun_file, file_stat, req, url);
+			if (handler)
+				return await handler(file_path, bun_file, file_stat, req, url);
+
+			// Options-based handling
+			if (options.ignore_hidden && path.basename(file_path).startsWith('.'))
+				return 404; // Not Found
+
+			if (file_stat.isDirectory()) {
+				if (options.index_directories)
+					return await generate_directory_index(file_path, url.pathname);
+
+				return 401; // Unauthorized
+			}
+
+			return options.support_ranges ? http_apply_range(bun_file, req) : bun_file;
 		} catch (e) {
 			const err = e as NodeJS.ErrnoException;
 			if (err?.code === 'ENOENT')
@@ -620,16 +752,17 @@ export function http_serve(port: number, hostname?: string) {
 		},
 
 		/** Serve a directory for a specific route. */
-		dir: (path: string, dir: string, handler?: DirHandler, method: HTTP_METHODS = 'GET'): void => {
+		dir: (path: string, dir: string, handler_or_options?: DirHandler | DirOptions, method: HTTP_METHODS = 'GET'): void => {
 			if (path.endsWith('/'))
 				path = path.slice(0, -1);
 
-			routes.push([[...path.split('/'), '*'], route_directory(path, dir, handler ?? default_directory_handler), method]);
+			const final_handler_or_options = handler_or_options ?? default_directory_handler;
+			routes.push([[...path.split('/'), '*'], route_directory(path, dir, final_handler_or_options), method]);
 		},
 
 		/** Add a route to upgrade connections to websockets. */
 		websocket: (path: string, handlers: WebsocketHandlers): void => {
-			routes.push([path.split('/'), async (req: Request, url: URL) => {
+			routes.push([path.split('/'), async (req: Request) => {
 				let context_data = undefined;
 				if (handlers.accept) {
 					const res = await handlers.accept(req);
@@ -655,7 +788,7 @@ export function http_serve(port: number, hostname?: string) {
 		},
 
 		webhook: (secret: string, path: string, handler: WebhookHandler): void => {
-			routes.push([path.split('/'), async (req: Request, url: URL) => {
+			routes.push([path.split('/'), async (req: Request) => {
 				if (req.headers.get('Content-Type') !== 'application/json')
 					return 400; // Bad Request
 
