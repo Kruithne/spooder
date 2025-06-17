@@ -186,8 +186,8 @@ export async function parse_template(template: string, replacements: Replacement
 			} else {
 				if (!drop_missing)
 					return match;
-				else
-					return '';
+
+				return '';
 			}
 		});
 
@@ -196,13 +196,12 @@ export async function parse_template(template: string, replacements: Replacement
 		result = await replace_async(result, if_regex, async (match, condition_key, if_content) => {
 			const condition_value = is_replacer_fn ? await replacements(condition_key) : replacements[condition_key];
 			
-			if (!drop_missing && !condition_value) {
+			if (!drop_missing && !condition_value)
 				return match;
-			} else if (condition_value) {
+			if (condition_value)
 				return await parse_template(if_content, replacements, drop_missing);
-			} else {
-				return '';
-			}
+
+			return '';
 		});
 
 		// Parse {{variable}} tags (innermost)
@@ -233,10 +232,11 @@ export async function parse_template(template: string, replacements: Replacement
 			
 			if (replacement !== undefined)
 				return replacement;
-			else if (!drop_missing)
+
+			if (!drop_missing)
 				return match;
-			else
-				return '';
+			
+			return '';
 		});
 	}
 
