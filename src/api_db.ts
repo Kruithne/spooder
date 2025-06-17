@@ -10,6 +10,10 @@ const db_log = log_create_logger('db', '#16b39e');
 export function db_cast_set<T extends string>(set: string | null): Set<T> {
 	return new Set(set?.split(',') as T[] ?? []);
 }
+
+export function db_serialize_set<T extends string>(set: Set<T> | null): string {
+	return set?.size ? Array.from(set).join(',') : '';
+}
 // endregion
 
 // region schema

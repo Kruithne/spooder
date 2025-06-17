@@ -529,6 +529,7 @@ get_git_hashes(length: number): Promise<Record<string, string>>;
 db_sqlite(filename: string, options: number|object): db_sqlite;
 db_mysql(options: ConnectionOptions, pool: boolean): Promise<MySQLDatabaseInterface>;
 db_cast_set<T extends string>(set: string | null): Set<T>;
+db_serialize_set<T extends string>(set: Set<T> | null): string;
 
 // db_sqlite
 update_schema(db_dir: string, schema_table?: string): Promise<void>
@@ -1594,6 +1595,25 @@ if (set.has(ExampleRow.OPT_B)) {
 	// ...
 }
 ```
+
+### 🔧 ``db_serialize_set<T extends string>(set: Set<T> | null): string``
+
+Takes a `Set<T>` and returns a database SET string. If the set is empty or `null`, it returns an empty string.
+
+```ts
+enum ExampleRow {
+	OPT_A = 'OPT_A',
+	OPT_B = 'OPT_B',
+	OPT_C = 'OPT_C'
+};
+
+const set = new Set<ExampleRow>([ExampleRow.OPT_A, ExampleRow.OPT_B]);
+
+const serialized = db_serialize_set(set);
+// > 'OPT_A,OPT_B'
+```
+
+
 
 <a id="api-database-interface-sqlite"></a>
 ## API > Database > Interface > SQLite
