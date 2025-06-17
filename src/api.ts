@@ -404,7 +404,13 @@ async function get_directory_index_template(): Promise<string> {
 async function generate_directory_index(file_path: string, request_path: string): Promise<Response> {
 	try {
 		const entries = await fs.readdir(file_path, { withFileTypes: true });
-		const filtered_entries = entries.filter(entry => !entry.name.startsWith('.'));
+		let filtered_entries = entries.filter(entry => !entry.name.startsWith('.'));
+		filtered_entries.sort((a, b) => {
+			if (a.isDirectory() === b.isDirectory())
+				return a.name.localeCompare(b.name);
+			
+			return a.isDirectory() ? -1 : 1;
+		});
 		
 		const base_url = request_path.endsWith('/') ? request_path.slice(0, -1) : request_path;
 		const entry_data = filtered_entries.map(entry => ({
