@@ -516,6 +516,8 @@ get_error_mode(): ERR_MODE;
 worker_event_pipe(worker: Worker | typeof self): WorkerEventPipe;
 pipe.send(id: string, data?: object): void;
 pipe.on(event: string, callback: (data: object) => void | Promise<void>): void;
+pipe.once(event: string, callback: (data: object) => void | Promise<void>): void;
+pipe.off(event: string): void;
 
 // templates
 parse_template(template: string, replacements: Record<string, string>, drop_missing?: boolean): Promise<string>;
@@ -1302,6 +1304,24 @@ pipe.on('process_data', async (data) => {
 pipe.on('log_message', (data) => {
 	console.log(data.message);
 });
+```
+
+### 🔧 `pipe.once(event: string, callback: (data: object) => void | Promise<void>): void`
+
+Register an event handler for messages with the specified event ID. This is the same as `pipe.on`, except the handler is automatically removed once it is fired.
+
+```ts
+pipe.once('one_time_event', async (data) => {
+	// this will only fire once
+});
+```
+
+### 🔧 `pipe.off(event: string): void`
+
+Unregister an event handler for messages with the specified event ID.
+
+```ts
+pipe.off('msg_name');
 ```
 
 > [!NOTE]

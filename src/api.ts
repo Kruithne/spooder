@@ -32,9 +32,13 @@ export * from './api_db';
 // region workers
 let worker_id_counter = 0;
 
+type WorkerMessageData = Record<string, any>;
+
 export interface WorkerEventPipe {
 	send: (id: string, data?: object) => void;
-	on: (event: string, callback: (data: Record<string, any>) => Promise<void> | void) => void;
+	on: (event: string, callback: (data: WorkerMessageData) => Promise<void> | void) => void;
+	once: (event: string, callback: (data: WorkerMessageData) => Promise<void> | void) => void;
+	off: (event: string) => void;
 }
 
 function worker_validate_message(message: any) {
@@ -112,8 +116,19 @@ export function worker_event_pipe(worker: Worker): WorkerEventPipe {
 			worker.postMessage(JSON.stringify({ id, data }));
 		},
 
-		on: (event: string, callback: (data: Record<string, any>) => Promise<void> | void) => {
+		on: (event: string, callback: (data: WorkerMessageData) => Promise<void> | void) => {
 			callbacks.set(event, callback);
+		},
+
+		off: (event: string) => {
+			callbacks.delete(event);
+		},
+
+		once: (event: string, callback: (data: WorkerMessageData) => Promise<void> | void) => {
+			callbacks.set(event, async (data: WorkerMessageData) => {
+				await callback(data);
+				callbacks.delete(event);
+			});
 		}
 	};
 }
