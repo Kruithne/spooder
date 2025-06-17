@@ -521,6 +521,17 @@ db_mysql(options: ConnectionOptions, pool: boolean): Promise<MySQLDatabaseInterf
 // db_sqlite
 set_error_mode(mode: db_error_mode);
 update_schema(db_dir: string, schema_table?: string): Promise<void>
+insert(sql: string, ...values: any): number;
+insert_object(table: string, obj: Record<string, any>): number;
+execute(sql: string, ...values: any): number;
+get_all<T>(sql: string, ...values: any): T[];
+get_single<T>(sql: string, ...values: any): T | null;
+get_column<T>(sql: string, column: string, ...values: any): T[];
+get_paged<T>(sql: string, values?: any[], page_size?: number): AsyncGenerator<T[]>;
+count(sql: string, ...values: any): number;
+count_table(table_name: string): number;
+exists(sql: string, ...values: any): boolean;
+transaction(scope: (transaction: SQLiteDatabaseInterface) => void | Promise<void>): boolean;
 
 // db_mysql
 set_error_mode(mode: db_error_mode);
@@ -1449,6 +1460,105 @@ await db_update_schema_sqlite(db.instance, './schema');
 import { db_sqlite } from 'spooder';
 const db = db_sqlite('./my_database.sqlite');
 await db.update_schema('./schema');
+```
+
+### 🔧 ``db_sqlite.insert(sql: string, ...values: any): number``
+
+Executes a query and returns the `lastInsertRowid`. Returns `-1` in the event of an error or if `lastInsertRowid` is not provided.
+
+```ts
+const id = db.insert('INSERT INTO users (name) VALUES(?)', 'test');
+```
+
+### 🔧 ``db_sqlite.insert_object(table: string, obj: Record<string, any>): number``
+
+Executes an insert query using object key/value mapping and returns the `lastInsertRowid`. Returns `-1` in the event of an error.
+
+```ts
+const id = db.insert_object('users', { name: 'John', email: 'john@example.com' });
+```
+
+### 🔧 ``db_sqlite.execute(sql: string, ...values: any): number``
+
+Executes a query and returns the number of affected rows. Returns `-1` in the event of an error.
+
+```ts
+const affected = db.execute('UPDATE users SET name = ? WHERE id = ?', 'Jane', 1);
+```
+
+### 🔧 ``db_sqlite.get_all<T>(sql: string, ...values: any): T[]``
+
+Returns the complete query result set as an array. Returns empty array if no rows found or if query fails.
+
+```ts
+const users = db.get_all<User>('SELECT * FROM users WHERE active = ?', true);
+```
+
+### 🔧 ``db_sqlite.get_single<T>(sql: string, ...values: any): T | null``
+
+Returns the first row from a query result set. Returns `null` if no rows found or if query fails.
+
+```ts
+const user = db.get_single<User>('SELECT * FROM users WHERE id = ?', 1);
+```
+
+### 🔧 ``db_sqlite.get_column<T>(sql: string, column: string, ...values: any): T[]``
+
+Returns the query result as a single column array. Returns empty array if no rows found or if query fails.
+
+```ts
+const names = db.get_column<string>('SELECT name FROM users', 'name');
+```
+
+### 🔧 ``db_sqlite.get_paged<T>(sql: string, values?: any[], page_size?: number): AsyncGenerator<T[]>``
+
+Returns an async iterator that yields pages of database rows. Each page contains at most `page_size` rows (default 1000).
+
+```ts
+for await (const page of db.get_paged<User>('SELECT * FROM users', [], 100)) {
+	console.log(`Processing ${page.length} users`);
+}
+```
+
+### 🔧 ``db_sqlite.count(sql: string, ...values: any): number``
+
+Returns the value of `count` from a query. Returns `0` if query fails.
+
+```ts
+const user_count = db.count('SELECT COUNT(*) AS count FROM users WHERE active = ?', true);
+```
+
+### 🔧 ``db_sqlite.count_table(table_name: string): number``
+
+Returns the total count of rows from a table. Returns `0` if query fails.
+
+```ts
+const total_users = db.count_table('users');
+```
+
+### 🔧 ``db_sqlite.exists(sql: string, ...values: any): boolean``
+
+Returns `true` if the query returns any results. Returns `false` if no results found or if query fails.
+
+```ts
+const has_active_users = db.exists('SELECT 1 FROM users WHERE active = ? LIMIT 1', true);
+```
+
+### 🔧 ``db_sqlite.transaction(scope: (transaction: SQLiteDatabaseInterface) => void | Promise<void>): boolean``
+
+Executes a callback function within a database transaction. The callback receives a transaction object with all the same database methods available. Returns `true` if the transaction was committed successfully, `false` if it was rolled back due to an error.
+
+```ts
+const success = db.transaction(async (tx) => {
+	const user_id = tx.insert('INSERT INTO users (name) VALUES (?)', 'John');
+	tx.insert('INSERT INTO user_profiles (user_id, bio) VALUES (?, ?)', user_id, 'Hello world');
+});
+
+if (success) {
+	console.log('Transaction completed successfully');
+} else {
+	console.log('Transaction was rolled back');
+}
 ```
 
 <a id="api-database-interface-mysql"></a>

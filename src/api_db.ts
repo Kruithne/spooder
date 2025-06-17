@@ -400,7 +400,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 		},
 
 		update_schema: async (schema_dir: string, schema_table_name: string = 'db_schema') => {
-			return db_update_schema_mysql(instance, schema_dir, schema_table_name);
+			await db_update_schema_mysql(instance, schema_dir, schema_table_name);
 		},
 
 		transaction: async (scope: (transaction: MySQLDatabaseInterface) => void | Promise<void>) => {
@@ -431,7 +431,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 // endregion
 
 // region sqlite
-export async function db_update_schema_sqlite(db: Database, schema_dir: string, schema_table_name = 'db_schema') {
+export async function db_update_schema_sqlite(db: Database, schema_dir: string, schema_table_name = 'db_schema'): Promise<void> {
 	db_log(`updating database schema for {${db.filename}}`);
 
 	const schema_versions = new Map();
@@ -445,41 +445,234 @@ export async function db_update_schema_sqlite(db: Database, schema_dir: string, 
 		db.run(`CREATE TABLE ${schema_table_name} (db_schema_table_name TEXT PRIMARY KEY, db_schema_version INTEGER)`);
 	}
 	
-	db.transaction(async () => {
-		const update_schema_query = db.prepare(`
-			INSERT INTO ${schema_table_name} (db_schema_version, db_schema_table_name) VALUES (?1, ?2)
-			ON CONFLICT(db_schema_table_name) DO UPDATE SET db_schema_version = EXCLUDED.db_schema_version
-		`);
-
-		const schemas = await db_load_schema(schema_dir, schema_versions);
-
-		for (const schema of schemas) {
-			let newest_schema_version = schema.current_version;
-			for (const rev_id of schema.chunk_keys) {
-				const revision = schema.revisions.get(rev_id);
-				const comment_text = revision.comment ? ` "{${revision.comment}}"` : '';
-				db_log(`applying revision [{${rev_id}}]${comment_text} to {${schema.name}}`);
-				db.transaction(() => db.run(revision.sql))();
-				newest_schema_version = rev_id;
-			}
+	return new Promise(resolve => {
+		db.transaction(async () => {
+			const update_schema_query = db.prepare(`
+				INSERT INTO ${schema_table_name} (db_schema_version, db_schema_table_name) VALUES (?1, ?2)
+				ON CONFLICT(db_schema_table_name) DO UPDATE SET db_schema_version = EXCLUDED.db_schema_version
+			`);
 	
-			if (newest_schema_version > schema.current_version) {
-				db_log(`updated table {${schema.name}} to revision {${newest_schema_version}}`);
-				update_schema_query.run(newest_schema_version, schema.name);
+			const schemas = await db_load_schema(schema_dir, schema_versions);
+	
+			for (const schema of schemas) {
+				let newest_schema_version = schema.current_version;
+				for (const rev_id of schema.chunk_keys) {
+					const revision = schema.revisions.get(rev_id);
+					const comment_text = revision.comment ? ` "{${revision.comment}}"` : '';
+					db_log(`applying revision [{${rev_id}}]${comment_text} to {${schema.name}}`);
+					db.transaction(() => db.run(revision.sql))();
+					newest_schema_version = rev_id;
+				}
+		
+				if (newest_schema_version > schema.current_version) {
+					db_log(`updated table {${schema.name}} to revision {${newest_schema_version}}`);
+					update_schema_query.run(newest_schema_version, schema.name);
+				}
+			}
+
+			resolve();
+		})();
+	});
+}
+
+type SQLiteDatabaseInterface = ReturnType<typeof create_sqlite_api>;
+
+function create_sqlite_api(instance: Database, error_handler: (error: unknown, return_value: any, title: string) => any) {
+	return {
+		/**
+		 * Executes a query and returns the lastInsertRowid.
+		 * Returns -1 if the query fails or no lastInsertRowid is available.
+		 */
+		insert: (sql: string, ...values: any) => {
+			try {
+				const result = instance.run(sql, ...values);
+				return Number(result.lastInsertRowid) || -1;
+			} catch (error) {
+				return error_handler(error, -1, 'insert failed');
+			}
+		},
+
+		/**
+		 * Executes an insert query using object key/value mapping.
+		 * Returns the lastInsertRowid or -1 if the query fails.
+		 */
+		insert_object: (table: string, obj: Record<string, any>) => {
+			try {
+				const values = Object.values(obj);
+				let sql = 'INSERT INTO `' + table + '` (';
+				sql += Object.keys(obj).map(e => '`' + e + '`').join(', ');
+				sql += ') VALUES(' + values.map(() => '?').join(', ') + ')';
+
+				const result = instance.run(sql, ...values);
+				return Number(result.lastInsertRowid) || -1;
+			} catch (error) {
+				return error_handler(error, -1, 'insert_object failed');
+			}
+		},
+
+		/**
+		 * Executes a query and returns the number of affected rows.
+		 * Returns -1 if the query fails.
+		 */
+		execute: (sql: string, ...values: any) => {
+			try {
+				const result = instance.run(sql, ...values);
+				return result.changes || 0;
+			} catch (error) {
+				return error_handler(error, -1, 'execute failed');
+			}
+		},
+
+		/**
+		 * Returns the complete query result set as an array.
+		 * Returns empty array if no rows found or if query fails.
+		 */
+		get_all: <T = any>(sql: string, ...values: any): T[] => {
+			try {
+				const rows = instance.query(sql).all(...values);
+				return rows as T[];
+			} catch (error) {
+				return error_handler(error, [], 'get_all failed');
+			}
+		},
+
+		/**
+		 * Returns the first row from a query result set.
+		 * Returns null if no rows found or if query fails.
+		 */
+		get_single: <T = any>(sql: string, ...values: any): T | null => {
+			try {
+				const row = instance.query(sql).get(...values);
+				return (row as T) ?? null;
+			} catch (error) {
+				return error_handler(error, null, 'get_single failed');
+			}
+		},
+
+		/**
+		 * Returns the query result as a single column array.
+		 * Returns empty array if no rows found or if query fails.
+		 */
+		get_column: <T = any>(sql: string, column: string, ...values: any): T[] => {
+			try {
+				const rows = instance.query(sql).all(...values) as any[];
+				return rows.map((row: any) => row[column]) as T[];
+			} catch (error) {
+				return error_handler(error, [], 'get_column failed');
+			}
+		},
+
+		/**
+		 * Returns an async iterator that yields pages of database rows.
+		 * Each page contains at most `page_size` rows (default 1000).
+		 */
+		get_paged: async function* <T = any>(sql: string, values: any[] = [], page_size: number = 1000): AsyncGenerator<T[]> {
+			let current_offset = 0;
+			
+			while (true) {
+				try {
+					const paged_sql = `${sql} LIMIT ? OFFSET ?`;
+					const paged_values = [...values, page_size, current_offset];
+					
+					const rows = instance.query(paged_sql).all(...paged_values) as T[];
+					
+					if (rows.length === 0)
+						break;
+					
+					yield rows;
+					
+					current_offset += page_size;
+					
+					if (rows.length < page_size)
+						break;
+				} catch (error) {
+					error_handler(error, undefined, 'get_paged failed');
+					return;
+				}
+			}
+		},
+
+		/**
+		 * Returns the value of `count` from a query.
+		 * Returns 0 if query fails.
+		 */
+		count: (sql: string, ...values: any): number => {
+			try {
+				const row = instance.query(sql).get(...values) as any;
+				return row?.count ?? 0;
+			} catch (error) {
+				return error_handler(error, 0, 'count failed');
+			}
+		},
+
+		/**
+		 * Returns the total count of rows from a table.
+		 * Returns 0 if query fails.
+		 */
+		count_table: (table_name: string): number => {
+			try {
+				const row = instance.query('SELECT COUNT(*) AS `count` FROM `' + table_name + '`').get();
+				return (row as any)?.count ?? 0;
+			} catch (error) {
+				return error_handler(error, 0, 'count_table failed');
+			}
+		},
+
+		/**
+		 * Returns true if the query returns any results.
+		 * Returns false if no results found or if query fails.
+		 */
+		exists: (sql: string, ...values: any): boolean => {
+			try {
+				const row = instance.query(sql).get(...values);
+				return row !== null;
+			} catch (error) {
+				return error_handler(error, false, 'exists failed');
 			}
 		}
-	})();
+	};
 }
 
 export function db_sqlite(...args: ConstructorParameters<typeof Database>) {
 	const instance = new Database(...args);
+	let error_mode = db_error_mode.SILENT_FAILURE;
+
+	function db_handle_error(error: unknown, return_value: any, title: string) {
+		if (error_mode === db_error_mode.THROW_EXCEPTION)
+			throw error;
+
+		if (error_mode === db_error_mode.CANARY_CAUTION)
+			caution(`sqlite: ${title}`, { error });
+
+		return return_value;
+	}
 
 	return {
 		instance,
+		
+		set_error_mode(mode: typeof db_error_mode[keyof typeof db_error_mode]) {
+			error_mode = mode;
+		},
 
 		update_schema: async (schema_dir: string, schema_table_name: string = 'db_schema') => {
-			return db_update_schema_sqlite(instance, schema_dir, schema_table_name);
-		}
-	}
+			await db_update_schema_sqlite(instance, schema_dir, schema_table_name);
+		},
+
+		transaction: (scope: (transaction: SQLiteDatabaseInterface) => void | Promise<void>) => {
+			const transaction_fn = instance.transaction(async () => {
+				const transaction_api = create_sqlite_api(instance, db_handle_error);
+				await scope(transaction_api);
+			});
+
+			try {
+				transaction_fn();
+				return true;
+			} catch (error) {
+				return db_handle_error(error, false, 'transaction failed');
+			}
+		},
+
+		...create_sqlite_api(instance, db_handle_error)
+	};
 }
 // endregion
