@@ -139,7 +139,7 @@ function filesize(bytes: number): string {
 // endregion
 
 // region logging
-export function log_create_logger(label: string, color: ColorInput = '#16b39e') {
+export function log_create_logger(label: string, color: ColorInput = 'blue') {
 	const ansi = Bun.color(color, 'ansi-256') ?? '\x1b[38;5;6m';
 	const prefix = `[${ansi}${label}\x1b[0m] `;
 
