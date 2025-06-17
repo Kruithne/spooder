@@ -155,7 +155,7 @@ export async function parse_template(template: string, replacements: Replacement
 		previous_result = result;
 
 		// Parse t-for tags first (outermost structures)
-		const for_regex = /<t-for\s+entries="([^"]+)"\s+as="([^"]+)"\s*>(.*?)<\/t-for>/gs;
+		const for_regex = /<t-for\s+items="([^"]+)"\s+as="([^"]+)"\s*>(.*?)<\/t-for>/gs;
 		result = await replace_async(result, for_regex, async (match, entries_key, alias_name, loop_content) => {
 			const loop_entries = is_replacer_fn ? await replacements(entries_key) : replacements[entries_key];
 			
@@ -192,7 +192,7 @@ export async function parse_template(template: string, replacements: Replacement
 		});
 
 		// Parse t-if tags
-		const if_regex = /<t-if\s+condition="([^"]+)"\s*>(.*?)<\/t-if>/gs;
+		const if_regex = /<t-if\s+test="([^"]+)"\s*>(.*?)<\/t-if>/gs;
 		result = await replace_async(result, if_regex, async (match, condition_key, if_content) => {
 			const condition_value = is_replacer_fn ? await replacements(condition_key) : replacements[condition_key];
 			
@@ -205,15 +205,21 @@ export async function parse_template(template: string, replacements: Replacement
 			}
 		});
 
-		// Parse t-var tags (innermost)
-		const var_regex = /<t-var\s+name="([^"]+)"\s*\/?>/g;
+		// Parse {{variable}} tags (innermost)
+		const var_regex = /\{\{([^}]+)\}\}/g;
 		result = await replace_async(result, var_regex, async (match, var_name) => {
+			// Trim whitespace from variable name
+			var_name = var_name.trim();
 			let replacement;
 			
 			if (is_replacer_fn) {
 				replacement = await replacements(var_name);
 			} else {
-				if (var_name.includes('.')) {
+				// First try direct key lookup (handles hash keys with dots like "hash=.gitignore")
+				replacement = replacements[var_name];
+				
+				// If direct lookup fails and variable contains dots, try nested property access
+				if (replacement === undefined && var_name.includes('.')) {
 					const dot_index = var_name.indexOf('.');
 					const base_key = var_name.substring(0, dot_index);
 					const prop_path = var_name.substring(dot_index + 1);
@@ -222,8 +228,6 @@ export async function parse_template(template: string, replacements: Replacement
 					if (base_obj !== undefined) {
 						replacement = get_nested_property(base_obj, prop_path);
 					}
-				} else {
-					replacement = replacements[var_name];
 				}
 			}
 			
