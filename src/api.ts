@@ -64,22 +64,23 @@ export function worker_event_pipe(worker: Worker): WorkerEventPipe {
 			caution(`exception in worker`, { exception: e });
 	}
 
+	function handle_message(event: MessageEvent) {
+		try {
+			const message = JSON.parse(event.data);
+			worker_validate_message(message);
+			
+			const callback = callbacks.get(message.id);
+			if (callback !== undefined)
+				callback(message.data ?? {});
+		} catch (e) {
+			handle_error(e);
+		}
+	}
+
 	if (Bun.isMainThread) {
 		worker_id = ++worker_id_counter;
 		
-		worker.addEventListener('message', (event: MessageEvent) => {
-			try {
-				const message = JSON.parse(event.data);
-				worker_validate_message(message);
-				
-				const callback = callbacks.get(message.id);
-				if (callback !== undefined)
-					callback(message.data ?? {});
-			} catch (e) {
-				handle_error(e);
-			}
-		});
-
+		worker.addEventListener('message', handle_message);
 		worker.postMessage(JSON.stringify({
 			id: '_init',
 			data: {
@@ -89,26 +90,15 @@ export function worker_event_pipe(worker: Worker): WorkerEventPipe {
 		}));
 	} else {
 		// worker thread
-		worker.onmessage = (event: MessageEvent) => {
-			try {
-				const message = JSON.parse(event.data);
-				worker_validate_message(message);
+		callbacks.set('_init', data => {
+			worker_error_mode = data.error_mode ?? ERR_MODE.SILENT_FAILURE;
+			worker_id = data.worker_id;
 
-				if (message.id === '_init') {
-					worker_error_mode = message.data.error_mode ?? ERR_MODE.SILENT_FAILURE;
-					worker_id = message.data.worker_id;
-					log_worker(`event pipe connected {main thread} ⇄ {worker_${worker_id}}`);
-					return;
-				}
+			log_worker(`event pipe connected {main thread} ⇄ {worker_${worker_id}}`);
+			callbacks.delete('_init');
+		});
 
-				const callback = callbacks.get(message.id);
-				if (callback !== undefined)
-					callback(message.data ?? {});
-
-			} catch (e) {
-				handle_error(e);
-			}
-		};
+		worker.onmessage = handle_message;
 	}
 
 	return {
