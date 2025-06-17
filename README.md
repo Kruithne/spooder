@@ -530,7 +530,7 @@ insert_object(table: string, obj: Record<string, any>): Promise<number>;
 execute(sql: string, ...values: any): Promise<number>;
 get_all<T>(sql: string, ...values: any): Promise<T[]>;
 get_single<T>(sql: string, ...values: any): Promise<T | null>;
-get_column_array<T>(sql: string, column: string, ...values: any): Promise<T[]>;
+get_column<T>(sql: string, column: string, ...values: any): Promise<T[]>;
 call<T>(func_name: string, ...args: any): Promise<T[]>;
 get_paged<T>(sql: string, values?: any[], page_size?: number): AsyncGenerator<T[]>;
 count(sql: string, ...values: any): Promise<number>;
@@ -1525,12 +1525,12 @@ Returns the first row from a query result set. Returns `null` if no rows found o
 const user = await db.get_single<User>('SELECT * FROM users WHERE id = ?', 1);
 ```
 
-### 🔧 ``db_mysql.get_column_array<T>(sql: string, column: string, ...values: any): Promise<T[]>``
+### 🔧 ``db_mysql.get_column<T>(sql: string, column: string, ...values: any): Promise<T[]>``
 
 Returns the query result as a single column array. Returns empty array if no rows found or if query fails.
 
 ```ts
-const names = await db.get_column_array<string>('SELECT name FROM users', 'name');
+const names = await db.get_column<string>('SELECT name FROM users', 'name');
 ```
 
 ### 🔧 ``db_mysql.call<T>(func_name: string, ...args: any): Promise<T[]>``

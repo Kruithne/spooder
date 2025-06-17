@@ -274,12 +274,12 @@ function create_mysql_api(instance: mysql_types.Connection | mysql_types.Pool, e
 		 * Returns the query result as a single column array.
 		 * Returns empty array if no rows found or if query fails.
 		 */
-		get_column_array: async <T = any>(sql: string, column: string, ...values: any): Promise<T[]> => {
+		get_column: async <T = any>(sql: string, column: string, ...values: any): Promise<T[]> => {
 			try {
 				const [rows] = await instance.execute(sql, values) as RowDataPacket[][];
 				return rows.map((e: any) => e[column]) as T[];
 			} catch (error) {
-				return error_handler(error, [], 'get_column_array failed');
+				return error_handler(error, [], 'get_column failed');
 			}
 		},
 
