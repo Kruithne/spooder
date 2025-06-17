@@ -195,7 +195,7 @@ export async function db_update_schema_mysql(db: mysql_types.Connection, schema_
 	await db.commit();
 }
 
-type DatabaseInterface = ReturnType<typeof create_mysql_api>;
+type MySQLDatabaseInterface = ReturnType<typeof create_mysql_api>;
 
 function create_mysql_api(instance: mysql_types.Connection | mysql_types.Pool, error_handler: (error: unknown, return_value: any, title: string) => any) {
 	return {
@@ -403,7 +403,7 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 			return db_update_schema_mysql(instance, schema_dir, schema_table_name);
 		},
 
-		transaction: async (scope: (transaction: DatabaseInterface) => void | Promise<void>) => {
+		transaction: async (scope: (transaction: MySQLDatabaseInterface) => void | Promise<void>) => {
 			let connection: mysql_types.Connection = instance;
 
 			if (pool)

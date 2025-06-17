@@ -516,7 +516,7 @@ get_git_hashes(length: number): Promise<Record<string, string>>;
 
 // database interface
 db_sqlite(filename: string, options: number|object): db_sqlite;
-db_mysql(options: ConnectionOptions, pool: boolean): Promise<db_mysql>;
+db_mysql(options: ConnectionOptions, pool: boolean): Promise<MySQLDatabaseInterface>;
 
 // db_sqlite
 set_error_mode(mode: db_error_mode);
