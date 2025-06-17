@@ -33,6 +33,7 @@
 			margin: 0;
 			font-size: 1.5rem;
 			font-weight: 600;
+			word-break: break-word;
 		}
 
 		.listing-table {
@@ -75,6 +76,7 @@
 		.entry-icon {
 			margin-right: 8px;
 			font-size: 1.1em;
+			flex-shrink: 0;
 		}
 
 		.directory .entry-icon:before {
@@ -104,6 +106,148 @@
 			font-size: 0.8rem;
 			color: #6c757d;
 		}
+
+		/* Mobile card layout styles - hidden by default */
+		.mobile-listing {
+			display: none;
+		}
+
+		.mobile-entry {
+			border-bottom: 1px solid #f0f0f0;
+		}
+
+		.mobile-entry:last-child {
+			border-bottom: none;
+		}
+
+		.mobile-entry-link {
+			display: block;
+			padding: 16px 20px;
+			text-decoration: none;
+			color: inherit;
+		}
+
+		.mobile-entry-link:hover,
+		.mobile-entry-link:active {
+			background-color: #f8f9fa;
+		}
+
+		.mobile-entry-main {
+			display: flex;
+			align-items: center;
+			margin-bottom: 4px;
+		}
+
+		.mobile-entry-icon {
+			margin-right: 12px;
+			font-size: 1.2em;
+			flex-shrink: 0;
+		}
+
+		.mobile-entry-name {
+			color: #0066cc;
+			font-weight: 500;
+			font-size: 1rem;
+			word-break: break-word;
+			flex: 1;
+		}
+
+		.mobile-entry-meta {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			font-size: 0.8rem;
+			color: #6c757d;
+			font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+			margin-left: 32px;
+		}
+
+		.mobile-date {
+			display: none;
+		}
+
+		/* Responsive media queries */
+		@media (max-width: 768px) {
+			body {
+				padding: 20px 10px;
+			}
+
+			.container {
+				border-radius: 0;
+				box-shadow: none;
+				margin: 0 -10px;
+			}
+
+			.header {
+				padding: 16px 20px;
+			}
+
+			h1 {
+				font-size: 1.25rem;
+			}
+
+			.footer {
+				padding: 16px 20px;
+			}
+
+			/* Hide table layout on mobile */
+			.listing-table {
+				display: none;
+			}
+
+			/* Show mobile card layout */
+			.mobile-listing {
+				display: block;
+			}
+
+			.mobile-date {
+				display: inline;
+			}
+
+			.desktop-date {
+				display: none;
+			}
+		}
+
+		@media (max-width: 480px) {
+			body {
+				padding: 10px 0;
+			}
+
+			.container {
+				border-radius: 0;
+			}
+
+			.header {
+				padding: 12px 16px;
+			}
+
+			h1 {
+				font-size: 1.1rem;
+			}
+
+			.footer {
+				padding: 12px 16px;
+				font-size: 0.75rem;
+			}
+
+			.mobile-entry-link {
+				padding: 14px 16px;
+			}
+
+			.mobile-entry-icon {
+				margin-right: 10px;
+			}
+
+			.mobile-entry-name {
+				font-size: 0.95rem;
+			}
+
+			.mobile-entry-meta {
+				font-size: 0.75rem;
+				margin-left: 28px;
+			}
+		}
 	</style>
 </head>
 <body>
@@ -111,6 +255,8 @@
 		<div class="header">
 			<h1>{$path}</h1>
 		</div>
+		
+		<!-- Desktop table layout -->
 		<table class="listing-table">
 			<thead>
 				<tr>
@@ -128,10 +274,27 @@
 						</a>
 					</td>
 					<td class="size-col">{$entry.size}</td>
-					<td class="date-col">{$entry.modified}</td>
+					<td class="date-col desktop-date">{$entry.modified}</td>
 				</tr>{/for}
 			</tbody>
 		</table>
+		
+		<!-- Mobile card layout -->
+		<div class="mobile-listing">
+			{$for:entries as entry}<div class="mobile-entry">
+				<a href="{$base_url}/{$entry.name}" class="mobile-entry-link {$entry.type}">
+					<div class="mobile-entry-main">
+						<span class="mobile-entry-icon entry-icon"></span>
+						<span class="mobile-entry-name">{$entry.name}</span>
+					</div>
+					<div class="mobile-entry-meta">
+						<span class="mobile-date">{$entry.modified_mobile}</span>
+						<span>{$entry.size}</span>
+					</div>
+				</a>
+			</div>{/for}
+		</div>
+		
 		<div class="footer">
 			spooder {$version}
 		</div>

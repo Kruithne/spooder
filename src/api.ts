@@ -422,6 +422,15 @@ function format_date(date: Date): string {
 	return date.toLocaleDateString('en-US', options);
 }
 
+function format_date_mobile(date: Date): string {
+	const options: Intl.DateTimeFormatOptions = {
+		year: 'numeric',
+		month: 'short',
+		day: '2-digit'
+	};
+	return date.toLocaleDateString('en-US', options);
+}
+
 async function generate_directory_index(file_path: string, request_path: string): Promise<Response> {
 	try {
 		const entries = await fs.readdir(file_path, { withFileTypes: true });
@@ -442,6 +451,7 @@ async function generate_directory_index(file_path: string, request_path: string)
 				type: entry.isDirectory() ? 'directory' : 'file',
 				size: entry.isDirectory() ? '-' : format_file_size(stat.size),
 				modified: format_date(stat.mtime),
+				modified_mobile: format_date_mobile(stat.mtime),
 				raw_size: entry.isDirectory() ? 0 : stat.size
 			};
 		}));
