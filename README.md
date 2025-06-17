@@ -1306,6 +1306,9 @@ pipe.on('log_message', (data) => {
 });
 ```
 
+> [!NOTE]
+> There can only be one event handler for a specific event ID. Registering a new handler for an existing event ID will overwrite the previous handler.
+
 ### 🔧 `pipe.once(event: string, callback: (data: object) => void | Promise<void>): void`
 
 Register an event handler for messages with the specified event ID. This is the same as `pipe.on`, except the handler is automatically removed once it is fired.
@@ -1318,10 +1321,10 @@ pipe.once('one_time_event', async (data) => {
 
 ### 🔧 `pipe.off(event: string): void`
 
-Unregister an event handler for messages with the specified event ID.
+Unregister an event handler for events with the specified event ID.
 
 ```ts
-pipe.off('msg_name');
+pipe.off('event_name');
 ```
 
 > [!NOTE]
