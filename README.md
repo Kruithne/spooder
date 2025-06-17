@@ -1228,12 +1228,12 @@ Replace placeholders in a template string with values from a replacement object.
 const template = `
 	<html>
 		<head>
-			<title>{$title}</title>
+			<title><t-var name="title"></title>
 		</head>
 		<body>
-			<h1>{$title}</h1>
-			<p>{$content}</p>
-			<p>{$ignored}</p>
+			<h1><t-var name="title"></h1>
+			<p><t-var name="content"></p>
+			<p><t-var name="ignored"></p>
 		</body>
 	</html>
 `;
@@ -1254,7 +1254,7 @@ const html = await parse_template(template, replacements);
 	<body>
 		<h1>Hello, world!</h1>
 		<p>This is a test.</p>
-		<p>{$ignored}</p>
+		<p><t-var name="ignored"></p>
 	</body>
 </html>
 ```
@@ -1285,7 +1285,7 @@ const replacer = (placeholder: string) => {
 	return placeholder.toUpperCase();
 };
 
-await parse_template('Hello {$world}', replacer);
+await parse_template('Hello <t-var name="world">', replacer);
 ```
 
 ```html
@@ -1301,28 +1301,28 @@ await parse_template('Hello {$world}', replacer);
 </html>
 ```
 
-`parse_template` supports optional scopes with the following syntax.
+`parse_template` supports conditional rendering with the following syntax.
 
 ```html
-{$if:foo}I love {$foo}{/if}
+<t-if condition="foo">I love <t-var name="foo"></t-if>
 ```
-Contents contained inside an `if` block will be rendered providing the given value, in this case `foo` is truthy in the substitution table.
+Contents contained inside a `t-if` block will be rendered providing the given value, in this case `foo` is truthy in the substitution table.
 
-An `if` block is only removed if `drop_missing` is `true`, allowing them to persist through multiple passes of a template.
+A `t-if` block is only removed if `drop_missing` is `true`, allowing them to persist through multiple passes of a template.
 
 
-`parse_template` supports looping arrays and objects with Vue-like syntax using the `as` keyword.
+`parse_template` supports looping arrays and objects using the `entries` and `as` attributes.
 
-#### Object/Array Looping with `as` Syntax
+#### Object/Array Looping with `entries` and `as` Attributes
 
 ```html
-{$for:items as item}<div>{$item.name}: {$item.value}</div>{/for}
+<t-for entries="items" as="item"><div><t-var name="item.name">: <t-var name="item.value"></div></t-for>
 ```
 
 ```ts
 const template = `
 	<ul>
-		{$for:colors as color}<li class="{$color.type}">{$color.name}</li>{/for}
+		<t-for entries="colors" as="color"><li class="<t-var name="color.type">"><t-var name="color.name"></li></t-for>
 	</ul>
 `;
 
@@ -1357,31 +1357,17 @@ const data = {
 	}
 };
 
-await parse_template('Hello {$user.profile.name}, you prefer {$user.settings.theme} mode!', data);
+await parse_template('Hello <t-var name="user.profile.name">, you prefer <t-var name="user.settings.theme"> mode!', data);
 // Result: "Hello John, you prefer dark mode!"
 ```
 
-#### Legacy Array Looping (Backward Compatibility)
-
-The older `%s` substitution syntax is still supported for simple string arrays:
-
-```html
-{$for:fruits}My fruit is %s{/for}
-```
-
-```ts
-const replacements = {
-	fruits: ['apple', 'orange', 'banana']
-};
-```
-
-All placeholders inside a `{$for:}` loop are substituted, but only if the loop variable exists.
+All placeholders inside a `<t-for>` loop are substituted, but only if the loop variable exists.
 
 In the following example, `missing` does not exist, so `test` is not substituted inside the loop, but `test` is still substituted outside the loop.
 
 ```html
-<div>Hello {$test}!</div>
-{$for:missing}<div>Loop {$test}</div>{/for}
+<div>Hello <t-var name="test">!</div>
+<t-for entries="missing" as="item"><div>Loop <t-var name="test"></div></t-for>
 ```
 
 ```ts
@@ -1392,7 +1378,7 @@ await parse_template(..., {
 
 ```html
 <div>Hello world!</div>
-{$for:missing}<div>Loop {$test}</div>{/for}
+<t-for entries="missing" as="item"><div>Loop <t-var name="test"></div></t-for>
 ```
 
 ### 🔧 `generate_hash_subs(length: number, prefix: string, hashes?: Record<string, string>): Promise<Record<string, string>>`
@@ -1408,7 +1394,7 @@ let hash_sub_table = {};
 generate_hash_subs().then(subs => hash_sub_table = subs).catch(caution);
 
 server.route('/test', (req, url) => {
-	return parse_template('Hello world {$hash=docs/project-logo.png}', hash_sub_table);
+	return parse_template('Hello world <t-var name="hash=docs/project-logo.png">', hash_sub_table);
 });
 ```
 
@@ -1435,7 +1421,7 @@ Use a different prefix other than `hash=` by passing it as the first parameter.
 generate_hash_subs(7, '$#').then(subs => hash_sub_table = subs).catch(caution);
 
 server.route('/test', (req, url) => {
-	return parse_template('Hello world {$#docs/project-logo.png}', hash_sub_table);
+	return parse_template('Hello world <t-var name="#docs/project-logo.png">', hash_sub_table);
 });
 ```
 

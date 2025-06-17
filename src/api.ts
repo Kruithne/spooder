@@ -146,133 +146,109 @@ function get_nested_property(obj: any, path: string): any {
 }
 
 export async function parse_template(template: string, replacements: Replacements, drop_missing = false): Promise<string> {
-	let result = '';
-	let buffer = '';
-	let buffer_active = false;
-
 	const is_replacer_fn = typeof replacements === 'function';
+	let result = template;
+	let previous_result = '';
+	
+	// Keep processing until no more changes occur (handles nested tags)
+	while (result !== previous_result) {
+		previous_result = result;
 
-	const template_length = template.length;
-	for (let i = 0; i < template_length; i++) {
-		const char = template[i];
-
-		if (char === '{' && template[i + 1] === '$') {
-			i++;
-			buffer_active = true;
-			buffer = '';
-		} else if (char === '}' && buffer_active) {
-			buffer_active = false;
-
-			if (buffer.startsWith('for:')) {
-				const for_content = buffer.substring(4);
-				const as_match = for_content.match(/^(.+?)\s+as\s+(\w+)$/);
-				
-				let loop_key: string;
-				let alias_name: string | null = null;
-				
-				if (as_match) {
-					loop_key = as_match[1].trim();
-					alias_name = as_match[2].trim();
-				} else {
-					loop_key = for_content.trim();
-				}
-
-				const loop_entries = is_replacer_fn ? await replacements(loop_key) : replacements[loop_key];
-				const loop_content_start_index = i + 1;
-				const loop_close_index = template.indexOf('{/for}', loop_content_start_index);
-				
-				if (loop_close_index === -1) {
-					if (!drop_missing)
-						result += '{$' + buffer + '}';
-				} else {
-					const loop_content = template.substring(loop_content_start_index, loop_close_index);
-					if (loop_entries !== undefined && Array.isArray(loop_entries)) {
-						for (const loop_entry of loop_entries) {
-							let scoped_replacements: Replacements;
-							
-							if (alias_name) {
-								if (typeof replacements === 'function') {
-									scoped_replacements = async (key: string) => {
-										if (key === alias_name) return loop_entry;
-										if (key.startsWith(alias_name + '.')) {
-											const prop_path = key.substring(alias_name.length + 1);
-											return get_nested_property(loop_entry, prop_path);
-										}
-										return await replacements(key);
-									};
-								} else {
-									scoped_replacements = {
-										...replacements,
-										[alias_name]: loop_entry
-									};
-								}
-							} else {
-								scoped_replacements = replacements;
-								const inner_content = loop_content.replaceAll('%s', typeof loop_entry === 'string' ? loop_entry : String(loop_entry));
-								result += await parse_template(inner_content, scoped_replacements, drop_missing);
-								continue;
+		// Parse t-for tags first (outermost structures)
+		const for_regex = /<t-for\s+entries="([^"]+)"\s+as="([^"]+)"\s*>(.*?)<\/t-for>/gs;
+		result = await replace_async(result, for_regex, async (match, entries_key, alias_name, loop_content) => {
+			const loop_entries = is_replacer_fn ? await replacements(entries_key) : replacements[entries_key];
+			
+			if (loop_entries !== undefined && Array.isArray(loop_entries)) {
+				let loop_result = '';
+				for (const loop_entry of loop_entries) {
+					let scoped_replacements: Replacements;
+					
+					if (typeof replacements === 'function') {
+						scoped_replacements = async (key: string) => {
+							if (key === alias_name) return loop_entry;
+							if (key.startsWith(alias_name + '.')) {
+								const prop_path = key.substring(alias_name.length + 1);
+								return get_nested_property(loop_entry, prop_path);
 							}
-							
-							result += await parse_template(loop_content, scoped_replacements, drop_missing);
-						}
+							return await replacements(key);
+						};
 					} else {
-						if (!drop_missing)
-							result += '{$' + buffer + '}' + loop_content + '{/for}';
+						scoped_replacements = {
+							...replacements,
+							[alias_name]: loop_entry
+						};
 					}
-					i += loop_content.length + 6;
+					
+					loop_result += await parse_template(loop_content, scoped_replacements, drop_missing);
 				}
-			} else if (buffer.startsWith('if:')) {
-				const if_key = buffer.substring(3);
-				const if_content_start_index = i + 1;
-				const if_close_index = template.indexOf('{/if}', if_content_start_index);
-
-				if (if_close_index === -1) {
-					if (!drop_missing)
-						result += '{$' + buffer + '}';
-				} else {
-					const if_content = template.substring(if_content_start_index, if_close_index);
-					const condition_value = is_replacer_fn ? await replacements(if_key) : replacements[if_key];
-
-					if (!drop_missing) {
-						result += '{$' + buffer + '}' + if_content + '{/if}';
-					} else if (condition_value) {
-						result += await parse_template(if_content, replacements, drop_missing);
-					}
-					i += if_content.length + 5;
-				}
+				return loop_result;
 			} else {
-				let replacement;
-				
-				if (is_replacer_fn) {
-					replacement = await replacements(buffer);
-				} else {
-					if (buffer.includes('.')) {
-						const dot_index = buffer.indexOf('.');
-						const base_key = buffer.substring(0, dot_index);
-						const prop_path = buffer.substring(dot_index + 1);
-						const base_obj = replacements[base_key];
-						
-						if (base_obj !== undefined) {
-							replacement = get_nested_property(base_obj, prop_path);
-						}
-					} else {
-						replacement = replacements[buffer];
-					}
-				}
-				
-				if (replacement !== undefined)
-					result += replacement;
-				else if (!drop_missing)
-					result += '{$' + buffer + '}';
+				if (!drop_missing)
+					return match;
+				else
+					return '';
 			}
-			buffer = '';
-		} else if (buffer_active) {
-			buffer += char;
-		} else {
-			result += char;
-		}
+		});
+
+		// Parse t-if tags
+		const if_regex = /<t-if\s+condition="([^"]+)"\s*>(.*?)<\/t-if>/gs;
+		result = await replace_async(result, if_regex, async (match, condition_key, if_content) => {
+			const condition_value = is_replacer_fn ? await replacements(condition_key) : replacements[condition_key];
+			
+			if (!drop_missing && !condition_value) {
+				return match;
+			} else if (condition_value) {
+				return await parse_template(if_content, replacements, drop_missing);
+			} else {
+				return '';
+			}
+		});
+
+		// Parse t-var tags (innermost)
+		const var_regex = /<t-var\s+name="([^"]+)"\s*\/?>/g;
+		result = await replace_async(result, var_regex, async (match, var_name) => {
+			let replacement;
+			
+			if (is_replacer_fn) {
+				replacement = await replacements(var_name);
+			} else {
+				if (var_name.includes('.')) {
+					const dot_index = var_name.indexOf('.');
+					const base_key = var_name.substring(0, dot_index);
+					const prop_path = var_name.substring(dot_index + 1);
+					const base_obj = replacements[base_key];
+					
+					if (base_obj !== undefined) {
+						replacement = get_nested_property(base_obj, prop_path);
+					}
+				} else {
+					replacement = replacements[var_name];
+				}
+			}
+			
+			if (replacement !== undefined)
+				return replacement;
+			else if (!drop_missing)
+				return match;
+			else
+				return '';
+		});
 	}
 
+	return result;
+}
+
+async function replace_async(str: string, regex: RegExp, replacer_fn: (match: string, ...args: any[]) => Promise<string>): Promise<string> {
+	const matches = Array.from(str.matchAll(regex));
+	let result = str;
+	
+	for (let i = matches.length - 1; i >= 0; i--) {
+		const match = matches[i];
+		const replacement = await replacer_fn(match[0], ...match.slice(1));
+		result = result.substring(0, match.index!) + replacement + result.substring(match.index! + match[0].length);
+	}
+	
 	return result;
 }
 

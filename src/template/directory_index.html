@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Directory listing - {$title}</title>
+	<title>Directory listing - <t-var name="title"></title>
 	<style>
 		body {
 			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -253,7 +253,7 @@
 <body>
 	<div class="container">
 		<div class="header">
-			<h1>{$path}</h1>
+			<h1><t-var name="path"></h1>
 		</div>
 		
 		<!-- Desktop table layout -->
@@ -266,37 +266,37 @@
 				</tr>
 			</thead>
 			<tbody>
-				{$for:entries as entry}<tr>
+				<t-for entries="entries" as="entry"><tr>
 					<td>
-						<a href="{$base_url}/{$entry.name}" class="entry-link {$entry.type}">
+						<a href="<t-var name="base_url">/<t-var name="entry.name">" class="entry-link <t-var name="entry.type">">
 							<span class="entry-icon"></span>
-							{$entry.name}
+							<t-var name="entry.name">
 						</a>
 					</td>
-					<td class="size-col">{$entry.size}</td>
-					<td class="date-col desktop-date">{$entry.modified}</td>
-				</tr>{/for}
+					<td class="size-col"><t-var name="entry.size"></td>
+					<td class="date-col desktop-date"><t-var name="entry.modified"></td>
+				</tr></t-for>
 			</tbody>
 		</table>
 		
 		<!-- Mobile card layout -->
 		<div class="mobile-listing">
-			{$for:entries as entry}<div class="mobile-entry">
-				<a href="{$base_url}/{$entry.name}" class="mobile-entry-link {$entry.type}">
+			<t-for entries="entries" as="entry"><div class="mobile-entry">
+				<a href="<t-var name="base_url">/<t-var name="entry.name">" class="mobile-entry-link <t-var name="entry.type">">
 					<div class="mobile-entry-main">
 						<span class="mobile-entry-icon entry-icon"></span>
-						<span class="mobile-entry-name">{$entry.name}</span>
+						<span class="mobile-entry-name"><t-var name="entry.name"></span>
 					</div>
 					<div class="mobile-entry-meta">
-						<span class="mobile-date">{$entry.modified_mobile}</span>
-						<span>{$entry.size}</span>
+						<span class="mobile-date"><t-var name="entry.modified_mobile"></span>
+						<span><t-var name="entry.size"></span>
 					</div>
 				</a>
-			</div>{/for}
+			</div></t-for>
 		</div>
 		
 		<div class="footer">
-			spooder {$version}
+			spooder <t-var name="version">
 		</div>
 	</div>
 </body>
