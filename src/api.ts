@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import crypto from 'crypto';
 import { Blob } from 'node:buffer';
 import { ColorInput } from 'bun';
+import packageJson from '../package.json' with { type: 'json' };
 
 // region api forwarding
 export * from './api_db';
@@ -401,6 +402,26 @@ async function get_directory_index_template(): Promise<string> {
 	return directory_index_template;
 }
 
+function format_file_size(bytes: number): string {
+	if (bytes === 0) return '0 B';
+	const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+	const i = Math.floor(Math.log(bytes) / Math.log(1024));
+	const size = bytes / Math.pow(1024, i);
+	return `${size.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+function format_date(date: Date): string {
+	const options: Intl.DateTimeFormatOptions = {
+		year: 'numeric',
+		month: 'short',
+		day: '2-digit',
+		hour: '2-digit',
+		minute: '2-digit',
+		hour12: true
+	};
+	return date.toLocaleDateString('en-US', options);
+}
+
 async function generate_directory_index(file_path: string, request_path: string): Promise<Response> {
 	try {
 		const entries = await fs.readdir(file_path, { withFileTypes: true });
@@ -413,9 +434,16 @@ async function generate_directory_index(file_path: string, request_path: string)
 		});
 		
 		const base_url = request_path.endsWith('/') ? request_path.slice(0, -1) : request_path;
-		const entry_data = filtered_entries.map(entry => ({
-			name: entry.name,
-			type: entry.isDirectory() ? 'directory' : 'file'
+		const entry_data = await Promise.all(filtered_entries.map(async entry => {
+			const entry_path = path.join(file_path, entry.name);
+			const stat = await fs.stat(entry_path);
+			return {
+				name: entry.name,
+				type: entry.isDirectory() ? 'directory' : 'file',
+				size: entry.isDirectory() ? '-' : format_file_size(stat.size),
+				modified: format_date(stat.mtime),
+				raw_size: entry.isDirectory() ? 0 : stat.size
+			};
 		}));
 		
 		const template = await get_directory_index_template();
@@ -423,7 +451,8 @@ async function generate_directory_index(file_path: string, request_path: string)
 			title: path.basename(file_path) || 'Root',
 			path: request_path,
 			base_url: base_url,
-			entries: entry_data
+			entries: entry_data,
+			version: packageJson.version
 		}, true);
 		
 		return new Response(html, {
