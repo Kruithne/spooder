@@ -6,6 +6,12 @@ import type { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 const db_log = log_create_logger('db', '#16b39e');
 
+// region utility
+export function db_cast_set<T extends string>(set: string | null): Set<T> {
+	return new Set(set?.split(',') as T[] ?? []);
+}
+// endregion
+
 // region schema
 interface DependencyTarget {
 	file_name: string;

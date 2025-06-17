@@ -528,6 +528,7 @@ get_git_hashes(length: number): Promise<Record<string, string>>;
 // database interface
 db_sqlite(filename: string, options: number|object): db_sqlite;
 db_mysql(options: ConnectionOptions, pool: boolean): Promise<MySQLDatabaseInterface>;
+db_cast_set<T extends string>(set: string | null): Set<T>;
 
 // db_sqlite
 update_schema(db_dir: string, schema_table?: string): Promise<void>
@@ -1576,6 +1577,24 @@ const subs = await generate_hash_subs(7, undefined, hashes);
 
 <a id="api-database"></a>
 <a id="api-database-interface"></a>
+
+### 🔧 ``db_cast_set<T extends string>(set: string | null): Set<T>``
+
+Takes a database SET string and returns a `Set<T>` where `T` is a provided enum.
+
+```ts
+enum ExampleRow {
+	OPT_A = 'OPT_A',
+	OPT_B = 'OPT_B',
+	OPT_C = 'OPT_C'
+};
+
+const set = db_cast_set<ExampleRow>('OPT_A,OPT_B');
+if (set.has(ExampleRow.OPT_B)) {
+	// ...
+}
+```
+
 <a id="api-database-interface-sqlite"></a>
 ## API > Database > Interface > SQLite
 
