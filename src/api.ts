@@ -7,8 +7,130 @@ import { Blob } from 'node:buffer';
 import { ColorInput } from 'bun';
 import packageJson from '../package.json' with { type: 'json' };
 
+// region global error handling
+export const ERR_MODE = {
+	SILENT_FAILURE: 0x0,
+	THROW_EXCEPTION: 0x1,
+	CANARY_CAUTION: 0x2,
+};
+
+let global_error_mode = ERR_MODE.SILENT_FAILURE;
+
+export function set_error_mode(mode: typeof ERR_MODE[keyof typeof ERR_MODE]) {
+	global_error_mode = mode;
+}
+
+export function get_error_mode() {
+	return global_error_mode;
+}
+// endregion
+
 // region api forwarding
 export * from './api_db';
+// endregion
+
+// region workers
+let worker_id_counter = 0;
+
+export interface WorkerEventPipe {
+	send: (id: string, data?: object) => void;
+	on: (event: string, callback: (data: Record<string, any>) => Promise<void> | void) => void;
+}
+
+function worker_validate_message(message: any) {
+	if (typeof message !== 'object' || message === null)
+		throw new ErrorWithMetadata('invalid worker message type', { message });
+
+	if (typeof message.id !== 'string')
+		throw new Error('missing worker message .id');
+}
+
+const log_worker = log_create_logger('worker', '#9333ea');
+export function worker_event_pipe(worker: Worker): WorkerEventPipe {
+	const callbacks = new Map<string, (data: Record<string, any>) => Promise<void> | void>();
+	let worker_id: number;
+	let worker_error_mode: number;
+	
+	function handle_error(e: unknown) {
+		const error_mode = Bun.isMainThread ? get_error_mode() : worker_error_mode ?? ERR_MODE.SILENT_FAILURE;
+		if (error_mode === ERR_MODE.THROW_EXCEPTION)
+			throw e;
+		
+		if (error_mode === ERR_MODE.CANARY_CAUTION)
+			caution(`exception in worker`, { exception: e });
+	}
+
+	if (Bun.isMainThread) {
+		worker_id = ++worker_id_counter;
+		
+		worker.addEventListener('message', (event: MessageEvent) => {
+			try {
+				const message = JSON.parse(event.data);
+				worker_validate_message(message);
+				
+				const callback = callbacks.get(message.id);
+				if (callback !== undefined)
+					callback(message.data ?? {});
+			} catch (e) {
+				handle_error(e);
+			}
+		});
+
+		worker.postMessage(JSON.stringify({
+			id: '_init',
+			data: {
+				error_mode: get_error_mode(),
+				worker_id: worker_id
+			}
+		}));
+	} else {
+		// worker thread
+		worker.onmessage = (event: MessageEvent) => {
+			try {
+				const message = JSON.parse(event.data);
+				worker_validate_message(message);
+
+				if (message.id === '_init') {
+					worker_error_mode = message.data.error_mode ?? ERR_MODE.SILENT_FAILURE;
+					worker_id = message.data.worker_id;
+					log_worker(`event pipe connected {main thread} ⇄ {worker_${worker_id}}`);
+					return;
+				}
+
+				const callback = callbacks.get(message.id);
+				if (callback !== undefined)
+					callback(message.data ?? {});
+
+			} catch (e) {
+				handle_error(e);
+			}
+		};
+	}
+
+	return {
+		send: (id: string, data: object = {}) => {
+			worker.postMessage(JSON.stringify({ id, data }));
+		},
+
+		on: (event: string, callback: (data: Record<string, any>) => Promise<void> | void) => {
+			callbacks.set(event, callback);
+		}
+	};
+}
+// endregion
+
+// region utility
+const FILESIZE_UNITS = ['bytes', 'kb', 'mb', 'gb', 'tb'];
+
+function filesize(bytes: number): string {
+	if (bytes === 0)
+		return '0 bytes';
+
+	const i = Math.floor(Math.log(bytes) / Math.log(1024));
+	const size = bytes / Math.pow(1024, i);
+	
+	return `${size.toFixed(i === 0 ? 0 : 1)} ${FILESIZE_UNITS[i]}`;
+}
 // endregion
 
 // region logging
@@ -382,14 +504,6 @@ async function get_directory_index_template(): Promise<string> {
 	return directory_index_template;
 }
 
-function format_file_size(bytes: number): string {
-	if (bytes === 0) return '0 B';
-	const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-	const i = Math.floor(Math.log(bytes) / Math.log(1024));
-	const size = bytes / Math.pow(1024, i);
-	return `${size.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
-}
-
 function format_date(date: Date): string {
 	const options: Intl.DateTimeFormatOptions = {
 		year: 'numeric',
@@ -429,7 +543,7 @@ async function generate_directory_index(file_path: string, request_path: string)
 			return {
 				name: entry.name,
 				type: entry.isDirectory() ? 'directory' : 'file',
-				size: entry.isDirectory() ? '-' : format_file_size(stat.size),
+				size: entry.isDirectory() ? '-' : filesize(stat.size),
 				modified: format_date(stat.mtime),
 				modified_mobile: format_date_mobile(stat.mtime),
 				raw_size: entry.isDirectory() ? 0 : stat.size

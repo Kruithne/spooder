@@ -1,16 +1,10 @@
 import { Database } from 'bun:sqlite';
-import { log_create_logger, log_list, caution } from './api';
+import { log_create_logger, log_list, caution, ERR_MODE, get_error_mode, set_error_mode } from './api';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 const db_log = log_create_logger('db', '#16b39e');
-
-export const db_error_mode = {
-	SILENT_FAILURE: 0x0,
-	THROW_EXCEPTION: 0x1,
-	CANARY_CAUTION: 0x2,
-};
 
 // region schema
 interface DependencyTarget {
@@ -380,13 +374,13 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 	db_info.multipleStatements = true;
 
 	const instance = pool ? mysql.createPool(db_info) : await mysql.createConnection(db_info);
-	let error_mode = db_error_mode.SILENT_FAILURE;
 
 	function db_handle_error(error: unknown, return_value: any, title: string) {
-		if (error_mode === db_error_mode.THROW_EXCEPTION)
+		const error_mode = get_error_mode();
+		if (error_mode === ERR_MODE.THROW_EXCEPTION)
 			throw error;
 
-		if (error_mode === db_error_mode.CANARY_CAUTION)
+		if (error_mode === ERR_MODE.CANARY_CAUTION)
 			caution(`mysql: ${title}`, { error });
 
 		return return_value;
@@ -394,10 +388,6 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 
 	return {
 		instance,
-		
-		set_error_mode(mode: typeof db_error_mode[keyof typeof db_error_mode]) {
-			error_mode = mode;
-		},
 
 		update_schema: async (schema_dir: string, schema_table_name: string = 'db_schema') => {
 			await db_update_schema_mysql(instance, schema_dir, schema_table_name);
@@ -635,13 +625,13 @@ function create_sqlite_api(instance: Database, error_handler: (error: unknown, r
 
 export function db_sqlite(...args: ConstructorParameters<typeof Database>) {
 	const instance = new Database(...args);
-	let error_mode = db_error_mode.SILENT_FAILURE;
 
 	function db_handle_error(error: unknown, return_value: any, title: string) {
-		if (error_mode === db_error_mode.THROW_EXCEPTION)
+		const error_mode = get_error_mode();
+		if (error_mode === ERR_MODE.THROW_EXCEPTION)
 			throw error;
 
-		if (error_mode === db_error_mode.CANARY_CAUTION)
+		if (error_mode === ERR_MODE.CANARY_CAUTION)
 			caution(`sqlite: ${title}`, { error });
 
 		return return_value;
@@ -649,10 +639,6 @@ export function db_sqlite(...args: ConstructorParameters<typeof Database>) {
 
 	return {
 		instance,
-		
-		set_error_mode(mode: typeof db_error_mode[keyof typeof db_error_mode]) {
-			error_mode = mode;
-		},
 
 		update_schema: async (schema_dir: string, schema_table_name: string = 'db_schema') => {
 			await db_update_schema_sqlite(instance, schema_dir, schema_table_name);

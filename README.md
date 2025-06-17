@@ -92,6 +92,7 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 	- [API > HTTP > Webhooks](#api-http-webhooks)
 	- [API > HTTP > Websocket Server](#api-http-websockets)
 - [API > Error Handling](#api-error-handling)
+- [API > Workers](#api-workers)
 - [API > Templating](#api-templating)
 - [API > Database](#api-database)
 	- [API > Database > Schema](#api-database-schema)
@@ -508,6 +509,13 @@ ErrorWithMetadata(message: string, metadata: object);
 caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>;
 panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>;
 safe(fn: Callable): Promise<void>;
+set_error_mode(mode: ERR_MODE): void;
+get_error_mode(): ERR_MODE;
+
+// worker
+worker_event_pipe(worker: Worker | typeof self): WorkerEventPipe;
+pipe.send(id: string, data?: object): void;
+pipe.on(event: string, callback: (data: object) => void | Promise<void>): void;
 
 // templates
 parse_template(template: string, replacements: Record<string, string>, drop_missing?: boolean): Promise<string>;
@@ -519,7 +527,6 @@ db_sqlite(filename: string, options: number|object): db_sqlite;
 db_mysql(options: ConnectionOptions, pool: boolean): Promise<MySQLDatabaseInterface>;
 
 // db_sqlite
-set_error_mode(mode: db_error_mode);
 update_schema(db_dir: string, schema_table?: string): Promise<void>
 insert(sql: string, ...values: any): number;
 insert_object(table: string, obj: Record<string, any>): number;
@@ -534,7 +541,6 @@ exists(sql: string, ...values: any): boolean;
 transaction(scope: (transaction: SQLiteDatabaseInterface) => void | Promise<void>): boolean;
 
 // db_mysql
-set_error_mode(mode: db_error_mode);
 update_schema(db_dir: string, schema_table?: string): Promise<void>
 insert(sql: string, ...values: any): Promise<number>;
 insert_object(table: string, obj: Record<string, any>): Promise<number>;
@@ -556,6 +562,7 @@ db_update_schema_mysql(db: Connection, schema_dir: string, schema_table?: string
 
 // constants
 HTTP_STATUS_CODE: Record<number, string>;
+ERR_MODE: Record<string, number>;
 ```
 
 <a id="api-logging"></a>
@@ -1217,6 +1224,92 @@ await safe(() => {
 });
 ```
 
+### 🔧 `set_error_mode(mode: ERR_MODE): void`
+
+Set the global error handling mode for spooder APIs. This affects how errors are handled across all spooder components including database interfaces and worker event pipes.
+
+```ts
+import { set_error_mode, ERR_MODE } from 'spooder';
+
+// Default - suppress errors, return fallback values
+set_error_mode(ERR_MODE.SILENT_FAILURE);
+
+// Throw exceptions on errors
+set_error_mode(ERR_MODE.THROW_EXCEPTION);
+
+// Suppress errors but raise caution reports
+set_error_mode(ERR_MODE.CANARY_CAUTION);
+```
+
+### 🔧 `get_error_mode(): ERR_MODE`
+
+Get the current global error handling mode.
+
+```ts
+import { get_error_mode, ERR_MODE } from 'spooder';
+
+const current_mode = get_error_mode();
+if (current_mode === ERR_MODE.CANARY_CAUTION) {
+	// Handle caution mode logic
+}
+```
+
+<a id="api-workers"></a>
+## API > Workers
+
+### 🔧 `worker_event_pipe(worker: Worker | typeof self): WorkerEventPipe`
+
+Create an event-based communication pipe between host and worker processes. This function works both inside and outside of workers and provides a simple event system on top of the native `postMessage` API.
+
+```ts
+// main thread
+const worker = new Worker('./some_file.ts');
+const pipe = worker_event_pipe(worker);
+
+pipe.on('bar', data => console.log('Received from worker:', data));
+pipe.send('foo', { x: 42 });
+
+// worker thread
+import { worker_event_pipe } from 'spooder';
+
+const pipe = worker_event_pipe(globalThis as unknown as Worker);
+
+pipe.on('foo', data => {
+	console.log('Received from main:', data); // { x: 42 }
+	pipe.send('bar', { response: 'success' });
+});
+```
+
+### 🔧 `pipe.send(id: string, data?: object): void`
+
+Send a message to the other side of the worker pipe with the specified event ID and optional data payload.
+
+```ts
+pipe.send('user_update', { user_id: 123, name: 'John' });
+pipe.send('simple_event'); // data defaults to {}
+```
+
+### 🔧 `pipe.on(event: string, callback: (data: object) => void | Promise<void>): void`
+
+Register an event handler for messages with the specified event ID. The callback can be synchronous or asynchronous.
+
+```ts
+pipe.on('process_data', async (data) => {
+	const result = await processData(data);
+	pipe.send('data_processed', { result });
+});
+
+pipe.on('log_message', (data) => {
+	console.log(data.message);
+});
+```
+
+> [!NOTE]
+> Worker event pipes use the global error handling mode. Errors in message handling will be handled according to the current `error_mode` setting (silent failure, throw exception, or canary caution).
+
+> [!IMPORTANT]
+> Each worker pipe instance expects to be the sole handler for the worker's message events. Creating multiple pipes for the same worker may result in unexpected behavior.
+
 <a id="api-templating"></a>
 ## API > Templating
 
@@ -1457,34 +1550,6 @@ const subs = await generate_hash_subs(7, undefined, hashes);
 
 <a id="api-database"></a>
 <a id="api-database-interface"></a>
-## API > Database > Interface
-
-### Error Mode
-
-By default, errors thrown from the database interfaces are silently caught and an error-value is returned from applicable functions. This behavior can be configured.
-
-```ts
-import { db_error_mode, db_mysql } from 'spooder';
-
-const db = await db_mysql({ ... });
-db.set_error_mode(db_error_mode.THROW_EXCEPTION);
-
-// available error modes
-db_error_mode = {
-	// does not throw, returns empty/error values 
-	// from applicable functions
-	SILENT_FAILURE: 0x0,
-
-	// will throw exceptions
-	THROW_EXCEPTION: 0x1,
-
-	// does not throw, returns empty/error values
-	// from applicable functions, raises a canary 
-	// caution, see CLI > Canary.
-	CANARY_CAUTION: 0x2,
-};
-```
-
 <a id="api-database-interface-sqlite"></a>
 ## API > Database > Interface > SQLite
 
