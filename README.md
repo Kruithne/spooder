@@ -1322,7 +1322,11 @@ A `t-if` block is only removed if `drop_missing` is `true`, allowing them to per
 ```ts
 const template = `
 	<ul>
-		<t-for entries="colors" as="color"><li class="<t-var name="color.type">"><t-var name="color.name"></li></t-for>
+		<t-for entries="colors" as="color">
+			<li class="<t-var name="color.type">">
+				<t-var name="color.name">
+			</li>
+		</t-for>
 	</ul>
 `;
 
@@ -1367,7 +1371,9 @@ In the following example, `missing` does not exist, so `test` is not substituted
 
 ```html
 <div>Hello <t-var name="test">!</div>
-<t-for entries="missing" as="item"><div>Loop <t-var name="test"></div></t-for>
+<t-for entries="missing" as="item">
+	<div>Loop <t-var name="test"></div>
+</t-for>
 ```
 
 ```ts
@@ -1378,7 +1384,9 @@ await parse_template(..., {
 
 ```html
 <div>Hello world!</div>
-<t-for entries="missing" as="item"><div>Loop <t-var name="test"></div></t-for>
+<t-for entries="missing" as="item">
+	<div>Loop <t-var name="test"></div>
+</t-for>
 ```
 
 ### 🔧 `generate_hash_subs(length: number, prefix: string, hashes?: Record<string, string>): Promise<Record<string, string>>`
