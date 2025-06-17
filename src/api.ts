@@ -770,7 +770,7 @@ export function http_serve(port: number, hostname?: string) {
 		}
 	});
 
-	log_spooder(`server started on port {${port}} (host: {${hostname ?? 'unspecified'})`);
+	log_spooder(`server started on port {${port}} (host: {${hostname ?? 'unspecified'}})`);
 
 	return {
 		/** Register a handler for a specific route. */
