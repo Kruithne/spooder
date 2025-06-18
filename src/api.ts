@@ -163,9 +163,9 @@ export const log = log_create_logger('info', 'blue');
 
 // region cache
 type CacheOptions = {
-	ttl: number;
-	max_size: number;
-	use_etags: boolean;
+	ttl?: number;
+	max_size?: number;
+	use_etags?: boolean;
 };
 
 type CacheEntry = {
