@@ -170,9 +170,11 @@ type CacheOptions = {
 
 type CacheEntry = {
 	content: string;
-	last_access: number;
+	last_access_ts: number;
 	etag?: string;
 	content_type: string;
+	size: number;
+	cached_ts: number;
 };
 
 const CACHE_DEFAULT_TTL = 5 * 60 * 60 * 1000; // 5 hours
@@ -182,33 +184,82 @@ const log_cache = log_create_logger('cache', 'spooder');
 
 export function cache_init(options?: CacheOptions) {
 	const ttl = options?.ttl ?? CACHE_DEFAULT_MAX_SIZE;
-	const max_size = options?.max_size ?? CACHE_DEFAULT_TTL;
+	const max_cache_size = options?.max_size ?? CACHE_DEFAULT_TTL;
 	const use_etags = options?.use_etags ?? true;
 
 	const cache = new Map<string, CacheEntry>();
+	let total_cache_size = 0;
 
 	return {
 		serve(file_path: string) {
 			return async (req: Request, url: URL) => {
 				let entry = cache.get(file_path);
+				const now_ts = Date.now();
+
+				// invalidate expired cache entries on access
+				if (entry) {
+					entry.last_access_ts = now_ts;
+
+					if (now_ts - entry.cached_ts > ttl) {
+						log_cache(`access: invalidating expired cache entry {${file_path}} (TTL expired)`);
+
+						cache.delete(file_path);
+						total_cache_size -= entry.size ?? 0;
+						entry = undefined;
+					}
+				}
 
 				if (entry === undefined) {
 					const file = Bun.file(file_path);
 					const content = await file.text();
+					const size = Buffer.byteLength(content);
 
 					entry = {
 						content,
-						last_access: Date.now(),
-						content_type: file.type
+						size,
+						last_access_ts: now_ts,
+						content_type: file.type,
+						cached_ts: now_ts
 					};
 
-					if (use_etags)
-						entry.etag = crypto.createHash('sha256').update(content).digest('hex');
+					if (size < max_cache_size) {
+						if (use_etags)
+							entry.etag = crypto.createHash('sha256').update(content).digest('hex');
 
-					cache.set(file_path, entry);
+						cache.set(file_path, entry);
+						total_cache_size += size;
 
-					const byte_size = Buffer.byteLength(content);
-					log_cache(`caching {${file_path}} (size: {${filesize(byte_size)}}, etag: {${entry.etag ?? 'none'}})`);
+						log_cache(`caching {${file_path}} (size: {${filesize(size)}}, etag: {${entry.etag ?? 'none'}})`);
+
+						// enforce cache max size
+						if (total_cache_size > max_cache_size) {
+							log_cache(`exceeded maximum capacity {${filesize(total_cache_size)}} > {${filesize(max_cache_size)}}, freeing space...`);
+
+							// delete expired files to potentially free up room
+							log_cache(`free: force-invalidating expired entries`);
+							for (const [key, cache_entry] of cache.entries()) {
+								if (now_ts - cache_entry.last_access_ts > ttl) {
+									log_cache(`free: invalidating expired cache entry {${key}} (TTL expired)`);
+									cache.delete(key);
+									total_cache_size -= cache_entry.size;
+								}
+							}
+
+							// if we still need more space, sort cache by last_access and begin pruning in reverse
+							if (total_cache_size > max_cache_size) {
+								log_cache(`free: cache still over-budget {${filesize(total_cache_size)}} > {${filesize(max_cache_size)}}, pruning by last access`);
+								const sorted_entries = Array.from(cache.entries()).sort((a, b) => a[1].last_access_ts - b[1].last_access_ts);
+								for (let i = 0; i < sorted_entries.length && total_cache_size > max_cache_size; i++) {
+									const [key, cache_entry] = sorted_entries[i];
+									log_cache(`free: removing entry {${key}} (size: {${filesize(cache_entry.size)}})`);
+									cache.delete(key);
+									total_cache_size -= cache_entry.size;
+								}
+							}
+						}
+					} else {
+						log_cache(`{${file_path}} cannot enter cache, exceeds maximum size {${filesize(size)} > ${filesize(max_cache_size)}}`);
+					}
 				}
 
 				const headers = {
