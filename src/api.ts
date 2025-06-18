@@ -50,7 +50,7 @@ function worker_validate_message(message: any) {
 		throw new Error('missing worker message .id');
 }
 
-const log_worker = log_create_logger('worker', '#9333ea');
+const log_worker = log_create_logger('worker', 'spooder');
 export function worker_event_pipe(worker: Worker): WorkerEventPipe {
 	const callbacks = new Map<string, (data: Record<string, any>) => Promise<void> | void>();
 	let worker_id: number;
@@ -141,6 +141,9 @@ function filesize(bytes: number): string {
 
 // region logging
 export function log_create_logger(label: string, color: ColorInput = 'blue') {
+	if (color === 'spooder')
+		color = '#16b39e';
+
 	const ansi = Bun.color(color, 'ansi-256') ?? '\x1b[38;5;6m';
 	const prefix = `[${ansi}${label}\x1b[0m] `;
 
@@ -153,7 +156,7 @@ export function log_list(input: any[], delimiter = ',') {
 	return input.map(e => `{${e}}`).join(delimiter);
 }
 
-const log_spooder = log_create_logger('spooder', '#16b39e');
+const log_spooder = log_create_logger('spooder', 'spooder');
 export const log = log_create_logger('info', 'blue');
 
 // endregion
@@ -175,7 +178,7 @@ type CacheEntry = {
 const CACHE_DEFAULT_TTL = 5 * 60 * 60 * 1000; // 5 hours
 const CACHE_DEFAULT_MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 
-const log_cache = log_create_logger('cache', '#9333ea');
+const log_cache = log_create_logger('cache', 'spooder');
 
 export function cache_init(options?: CacheOptions) {
 	const ttl = options?.ttl ?? CACHE_DEFAULT_MAX_SIZE;

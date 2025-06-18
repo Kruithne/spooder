@@ -4,7 +4,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2';
 
-const db_log = log_create_logger('db', '#16b39e');
+const db_log = log_create_logger('db', 'spooder');
 
 // region utility
 export function db_cast_set<T extends string>(set: string | null): Set<T> {
