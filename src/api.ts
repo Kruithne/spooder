@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { Blob } from 'node:buffer';
 import { ColorInput } from 'bun';
 import packageJson from '../package.json' with { type: 'json' };
+import { ConnectionOptions } from 'mysql2';
 
 // region global error handling
 export const ERR_MODE = {
@@ -155,6 +156,74 @@ export function log_list(input: any[], delimiter = ',') {
 const log_spooder = log_create_logger('spooder', '#16b39e');
 export const log = log_create_logger('info', 'blue');
 
+// endregion
+
+// region cache
+type CacheOptions = {
+	ttl: number;
+	max_size: number;
+	use_etags: boolean;
+};
+
+type CacheEntry = {
+	content: string;
+	last_access: number;
+	etag?: string;
+	content_type: string;
+};
+
+const CACHE_DEFAULT_TTL = 5 * 60 * 60 * 1000; // 5 hours
+const CACHE_DEFAULT_MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+
+const log_cache = log_create_logger('cache', '#9333ea');
+
+export function cache_init(options?: CacheOptions) {
+	const ttl = options?.ttl ?? CACHE_DEFAULT_MAX_SIZE;
+	const max_size = options?.max_size ?? CACHE_DEFAULT_TTL;
+	const use_etags = options?.use_etags ?? true;
+
+	const cache = new Map<string, CacheEntry>();
+
+	return {
+		serve(file_path: string) {
+			return async (req: Request, url: URL) => {
+				let entry = cache.get(file_path);
+
+				if (entry === undefined) {
+					const file = Bun.file(file_path);
+					const content = await file.text();
+
+					entry = {
+						content,
+						last_access: Date.now(),
+						content_type: file.type
+					};
+
+					if (use_etags)
+						entry.etag = crypto.createHash('sha256').update(content).digest('hex');
+
+					cache.set(file_path, entry);
+
+					const byte_size = Buffer.byteLength(content);
+					log_cache(`caching {${file_path}} (size: {${filesize(byte_size)}}, etag: {${entry.etag ?? 'none'}})`);
+				}
+
+				const headers = {
+					'Content-Type': entry.content_type
+				} as Record<string, string>;
+
+				if (use_etags && entry.etag) {
+					headers['ETag'] = entry.etag;
+
+					if (req.headers.get('If-None-Match') === entry.etag)
+						return new Response(null, { status: 304, headers }); // Not Modified
+				}
+				
+				return new Response(entry.content, { status: 200, headers });
+			};
+		}
+	};
+}
 // endregion
 
 // region error handling
