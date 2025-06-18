@@ -166,6 +166,7 @@ type CacheOptions = {
 	ttl?: number;
 	max_size?: number;
 	use_etags?: boolean;
+	headers?: Record<string, string>
 };
 
 type CacheEntry = {
@@ -186,6 +187,7 @@ export function cache_init(options?: CacheOptions) {
 	const ttl = options?.ttl ?? CACHE_DEFAULT_MAX_SIZE;
 	const max_cache_size = options?.max_size ?? CACHE_DEFAULT_TTL;
 	const use_etags = options?.use_etags ?? true;
+	const cache_headers = options?.headers ?? {};
 
 	const cache = new Map<string, CacheEntry>();
 	let total_cache_size = 0;
@@ -262,9 +264,9 @@ export function cache_init(options?: CacheOptions) {
 					}
 				}
 
-				const headers = {
+				const headers = Object.assign({
 					'Content-Type': entry.content_type
-				} as Record<string, string>;
+				}, cache_headers) as Record<string, string>;
 
 				if (use_etags && entry.etag) {
 					headers['ETag'] = entry.etag;
