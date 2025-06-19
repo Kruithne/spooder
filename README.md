@@ -472,6 +472,7 @@ In addition to the information provided by the developer, `spooder` also include
 ```ts
 // logging
 log(message: string);
+log_error(message: string);
 log_create_logger(prefix: string, color: ColorInput);
 log_list(input: any[], delimiter = ', ');
 
@@ -585,6 +586,14 @@ Print a message to the console using the default logger. Wrapping text segments 
 ```ts
 log('Hello, {world}!');
 // > [info] Hello, world!
+```
+
+### 🔧 `log_error(message: string)`
+Print an error message to the console. Wrapping text segments in curly braces will highlight those segments. This works the same as `log()` except it's red, so you know it's bad.
+
+```ts
+log_error('Something went {really} wrong');
+// > [error] Something went really wrong
 ```
 
 ### 🔧 `log_create_logger(prefix: string, color: ColorInput)`

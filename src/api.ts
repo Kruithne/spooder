@@ -158,6 +158,7 @@ export function log_list(input: any[], delimiter = ',') {
 
 const log_spooder = log_create_logger('spooder', 'spooder');
 export const log = log_create_logger('info', 'blue');
+export const log_error = log_create_logger('error', 'red');
 
 // endregion
 
