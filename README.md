@@ -93,6 +93,7 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 	- [API > HTTP > Websocket Server](#api-http-websockets)
 - [API > Error Handling](#api-error-handling)
 - [API > Workers](#api-workers)
+- [API > Caching](#api-caching)
 - [API > Templating](#api-templating)
 - [API > Database](#api-database)
 	- [API > Database > Schema](#api-database-schema)
@@ -563,6 +564,9 @@ transaction(scope: (transaction: MySQLDatabaseInterface) => void | Promise<void>
 // database schema
 db_update_schema_sqlite(db: Database, schema_dir: string, schema_table?: string): Promise<void>;
 db_update_schema_mysql(db: Connection, schema_dir: string, schema_table?: string): Promise<void>;
+
+// caching
+cache_init(options?: CacheOptions);
 
 // utilities
 filesize(bytes: number): string;
@@ -1365,6 +1369,51 @@ pipe.off('event_name');
 
 > [!IMPORTANT]
 > Each worker pipe instance expects to be the sole handler for the worker's message events. Creating multiple pipes for the same worker may result in unexpected behavior.
+
+<a id="api-caching"></a>
+## API > Caching
+
+### 🔧 `cache_init(options?: CacheOptions)`
+
+Initialize a file caching system that stores file contents in memory with configurable TTL, size limits, and ETag support for efficient HTTP caching.
+
+```ts
+import { cache_init } from 'spooder';
+
+const cache = cache_init({
+	ttl: 5 * 60 * 1000 // 5 minutes
+});
+
+// Use with server routes
+server.route('/', cache.serve('./index.html'));
+```
+
+The `cache_init()` function returns an object with a `serve()` method that can be used as a route handler for serving cached files.
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `ttl` | `number` | `18000000` (5 hours) | Time in milliseconds before cached entries expire |
+| `max_size` | `number` | `5242880` (5 MB) | Maximum total size of all cached files in bytes |
+| `use_etags` | `boolean` | `true` | Generate and use ETag headers for cache validation |
+| `headers` | `Record<string, string>` | `{}` | Additional HTTP headers to include in responses |
+
+#### Cache Behavior
+
+- Files are cached for the specified TTL duration.
+- Individual files larger than `max_size` will not be cached
+- When total cache size exceeds `max_size`, expired entries are removed first
+- If still over limit, least recently used (LRU) entries are evicted
+
+**ETag Support:**
+- When `use_etags` is enabled, SHA-256 hashes are generated for file contents
+- ETags enable HTTP 304 Not Modified responses for unchanged files
+- Clients can send `If-None-Match` headers for efficient cache validation
+
+> [!IMPORTANT]
+> The cache uses memory storage and will be lost when the server restarts. It's designed for improving response times of frequently requested files rather than persistent storage.
+
+> [!NOTE]
+> Files are only cached after the first request. The cache performs lazy loading and does not pre-populate files on initialization.
 
 <a id="api-templating"></a>
 ## API > Templating
