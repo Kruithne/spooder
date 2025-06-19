@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { log_create_logger } from './api';
 
-const log_config = log_create_logger('config');
+const log_config = log_create_logger('config', 'spooder');
 
 const internal_config = {
 	run: 'bun run index.ts',

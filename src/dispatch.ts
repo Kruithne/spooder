@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const log = log_create_logger('canary');
+const log = log_create_logger('canary', 'spooder');
 
 // region github
 type GitHubInstallationResponse = Array<{
