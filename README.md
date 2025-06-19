@@ -1402,6 +1402,10 @@ If `use_canary_reporting` is enabled, `spooder` will call `caution()` in two sce
 > [!NOTE]
 > Files are only cached after the first request. The cache performs lazy loading and does not pre-populate files on initialization.
 
+### Raw Cache Access
+
+The internal cache map can be accessed via `cache.entries`. This is exposed primarily for debugging and diagnostics you may wish to implement. It is not recommended that you directly manage this.
+
 <a id="api-templating"></a>
 ## API > Templating
 

@@ -151,13 +151,15 @@ export function cache_http(options?: CacheOptions) {
 	const cache_headers = options?.headers ?? {};
 	const canary_report = options?.use_canary_reporting ?? false;
 
-	const cache = new Map<string, CacheEntry>();
+	const entries = new Map<string, CacheEntry>();
 	let total_cache_size = 0;
 
 	return {
+		entries,
+		
 		serve(file_path: string) {
 			return async (req: Request, url: URL) => {
-				let entry = cache.get(file_path);
+				let entry = entries.get(file_path);
 				const now_ts = Date.now();
 
 				// invalidate expired cache entries on access
@@ -167,7 +169,7 @@ export function cache_http(options?: CacheOptions) {
 					if (now_ts - entry.cached_ts > ttl) {
 						log_cache(`access: invalidating expired cache entry {${file_path}} (TTL expired)`);
 
-						cache.delete(file_path);
+						entries.delete(file_path);
 						total_cache_size -= entry.size ?? 0;
 						entry = undefined;
 					}
@@ -190,7 +192,7 @@ export function cache_http(options?: CacheOptions) {
 						if (use_etags)
 							entry.etag = crypto.createHash('sha256').update(content).digest('hex');
 
-						cache.set(file_path, entry);
+						entries.set(file_path, entry);
 						total_cache_size += size;
 
 						log_cache(`caching {${file_path}} (size: {${filesize(size)}}, etag: {${entry.etag ?? 'none'}})`);
@@ -203,16 +205,16 @@ export function cache_http(options?: CacheOptions) {
 								caution('cache exceeded maximum capacity', {
 									total_cache_size,
 									max_cache_size,
-									item_count: cache.size
+									item_count: entries.size
 								});
 							}
 
 							// delete expired files to potentially free up room
 							log_cache(`free: force-invalidating expired entries`);
-							for (const [key, cache_entry] of cache.entries()) {
+							for (const [key, cache_entry] of entries.entries()) {
 								if (now_ts - cache_entry.last_access_ts > ttl) {
 									log_cache(`free: invalidating expired cache entry {${key}} (TTL expired)`);
-									cache.delete(key);
+									entries.delete(key);
 									total_cache_size -= cache_entry.size;
 								}
 							}
@@ -220,11 +222,11 @@ export function cache_http(options?: CacheOptions) {
 							// if we still need more space, sort cache by last_access and begin pruning in reverse
 							if (total_cache_size > max_cache_size) {
 								log_cache(`free: cache still over-budget {${filesize(total_cache_size)}} > {${filesize(max_cache_size)}}, pruning by last access`);
-								const sorted_entries = Array.from(cache.entries()).sort((a, b) => a[1].last_access_ts - b[1].last_access_ts);
+								const sorted_entries = Array.from(entries.entries()).sort((a, b) => a[1].last_access_ts - b[1].last_access_ts);
 								for (let i = 0; i < sorted_entries.length && total_cache_size > max_cache_size; i++) {
 									const [key, cache_entry] = sorted_entries[i];
 									log_cache(`free: removing entry {${key}} (size: {${filesize(cache_entry.size)}})`);
-									cache.delete(key);
+									entries.delete(key);
 									total_cache_size -= cache_entry.size;
 								}
 							}
