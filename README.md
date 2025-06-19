@@ -566,7 +566,7 @@ db_update_schema_sqlite(db: Database, schema_dir: string, schema_table?: string)
 db_update_schema_mysql(db: Connection, schema_dir: string, schema_table?: string): Promise<void>;
 
 // caching
-cache_init(options?: CacheOptions);
+cache_http(options?: CacheOptions);
 
 // utilities
 filesize(bytes: number): string;
@@ -1373,14 +1373,14 @@ pipe.off('event_name');
 <a id="api-caching"></a>
 ## API > Caching
 
-### 🔧 `cache_init(options?: CacheOptions)`
+### 🔧 `cache_http(options?: CacheOptions)`
 
 Initialize a file caching system that stores file contents in memory with configurable TTL, size limits, and ETag support for efficient HTTP caching.
 
 ```ts
-import { cache_init } from 'spooder';
+import { cache_http } from 'spooder';
 
-const cache = cache_init({
+const cache = cache_http({
 	ttl: 5 * 60 * 1000 // 5 minutes
 });
 
@@ -1388,7 +1388,7 @@ const cache = cache_init({
 server.route('/', cache.serve('./index.html'));
 ```
 
-The `cache_init()` function returns an object with a `serve()` method that can be used as a route handler for serving cached files.
+The `cache_http()` function returns an object with a `serve()` method that can be used as a route handler for serving cached files.
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
