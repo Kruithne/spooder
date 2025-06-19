@@ -6,7 +6,6 @@ import crypto from 'crypto';
 import { Blob } from 'node:buffer';
 import { ColorInput } from 'bun';
 import packageJson from '../package.json' with { type: 'json' };
-import { ConnectionOptions } from 'mysql2';
 
 // region global error handling
 export const ERR_MODE = {
