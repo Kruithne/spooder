@@ -283,7 +283,7 @@ export async function dispatch_report(report_title: string, report_body: Array<u
 		const canary_repostiory = config.canary.repository;
 
 		if (canary_account.length === 0|| canary_repostiory.length === 0) {
-			log(`report dispatch failed; no account/repository configured`);
+			log(`report dispatch failed; no canary account/repository configured`);
 			return;
 		}
 
