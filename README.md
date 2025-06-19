@@ -512,11 +512,9 @@ ErrorWithMetadata(message: string, metadata: object);
 caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>;
 panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>;
 safe(fn: Callable): Promise<void>;
-set_error_mode(mode: ERR_MODE): void;
-get_error_mode(): ERR_MODE;
 
 // worker
-worker_event_pipe(worker: Worker | typeof self): WorkerEventPipe;
+worker_event_pipe(worker: Worker, options?: WorkerEventPipeOptions): WorkerEventPipe;
 pipe.send(id: string, data?: object): void;
 pipe.on(event: string, callback: (data: object) => void | Promise<void>): void;
 pipe.once(event: string, callback: (data: object) => void | Promise<void>): void;
@@ -574,7 +572,6 @@ filesize(bytes: number): string;
 
 // constants
 HTTP_STATUS_CODE: Record<number, string>;
-ERR_MODE: Record<string, number>;
 ```
 
 <a id="api-logging"></a>
@@ -1272,40 +1269,10 @@ await safe(() => {
 });
 ```
 
-### 🔧 `set_error_mode(mode: ERR_MODE): void`
-
-Set the global error handling mode for spooder APIs. This affects how errors are handled across all spooder components including database interfaces and worker event pipes.
-
-```ts
-import { set_error_mode, ERR_MODE } from 'spooder';
-
-// Default - suppress errors, return fallback values
-set_error_mode(ERR_MODE.SILENT_FAILURE);
-
-// Throw exceptions on errors
-set_error_mode(ERR_MODE.THROW_EXCEPTION);
-
-// Suppress errors but raise caution reports
-set_error_mode(ERR_MODE.CANARY_CAUTION);
-```
-
-### 🔧 `get_error_mode(): ERR_MODE`
-
-Get the current global error handling mode.
-
-```ts
-import { get_error_mode, ERR_MODE } from 'spooder';
-
-const current_mode = get_error_mode();
-if (current_mode === ERR_MODE.CANARY_CAUTION) {
-	// Handle caution mode logic
-}
-```
-
 <a id="api-workers"></a>
 ## API > Workers
 
-### 🔧 `worker_event_pipe(worker: Worker | typeof self): WorkerEventPipe`
+### 🔧 `worker_event_pipe(worker: Worker, options?: WorkerEventPipeOptions): WorkerEventPipe`
 
 Create an event-based communication pipe between host and worker processes. This function works both inside and outside of workers and provides a simple event system on top of the native `postMessage` API.
 
@@ -1327,6 +1294,12 @@ pipe.on('foo', data => {
 	pipe.send('bar', { response: 'success' });
 });
 ```
+
+### WorkerEventPipeOptions
+
+The second parameter of `worker_event_pipe` accepts an object of options.
+
+Currently the only available option is `use_canary_reporting`. If enabled, the event pipe will call `caution()` when it encounters errors such as malformed payloads.
 
 ### 🔧 `pipe.send(id: string, data?: object): void`
 
@@ -1373,9 +1346,6 @@ Unregister an event handler for events with the specified event ID.
 pipe.off('event_name');
 ```
 
-> [!NOTE]
-> Worker event pipes use the global error handling mode. Errors in message handling will be handled according to the current `error_mode` setting (silent failure, throw exception, or canary caution).
-
 > [!IMPORTANT]
 > Each worker pipe instance expects to be the sole handler for the worker's message events. Creating multiple pipes for the same worker may result in unexpected behavior.
 
@@ -1405,11 +1375,11 @@ The `cache_http()` function returns an object with a `serve()` method that can b
 | `max_size` | `number` | `5242880` (5 MB) | Maximum total size of all cached files in bytes |
 | `use_etags` | `boolean` | `true` | Generate and use ETag headers for cache validation |
 | `headers` | `Record<string, string>` | `{}` | Additional HTTP headers to include in responses |
-| `canary_report` | `boolean` | `false` | Reports faults to canary (see below).
+| `use_canary_reporting` | `boolean` | `false` | Reports faults to canary (see below).
 
 #### Canary Reporting
 
-If `canary_report` is enabled, `spooder` will call `caution()` in two scenarios:
+If `use_canary_reporting` is enabled, `spooder` will call `caution()` in two scenarios:
 
 1. The cache has exceeded it's maximum capacity and had to purge. If this happens frequently, it is an indication that the maximum capacity should be increased or the use of the cache should be evaluated.
 2. An item cannot enter the cache because it's size is larger than the total size of the cache. This is an indication that either something too large is being cached, or the maximum capacity is far too small.

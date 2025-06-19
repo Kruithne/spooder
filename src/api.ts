@@ -7,32 +7,15 @@ import { Blob } from 'node:buffer';
 import { ColorInput } from 'bun';
 import packageJson from '../package.json' with { type: 'json' };
 
-// region global error handling
-export const ERR_MODE = {
-	SILENT_FAILURE: 0x0,
-	THROW_EXCEPTION: 0x1,
-	CANARY_CAUTION: 0x2,
-};
-
-let global_error_mode = ERR_MODE.SILENT_FAILURE;
-
-export function set_error_mode(mode: typeof ERR_MODE[keyof typeof ERR_MODE]) {
-	global_error_mode = mode;
-}
-
-export function get_error_mode() {
-	return global_error_mode;
-}
-// endregion
-
 // region api forwarding
 export * from './api_db';
 // endregion
 
 // region workers
-let worker_id_counter = 0;
-
 type WorkerMessageData = Record<string, any>;
+type WorkerEventPipeOptions = {
+	use_canary_reporting?: boolean;
+};
 
 export interface WorkerEventPipe {
 	send: (id: string, data?: object) => void;
@@ -50,19 +33,9 @@ function worker_validate_message(message: any) {
 }
 
 const log_worker = log_create_logger('worker', 'spooder');
-export function worker_event_pipe(worker: Worker): WorkerEventPipe {
+export function worker_event_pipe(worker: Worker, options?: WorkerEventPipeOptions): WorkerEventPipe {
+	const use_canary_reporting = options?.use_canary_reporting ?? false;
 	const callbacks = new Map<string, (data: Record<string, any>) => Promise<void> | void>();
-	let worker_id: number;
-	let worker_error_mode: number;
-	
-	function handle_error(e: unknown) {
-		const error_mode = Bun.isMainThread ? get_error_mode() : worker_error_mode ?? ERR_MODE.SILENT_FAILURE;
-		if (error_mode === ERR_MODE.THROW_EXCEPTION)
-			throw e;
-		
-		if (error_mode === ERR_MODE.CANARY_CAUTION)
-			caution(`exception in worker`, { exception: e });
-	}
 
 	function handle_message(event: MessageEvent) {
 		try {
@@ -73,31 +46,18 @@ export function worker_event_pipe(worker: Worker): WorkerEventPipe {
 			if (callback !== undefined)
 				callback(message.data ?? {});
 		} catch (e) {
-			handle_error(e);
+			log_error(`exception in worker: ${(e as Error).message}`);
+
+			if (use_canary_reporting)
+				caution('worker: exception handling payload', { exception: e });
 		}
 	}
 
 	if (Bun.isMainThread) {
-		worker_id = ++worker_id_counter;
-		
+		log_worker(`event pipe connected {main thread} ⇄ {worker}`);
 		worker.addEventListener('message', handle_message);
-		worker.postMessage(JSON.stringify({
-			id: '_init',
-			data: {
-				error_mode: get_error_mode(),
-				worker_id: worker_id
-			}
-		}));
 	} else {
-		// worker thread
-		callbacks.set('_init', data => {
-			worker_error_mode = data.error_mode ?? ERR_MODE.SILENT_FAILURE;
-			worker_id = data.worker_id;
-
-			log_worker(`event pipe connected {main thread} ⇄ {worker_${worker_id}}`);
-			callbacks.delete('_init');
-		});
-
+		log_worker(`event pipe connected {worker} ⇄ {main thread}`);
 		worker.onmessage = handle_message;
 	}
 
@@ -167,7 +127,7 @@ type CacheOptions = {
 	max_size?: number;
 	use_etags?: boolean;
 	headers?: Record<string, string>,
-	canary_report?: boolean;
+	use_canary_reporting?: boolean;
 };
 
 type CacheEntry = {
@@ -189,7 +149,7 @@ export function cache_http(options?: CacheOptions) {
 	const max_cache_size = options?.max_size ?? CACHE_DEFAULT_TTL;
 	const use_etags = options?.use_etags ?? true;
 	const cache_headers = options?.headers ?? {};
-	const canary_report = options?.canary_report ?? false;
+	const canary_report = options?.use_canary_reporting ?? false;
 
 	const cache = new Map<string, CacheEntry>();
 	let total_cache_size = 0;

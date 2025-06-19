@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import { log_create_logger, log_list, caution, ERR_MODE, get_error_mode, set_error_mode } from './api';
+import { log_create_logger, log_list, log_error, caution } from './api';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2';
@@ -376,7 +376,7 @@ function create_mysql_api(instance: mysql_types.Connection | mysql_types.Pool, e
 	};
 }
 
-export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boolean = false) {
+export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boolean = false, use_canary_reporting = false) {
 	if (mysql === undefined)
 		throw new Error('db_mysql cannot be called without optional dependency {mysql2} installed');
 
@@ -386,12 +386,10 @@ export async function db_mysql(db_info: mysql_types.ConnectionOptions, pool: boo
 	const instance = pool ? mysql.createPool(db_info) : await mysql.createConnection(db_info);
 
 	function db_handle_error(error: unknown, return_value: any, title: string) {
-		const error_mode = get_error_mode();
-		if (error_mode === ERR_MODE.THROW_EXCEPTION)
-			throw error;
+		log_error(`error in {db_mysql}: ${title}`);
 
-		if (error_mode === ERR_MODE.CANARY_CAUTION)
-			caution(`mysql: ${title}`, { error });
+		if (use_canary_reporting)
+			caution('db_mysql: ' + title, { error });
 
 		return return_value;
 	}
@@ -633,16 +631,14 @@ function create_sqlite_api(instance: Database, error_handler: (error: unknown, r
 	};
 }
 
-export function db_sqlite(...args: ConstructorParameters<typeof Database>) {
-	const instance = new Database(...args);
+export function db_sqlite(filename: string, options: ConstructorParameters<typeof Database>[1], use_canary_reporting = false) {
+	const instance = new Database(filename, options);
 
 	function db_handle_error(error: unknown, return_value: any, title: string) {
-		const error_mode = get_error_mode();
-		if (error_mode === ERR_MODE.THROW_EXCEPTION)
-			throw error;
+		log_error(`error in {db_sqlite}: ${title}`);
 
-		if (error_mode === ERR_MODE.CANARY_CAUTION)
-			caution(`sqlite: ${title}`, { error });
+		if (use_canary_reporting)
+			caution('db_sqlite: ' + title, { error });
 
 		return return_value;
 	}
