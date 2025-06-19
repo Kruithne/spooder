@@ -166,7 +166,8 @@ type CacheOptions = {
 	ttl?: number;
 	max_size?: number;
 	use_etags?: boolean;
-	headers?: Record<string, string>
+	headers?: Record<string, string>,
+	canary_report?: boolean;
 };
 
 type CacheEntry = {
@@ -188,6 +189,7 @@ export function cache_init(options?: CacheOptions) {
 	const max_cache_size = options?.max_size ?? CACHE_DEFAULT_TTL;
 	const use_etags = options?.use_etags ?? true;
 	const cache_headers = options?.headers ?? {};
+	const canary_report = options?.canary_report ?? false;
 
 	const cache = new Map<string, CacheEntry>();
 	let total_cache_size = 0;
@@ -237,6 +239,14 @@ export function cache_init(options?: CacheOptions) {
 						if (total_cache_size > max_cache_size) {
 							log_cache(`exceeded maximum capacity {${filesize(total_cache_size)}} > {${filesize(max_cache_size)}}, freeing space...`);
 
+							if (canary_report) {
+								caution('cache exceeded maximum capacity', {
+									total_cache_size,
+									max_cache_size,
+									item_count: cache.size
+								});
+							}
+
 							// delete expired files to potentially free up room
 							log_cache(`free: force-invalidating expired entries`);
 							for (const [key, cache_entry] of cache.entries()) {
@@ -261,6 +271,14 @@ export function cache_init(options?: CacheOptions) {
 						}
 					} else {
 						log_cache(`{${file_path}} cannot enter cache, exceeds maximum size {${filesize(size)} > ${filesize(max_cache_size)}}`);
+
+						if (canary_report) {
+							caution('cache entry exceeds maximum size', {
+								file_path,
+								size,
+								max_cache_size
+							});
+						}
 					}
 				}
 

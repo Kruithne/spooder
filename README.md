@@ -1396,6 +1396,14 @@ The `cache_init()` function returns an object with a `serve()` method that can b
 | `max_size` | `number` | `5242880` (5 MB) | Maximum total size of all cached files in bytes |
 | `use_etags` | `boolean` | `true` | Generate and use ETag headers for cache validation |
 | `headers` | `Record<string, string>` | `{}` | Additional HTTP headers to include in responses |
+| `canary_report` | `boolean` | `false` | Reports faults to canary (see below).
+
+#### Canary Reporting
+
+If `canary_report` is enabled, `spooder` will call `caution()` in two scenarios:
+
+1. The cache has exceeded it's maximum capacity and had to purge. If this happens frequently, it is an indication that the maximum capacity should be increased or the use of the cache should be evaluated.
+2. An item cannot enter the cache because it's size is larger than the total size of the cache. This is an indication that either something too large is being cached, or the maximum capacity is far too small.
 
 #### Cache Behavior
 
