@@ -1363,11 +1363,43 @@ const cache = cache_http({
 	ttl: 5 * 60 * 1000 // 5 minutes
 });
 
-// Use with server routes
-server.route('/', cache.serve('./index.html'));
+// Use with server routes for static files
+server.route('/', cache.file('./index.html'));
+
+// Use with server routes for dynamic content
+server.route('/dynamic', cache.key('dynamic-page', () => 'Dynamic Content'));
 ```
 
-The `cache_http()` function returns an object with a `serve()` method that can be used as a route handler for serving cached files.
+The `cache_http()` function returns an object with two methods:
+
+### 🔧 `cache.file(file_path: string)`
+Caches static files from the filesystem. This method reads the file from disk and caches its contents with automatic content-type detection.
+
+```ts
+// Cache a static HTML file
+server.route('/', cache.file('./public/index.html'));
+
+// Cache CSS files
+server.route('/styles.css', cache.file('./public/styles.css'));
+```
+
+### 🔧 `cache.key(cache_key: string, content_generator: () => string | Promise<string>)`
+Caches dynamic content using a cache key and content generator function. The generator function is called only when the cache is cold (empty or expired).
+
+```ts
+// Cache dynamic HTML content
+server.route('/user/:id', cache.key('/user', async () => {
+	const userData = await fetchUserData();
+	return generateUserHTML(userData);
+}));
+
+// Cache API responses
+server.route('/api/stats', cache.key('stats', () => {
+	return JSON.stringify({ users: getUserCount(), posts: getPostCount() });
+}));
+```
+
+## Configuration Options
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |

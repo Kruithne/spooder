@@ -154,26 +154,101 @@ export function cache_http(options?: CacheOptions) {
 	const entries = new Map<string, CacheEntry>();
 	let total_cache_size = 0;
 
+	function get_and_validate_entry(cache_key: string, now_ts: number): CacheEntry | undefined {
+		let entry = entries.get(cache_key);
+
+		if (entry) {
+			entry.last_access_ts = now_ts;
+
+			if (now_ts - entry.cached_ts > ttl) {
+				log_cache(`access: invalidating expired cache entry {${cache_key}} (TTL expired)`);
+				entries.delete(cache_key);
+				total_cache_size -= entry.size ?? 0;
+				entry = undefined;
+			}
+		}
+
+		return entry;
+	}
+
+	function store_cache_entry(cache_key: string, entry: CacheEntry, now_ts: number): void {
+		const size = entry.size;
+
+		if (size < max_cache_size) {
+			if (use_etags)
+				entry.etag = crypto.createHash('sha256').update(entry.content).digest('hex');
+
+			entries.set(cache_key, entry);
+			total_cache_size += size;
+
+			log_cache(`caching {${cache_key}} (size: {${filesize(size)}}, etag: {${entry.etag ?? 'none'}})`);
+
+			if (total_cache_size > max_cache_size) {
+				log_cache(`exceeded maximum capacity {${filesize(total_cache_size)}} > {${filesize(max_cache_size)}}, freeing space...`);
+
+				if (canary_report) {
+					caution('cache exceeded maximum capacity', {
+						total_cache_size,
+						max_cache_size,
+						item_count: entries.size
+					});
+				}
+
+				log_cache(`free: force-invalidating expired entries`);
+				for (const [key, cache_entry] of entries.entries()) {
+					if (now_ts - cache_entry.last_access_ts > ttl) {
+						log_cache(`free: invalidating expired cache entry {${key}} (TTL expired)`);
+						entries.delete(key);
+						total_cache_size -= cache_entry.size;
+					}
+				}
+
+				if (total_cache_size > max_cache_size) {
+					log_cache(`free: cache still over-budget {${filesize(total_cache_size)}} > {${filesize(max_cache_size)}}, pruning by last access`);
+					const sorted_entries = Array.from(entries.entries()).sort((a, b) => a[1].last_access_ts - b[1].last_access_ts);
+					for (let i = 0; i < sorted_entries.length && total_cache_size > max_cache_size; i++) {
+						const [key, cache_entry] = sorted_entries[i];
+						log_cache(`free: removing entry {${key}} (size: {${filesize(cache_entry.size)}})`);
+						entries.delete(key);
+						total_cache_size -= cache_entry.size;
+					}
+				}
+			}
+		} else {
+			log_cache(`{${cache_key}} cannot enter cache, exceeds maximum size {${filesize(size)} > ${filesize(max_cache_size)}}`);
+
+			if (canary_report) {
+				caution('cache entry exceeds maximum size', {
+					file_path: cache_key,
+					size,
+					max_cache_size
+				});
+			}
+		}
+	}
+
+	function build_response(entry: CacheEntry, req: Request): Response {
+		const headers = Object.assign({
+			'Content-Type': entry.content_type
+		}, cache_headers) as Record<string, string>;
+
+		if (use_etags && entry.etag) {
+			headers['ETag'] = entry.etag;
+
+			if (req.headers.get('If-None-Match') === entry.etag)
+				return new Response(null, { status: 304, headers });
+		}
+		
+		return new Response(entry.content, { status: 200, headers });
+	}
+
 	return {
 		entries,
 		
-		serve(file_path: string) {
+		file(file_path: string) {
 			return async (req: Request, url: URL) => {
-				let entry = entries.get(file_path);
 				const now_ts = Date.now();
-
-				// invalidate expired cache entries on access
-				if (entry) {
-					entry.last_access_ts = now_ts;
-
-					if (now_ts - entry.cached_ts > ttl) {
-						log_cache(`access: invalidating expired cache entry {${file_path}} (TTL expired)`);
-
-						entries.delete(file_path);
-						total_cache_size -= entry.size ?? 0;
-						entry = undefined;
-					}
-				}
+				let entry = get_and_validate_entry(file_path, now_ts);
 
 				if (entry === undefined) {
 					const file = Bun.file(file_path);
@@ -188,74 +263,34 @@ export function cache_http(options?: CacheOptions) {
 						cached_ts: now_ts
 					};
 
-					if (size < max_cache_size) {
-						if (use_etags)
-							entry.etag = crypto.createHash('sha256').update(content).digest('hex');
-
-						entries.set(file_path, entry);
-						total_cache_size += size;
-
-						log_cache(`caching {${file_path}} (size: {${filesize(size)}}, etag: {${entry.etag ?? 'none'}})`);
-
-						// enforce cache max size
-						if (total_cache_size > max_cache_size) {
-							log_cache(`exceeded maximum capacity {${filesize(total_cache_size)}} > {${filesize(max_cache_size)}}, freeing space...`);
-
-							if (canary_report) {
-								caution('cache exceeded maximum capacity', {
-									total_cache_size,
-									max_cache_size,
-									item_count: entries.size
-								});
-							}
-
-							// delete expired files to potentially free up room
-							log_cache(`free: force-invalidating expired entries`);
-							for (const [key, cache_entry] of entries.entries()) {
-								if (now_ts - cache_entry.last_access_ts > ttl) {
-									log_cache(`free: invalidating expired cache entry {${key}} (TTL expired)`);
-									entries.delete(key);
-									total_cache_size -= cache_entry.size;
-								}
-							}
-
-							// if we still need more space, sort cache by last_access and begin pruning in reverse
-							if (total_cache_size > max_cache_size) {
-								log_cache(`free: cache still over-budget {${filesize(total_cache_size)}} > {${filesize(max_cache_size)}}, pruning by last access`);
-								const sorted_entries = Array.from(entries.entries()).sort((a, b) => a[1].last_access_ts - b[1].last_access_ts);
-								for (let i = 0; i < sorted_entries.length && total_cache_size > max_cache_size; i++) {
-									const [key, cache_entry] = sorted_entries[i];
-									log_cache(`free: removing entry {${key}} (size: {${filesize(cache_entry.size)}})`);
-									entries.delete(key);
-									total_cache_size -= cache_entry.size;
-								}
-							}
-						}
-					} else {
-						log_cache(`{${file_path}} cannot enter cache, exceeds maximum size {${filesize(size)} > ${filesize(max_cache_size)}}`);
-
-						if (canary_report) {
-							caution('cache entry exceeds maximum size', {
-								file_path,
-								size,
-								max_cache_size
-							});
-						}
-					}
+					store_cache_entry(file_path, entry, now_ts);
 				}
 
-				const headers = Object.assign({
-					'Content-Type': entry.content_type
-				}, cache_headers) as Record<string, string>;
+				return build_response(entry, req);
+			};
+		},
 
-				if (use_etags && entry.etag) {
-					headers['ETag'] = entry.etag;
+		key(cache_key: string, content_generator: () => string | Promise<string>) {
+			return async (req: Request, url: URL) => {
+				const now_ts = Date.now();
+				let entry = get_and_validate_entry(cache_key, now_ts);
 
-					if (req.headers.get('If-None-Match') === entry.etag)
-						return new Response(null, { status: 304, headers }); // Not Modified
+				if (entry === undefined) {
+					const content = await content_generator();
+					const size = Buffer.byteLength(content);
+
+					entry = {
+						content,
+						size,
+						last_access_ts: now_ts,
+						content_type: 'text/html',
+						cached_ts: now_ts
+					};
+
+					store_cache_entry(cache_key, entry, now_ts);
 				}
-				
-				return new Response(entry.content, { status: 200, headers });
+
+				return build_response(entry, req);
 			};
 		}
 	};
