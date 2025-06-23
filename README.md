@@ -1646,6 +1646,7 @@ const subs = await generate_hash_subs(7, undefined, hashes);
 
 <a id="api-database"></a>
 <a id="api-database-interface"></a>
+## API > Database
 
 ### 🔧 ``db_cast_set<T extends string>(set: string | null): Set<T>``
 
