@@ -1682,12 +1682,10 @@ const serialized = db_serialize_set(set);
 // > 'OPT_A,OPT_B'
 ```
 
-
-
 <a id="api-database-interface-sqlite"></a>
 ## API > Database > Interface > SQLite
 
-`spooder` provides a simple **SQLIte** interface that acts as a wrapper around the Bun SQLite API. The construction parameters match the underlying API.
+`spooder` provides a simple **SQLite** interface that acts as a wrapper around the Bun SQLite API. The construction parameters match the underlying API.
 
 ```ts
 // see: https://bun.sh/docs/api/sqlite
