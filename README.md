@@ -1693,6 +1693,23 @@ const db = db_sqlite(':memory:', { create: true });
 db.instance; // raw access to underlying sqlite instance.
 ```
 
+### Error Reporting
+
+In the event of an error from SQLite, an applicable value will be returned from interface functions, rather than the error being thrown.
+
+```ts
+const result = await db.get_single('BROKEN QUERY');
+if (result !== null) {
+	// do more stuff with result
+}
+```
+
+If you have configured the canary reporting feature in spooder, you can instruct the database interface to report errors using this feature with the `use_canary_reporting` parameter.
+
+```ts
+const db = db_sqlite(':memory', { ... }, true);
+```
+
 ### 🔧 ``db_sqlite.update_schema(schema_dir: string, schema_table: string): Promise<void>``
 
 `spooder` offers a database schema management system. The `update_schema()` function is a shortcut to call this on the underlying database.
@@ -1824,6 +1841,31 @@ const db = await db_mysql({
 	// ...
 });
 db.instance; // raw access to underlying mysql2 instance.
+```
+
+### Error Reporting
+
+In the event of an error from MySQL, an applicable value will be returned from interface functions, rather than the error being thrown.
+
+```ts
+const result = await db.get_single('BROKEN QUERY');
+if (result !== null) {
+	// do more stuff with result
+}
+```
+
+If you have configured the canary reporting feature in spooder, you can instruct the database interface to report errors using this feature with the `use_canary_reporting` parameter.
+
+```ts
+const db = await db_mysql({ ... }, false, true);
+```
+
+### Pooling
+
+MySQL supports connection pooling. This can be configured by providing `true` to the `pool` parameter.
+
+```ts
+const pool = await db_mysql({ ... }, true);
 ```
 
 ### 🔧 ``db_mysql.update_schema(schema_dir: string, schema_table: string): Promise<void>``
