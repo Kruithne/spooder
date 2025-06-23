@@ -145,8 +145,8 @@ const CACHE_DEFAULT_MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 const log_cache = log_create_logger('cache', 'spooder');
 
 export function cache_http(options?: CacheOptions) {
-	const ttl = options?.ttl ?? CACHE_DEFAULT_MAX_SIZE;
-	const max_cache_size = options?.max_size ?? CACHE_DEFAULT_TTL;
+	const ttl = options?.ttl ?? CACHE_DEFAULT_TTL;
+	const max_cache_size = options?.max_size ?? CACHE_DEFAULT_MAX_SIZE;
 	const use_etags = options?.use_etags ?? true;
 	const cache_headers = options?.headers ?? {};
 	const canary_report = options?.use_canary_reporting ?? false;
