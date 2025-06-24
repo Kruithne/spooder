@@ -144,6 +144,10 @@ const CACHE_DEFAULT_MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 
 const log_cache = log_create_logger('cache', 'spooder');
 
+function is_cache_http(target: any): target is ReturnType<typeof cache_http> {
+	return target && typeof target === 'object' && 'entries' in target && typeof target.entries === 'object';
+}
+
 export function cache_http(options?: CacheOptions) {
 	const ttl = options?.ttl ?? CACHE_DEFAULT_TTL;
 	const max_cache_size = options?.max_size ?? CACHE_DEFAULT_MAX_SIZE;
@@ -849,7 +853,7 @@ type BootstrapRoute = {
 type BootstrapOptions = {
 	base?: string | BunFile;
 	routes: Record<string, BootstrapRoute>;
-	cache?: ReturnType<typeof cache_http>;
+	cache?: ReturnType<typeof cache_http> | CacheOptions;
 	cache_bust?: boolean;
 	
 	static?: {
@@ -1256,6 +1260,10 @@ export function http_serve(port: number, hostname?: string) {
 			const hash_sub_table = options.cache_bust ? await generate_hash_subs() : {};
 			const global_sub_table = sub_table_merge(hash_sub_table, options.global_subs);
 
+			let cache = options.cache;
+			if (cache !== undefined && !is_cache_http(cache))
+				cache = cache_http(cache);
+
 			for (const [route, route_opts] of Object.entries(options.routes)) {
 				const handler = async () => {
 					let content = await resolve_bootstrap_content(route_opts.content);
@@ -1269,7 +1277,7 @@ export function http_serve(port: number, hostname?: string) {
 					return content;
 				};
 				
-				this.route(route, options.cache?.key(route, handler) ?? handler);
+				this.route(route, cache?.key(route, handler) ?? handler);
 			}
 			
 			const static_options = options.static;

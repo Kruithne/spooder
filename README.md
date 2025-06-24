@@ -1229,17 +1229,17 @@ Bootstrap a server using `spooder` utilities with a straight-forward options API
 
 ```ts
 const server = http_serve(80);
-const cache = cache_http({
-	ttl: 5 * 60 * 60 * 1000, // 5 minutes
-	max_size: 5 * 1024 * 1024, // 5 MB
-	use_canary_reporting: true,
-	use_etags: true
-});
 
 server.bootstrap({
 	base: Bun.file('./html/base_template.html'),
 
-	cache,
+	cache: {
+		ttl: 5 * 60 * 60 * 1000, // 5 minutes
+		max_size: 5 * 1024 * 1024, // 5 MB
+		use_canary_reporting: true,
+		use_etags: true
+	},
+	
 	cache_bust: true,
 
 	static: {
