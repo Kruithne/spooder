@@ -920,7 +920,7 @@ server.route('/test', async (req) => {
 > This will have no effect if a handler hasn't been registered with `on_slow_request`.
 
 <a id="api-http-directory"></a>
-## HTTP > Directory Serving
+## API > HTTP > Directory Serving
 
 ### 🔧 `server.dir(path: string, dir: string, options?: DirOptions | DirHandler)`
 Serve files from a directory.
@@ -1038,7 +1038,7 @@ Hello,
 ```
 
 <a id="api-http-sse"></a>
-## HTTP > Server-Sent Events (SSE)
+## API > HTTP > Server-Sent Events (SSE)
 
 ### 🔧 `server.sse(path: string, handler: ServerSentEventHandler)`
 
@@ -1078,7 +1078,7 @@ server.sse('/sse', (req, url, client) => {
 ```
 
 <a id="api-http-webhooks"></a>
-## HTTP > Webhooks
+## API > HTTP > Webhooks
 
 ### 🔧 `server.webhook(secret: string, path: string, handler: WebhookHandler)`
 
@@ -1102,7 +1102,7 @@ A webhook callback will only be called if the following critera is met by a requ
 > Constant-time comparison is used to prevent timing attacks when comparing the HMAC signature.
 
 <a id="api-http-websockets"></a>
-## HTTP > Websocket Server
+## API > HTTP > Websocket Server
 
 ### 🔧 `server.websocket(path: string, handlers: WebSocketHandlers)`
 
