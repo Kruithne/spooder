@@ -801,7 +801,7 @@ function is_bun_file(obj: any): obj is BunFile {
 	return obj.constructor === Blob;
 }
 
-function sub_table_merge<T extends Record<string, any>>(target: T, ...sources: (Partial<T> | undefined | null)[]): T {
+function sub_table_merge(target: Record<string, any>, ...sources: (Record<string, any> | undefined | null)[]): Record<string, any> {
 	const result = { ...target };
 	
 	for (const source of sources) {
@@ -814,9 +814,9 @@ function sub_table_merge<T extends Record<string, any>>(target: T, ...sources: (
 				const targetValue = result[key];
 				
 				if (Array.isArray(targetValue) && Array.isArray(sourceValue))
-					result[key] = [...targetValue, ...sourceValue] as any;
+					result[key] = [...targetValue, ...sourceValue];
 				else
-					result[key] = sourceValue as any;
+					result[key] = sourceValue;
 			}
 		}
 	}
@@ -841,7 +841,7 @@ type WebsocketHandlers = {
 	drain?: (ws: WebSocket) => void
 };
 
-type BootstrapSub = string;
+type BootstrapSub = string | string[];
 
 type BootstrapRoute = {
 	content: string | BunFile;
