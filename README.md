@@ -1178,6 +1178,26 @@ const cache = cache_http({
 const base_file = await Bun.file('./html/base_template.html').text();
 const hash_table = await generate_hash_subs();
 
+async function default_handler(status_code: number): Promise<Response> {
+	const error_text = HTTP_STATUS_CODE[status_code] as string;
+	const error_page = await Bun.file('./html/error.html').text();
+
+	const content = await parse_template(error_page, {
+		title: error_text,
+		error_code: status_code.toString(),
+		error_text: error_text
+	}, true);
+
+	return new Response(content, { status: status_code });
+}
+
+server.error((err: Error) => {
+	caution(err?.message ?? err);
+	return default_handler(500);
+});
+
+server.default((req, status_code) => default_handler(status_code));
+
 server.dir('/static', './static', async (file_path, file, stat, request) => {
 	// ignore hidden files by default, return 404 to prevent file sniffing
 	if (path.basename(file_path).startsWith('.'))
@@ -1238,6 +1258,11 @@ server.bootstrap({
 		max_size: 5 * 1024 * 1024, // 5 MB
 		use_canary_reporting: true,
 		use_etags: true
+	},
+
+	error: {
+		use_canary_reporting: true,
+		error_page: Bun.file('./html/error.html')
 	},
 	
 	cache_bust: true,

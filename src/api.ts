@@ -855,6 +855,10 @@ type BootstrapOptions = {
 	routes: Record<string, BootstrapRoute>;
 	cache?: ReturnType<typeof cache_http> | CacheOptions;
 	cache_bust?: boolean;
+	error?: {
+		use_canary_reporting?: boolean;
+		error_page: string | BunFile;
+	},
 	
 	static?: {
 		route: string;
@@ -1278,6 +1282,34 @@ export function http_serve(port: number, hostname?: string) {
 				};
 				
 				this.route(route, cache?.key(route, handler) ?? handler);
+			}
+
+			const error_options = options.error;
+			if (error_options !== undefined) {
+				async function default_handler(status_code: number): Promise<Response> {
+					const error_text = HTTP_STATUS_CODE[status_code] as string;
+					let content = await resolve_bootstrap_content(error_options!.error_page);
+
+					if (options.base !== undefined)
+						content = await parse_template(await resolve_bootstrap_content(options.base), { content }, false);
+
+					const sub_table = sub_table_merge({
+						error_code: status_code.toString(),
+						error_text: error_text
+					}, global_sub_table);
+
+					content = await parse_template(content, sub_table, true);
+					return new Response(content, { status: status_code });
+				}
+
+				this.error((err: Error) => {
+					if (options.error?.use_canary_reporting)
+						caution(err?.message ?? err);
+	
+					return default_handler(500);
+				});
+				
+				this.default((req, status_code) => default_handler(status_code));
 			}
 			
 			const static_options = options.static;
