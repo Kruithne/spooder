@@ -91,6 +91,7 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 	- [API > HTTP > Server-Sent Events (SSE)](#api-http-sse)
 	- [API > HTTP > Webhooks](#api-http-webhooks)
 	- [API > HTTP > Websocket Server](#api-http-websockets)
+	- [API > HTTP > Bootstrap](#api-http-bootstrap)
 - [API > Error Handling](#api-error-handling)
 - [API > Workers](#api-workers)
 - [API > Caching](#api-caching)
@@ -506,6 +507,9 @@ server.webhook(secret: string, path: string, handler: WebhookHandler);
 
 // websockets
 server.websocket(path: string, handlers: WebsocketHandlers);
+
+// bootstrap
+server.bootstrap(options: BootstrapOptions): Promise<void>;
 
 // error handling
 ErrorWithMetadata(message: string, metadata: object);
@@ -1151,6 +1155,131 @@ server.websocket('/path/to/websocket', {
 
 > [!IMPORTANT]
 > While it is possible to register multiple routes for websockets, the only handler which is unique per route is `accept()`. The last handlers provided to any route (with the exception of `accept()`) will apply to ALL websocket routes. This is a limitation in Bun.
+
+<a id="api-http-bootstrap"></a>
+## API > HTTP > Bootstrap
+
+`spooder` provides a building-block style API with the intention of giving you the blocks to construct a server your way, rather than being shoe-horned into one over-engineered mega-solution which you don't need.
+
+For simpler projects, the scaffolding can often look the same, potentially something similar to below.
+
+```ts
+import { http_serve, cache_http, generate_hash_subs, parse_template, http_apply_range } from 'spooder';
+import path from 'node:path';
+
+const server = http_serve(80);
+const cache = cache_http({
+	ttl: 5 * 60 * 60 * 1000, // 5 minutes
+	max_size: 5 * 1024 * 1024, // 5 MB
+	use_canary_reporting: true,
+	use_etags: true
+});
+
+const base_file = await Bun.file('./html/base_template.html').text();
+const hash_table = await generate_hash_subs();
+
+server.dir('/static', './static', async (file_path, file, stat, request) => {
+	// ignore hidden files by default, return 404 to prevent file sniffing
+	if (path.basename(file_path).startsWith('.'))
+		return 404; // Not Found
+	
+	if (stat.isDirectory())
+		return 401; // Unauthorized
+
+	// cache busting
+	const ext = path.extname(file_path);
+	if (ext === '.css' || ext === '.js') {
+		const content = await parse_template(await file.text(), hash_table, true);
+
+		return new Response(content, {
+			headers: {
+				'Content-Type': file.type
+			}
+		});
+	}
+	
+	return http_apply_range(file, request);
+});
+
+function add_route(route: string, file: string, title: string) {
+	server.route(route, cache.key(route, async () => {
+		const file_content = await Bun.file(file).text();
+		const template = await parse_template(base_file, {
+			title: title,
+			content: file_content,
+			...hash_table	
+		}, false);
+
+		return template;
+	}));
+}
+
+add_route('/', './html/index.html', 'Homepage');
+add_route('/about', './html/about.html', 'About Us');
+add_route('/contact', './html/contact.html', 'Contact Us');
+add_route('/privacy', './html/privacy.html', 'Privacy Policy');
+add_route('/terms', './html/terms.html', 'Terms of Service');
+```
+
+For a project where you are looking for fine control, this may be acceptable, but for bootstrapping simple servers this can be a lot of boilerplate. This is where `server.bootstrap` comes in.
+
+### 🔧 `server.bootstrap(options: BootstrapOptions): Promise<void>`
+
+Bootstrap a server using `spooder` utilities with a straight-forward options API, cutting out the boilerplate.
+
+```ts
+const server = http_serve(80);
+const cache = cache_http({
+	ttl: 5 * 60 * 60 * 1000, // 5 minutes
+	max_size: 5 * 1024 * 1024, // 5 MB
+	use_canary_reporting: true,
+	use_etags: true
+});
+
+server.bootstrap({
+	base: Bun.file('./html/base_template.html'),
+
+	cache,
+	cache_bust: true,
+
+	static: {
+		directory: './static',
+		route: '/static',
+		sub_ext: ['.css']
+	},
+
+	global_subs: {
+		'project_name': 'Some Project'
+	},
+
+	routes: {
+		'/': {
+			content: Bun.file('./html/index.html'),
+			subs: { 'title': 'Homepage' }
+		},
+
+		'/about': {
+			content: Bun.file('./html/about.html'),
+			subs: { 'title': 'About Us' }
+		},
+
+		'/contact': {
+			content: Bun.file('./html/contact.html'),
+			subs: { 'title': 'Contact Us' }
+		},
+
+		'/privacy': {
+			content: Bun.file('./html/privacy.html'),
+			subs: { 'title': 'Privacy Policy' }
+		},
+
+		'/terms': {
+			content: Bun.file('./html/terms.html'),
+			subs: { 'title': 'Terms of Service' }
+		}
+	}
+});
+```
 
 <a id="api-error-handling"></a>
 ## API > Error Handling
