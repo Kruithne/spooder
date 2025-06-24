@@ -570,6 +570,8 @@ db_update_schema_mysql(db: Connection, schema_dir: string, schema_table?: string
 
 // caching
 cache_http(options?: CacheOptions);
+cache.file(file_path: string): RequestHandler;
+cache.request(req: Request, cache_key: string, content_generator: () => string | Promise<string>): Promise<Response>;
 
 // utilities
 filesize(bytes: number): string;
@@ -1222,16 +1224,18 @@ server.dir('/static', './static', async (file_path, file, stat, request) => {
 });
 
 function add_route(route: string, file: string, title: string) {
-	server.route(route, cache.key(route, async () => {
-		const file_content = await Bun.file(file).text();
-		const template = await parse_template(base_file, {
-			title: title,
-			content: file_content,
-			...hash_table	
-		}, false);
+	server.route(route, async (req) => {
+		return cache.request(req, route, async () => {
+			const file_content = await Bun.file(file).text();
+			const template = await parse_template(base_file, {
+				title: title,
+				content: file_content,
+				...hash_table	
+			}, false);
 
-		return template;
-	}));
+			return template;
+		});
+	});
 }
 
 add_route('/', './html/index.html', 'Homepage');
@@ -1521,7 +1525,7 @@ const cache = cache_http({
 server.route('/', cache.file('./index.html'));
 
 // Use with server routes for dynamic content
-server.route('/dynamic', cache.key('dynamic-page', () => 'Dynamic Content'));
+server.route('/dynamic', async (req) => cache.request(req, 'dynamic-page', () => 'Dynamic Content'));
 ```
 
 The `cache_http()` function returns an object with two methods:
@@ -1537,20 +1541,24 @@ server.route('/', cache.file('./public/index.html'));
 server.route('/styles.css', cache.file('./public/styles.css'));
 ```
 
-### 🔧 `cache.key(cache_key: string, content_generator: () => string | Promise<string>)`
-Caches dynamic content using a cache key and content generator function. The generator function is called only when the cache is cold (empty or expired).
+### 🔧 `cache.request(req: Request, cache_key: string, content_generator: () => string | Promise<string>): Promise<Response>`
+Caches dynamic content using a cache key and content generator function. The generator function is called only when the cache is cold (empty or expired). This method directly processes requests and returns responses, making it compatible with any request handler.
 
 ```ts
 // Cache dynamic HTML content
-server.route('/user/:id', cache.key('/user', async () => {
-	const userData = await fetchUserData();
-	return generateUserHTML(userData);
-}));
+server.route('/user/:id', async (req) => {
+	return cache.request(req, '/user', async () => {
+		const userData = await fetchUserData();
+		return generateUserHTML(userData);
+	});
+});
 
 // Cache API responses
-server.route('/api/stats', cache.key('stats', () => {
-	return JSON.stringify({ users: getUserCount(), posts: getPostCount() });
-}));
+server.route('/api/stats', async (req) => {
+	return cache.request(req, 'stats', () => {
+		return JSON.stringify({ users: getUserCount(), posts: getPostCount() });
+	});
+});
 ```
 
 ## Configuration Options

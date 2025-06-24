@@ -231,7 +231,7 @@ export function cache_http(options?: CacheOptions) {
 		}
 	}
 	
-	function build_response(entry: CacheEntry, req: Request): Response {
+	function build_response(entry: CacheEntry, req: Request, status_code: number): Response {
 		const headers = Object.assign({
 			'Content-Type': entry.content_type
 		}, cache_headers) as Record<string, string>;
@@ -243,7 +243,7 @@ export function cache_http(options?: CacheOptions) {
 				return new Response(null, { status: 304, headers });
 		}
 		
-		return new Response(entry.content, { status: 200, headers });
+		return new Response(entry.content, { status: status_code, headers });
 	}
 	
 	return {
@@ -270,32 +270,30 @@ export function cache_http(options?: CacheOptions) {
 					store_cache_entry(file_path, entry, now_ts);
 				}
 				
-				return build_response(entry, req);
+				return build_response(entry, req, 200);
 			};
 		},
 		
-		key(cache_key: string, content_generator: () => string | Promise<string>) {
-			return async (req: Request, url: URL) => {
-				const now_ts = Date.now();
-				let entry = get_and_validate_entry(cache_key, now_ts);
+		async request(req: Request, cache_key: string, content_generator: () => string | Promise<string>, status_code = 200): Promise<Response> {
+			const now_ts = Date.now();
+			let entry = get_and_validate_entry(cache_key, now_ts);
+			
+			if (entry === undefined) {
+				const content = await content_generator();
+				const size = Buffer.byteLength(content);
 				
-				if (entry === undefined) {
-					const content = await content_generator();
-					const size = Buffer.byteLength(content);
-					
-					entry = {
-						content,
-						size,
-						last_access_ts: now_ts,
-						content_type: 'text/html',
-						cached_ts: now_ts
-					};
-					
-					store_cache_entry(cache_key, entry, now_ts);
-				}
+				entry = {
+					content,
+					size,
+					last_access_ts: now_ts,
+					content_type: 'text/html',
+					cached_ts: now_ts
+				};
 				
-				return build_response(entry, req);
-			};
+				store_cache_entry(cache_key, entry, now_ts);
+			}
+			
+			return build_response(entry, req, status_code);
 		}
 	};
 }
@@ -1269,7 +1267,7 @@ export function http_serve(port: number, hostname?: string) {
 				cache = cache_http(cache);
 
 			for (const [route, route_opts] of Object.entries(options.routes)) {
-				const handler = async () => {
+				const content_generator = async () => {
 					let content = await resolve_bootstrap_content(route_opts.content);
 
 					if (options.base !== undefined)
@@ -1281,14 +1279,18 @@ export function http_serve(port: number, hostname?: string) {
 					return content;
 				};
 				
-				this.route(route, cache?.key(route, handler) ?? handler);
+				const handler = cache 
+					? async (req: Request) => cache.request(req, route, content_generator)
+					: async () => content_generator();
+				
+				this.route(route, handler);
 			}
 
 			const error_options = options.error;
 			if (error_options !== undefined) {
-				async function default_handler(status_code: number): Promise<Response> {
+				const create_error_content_generator = (status_code: number) => async () => {
 					const error_text = HTTP_STATUS_CODE[status_code] as string;
-					let content = await resolve_bootstrap_content(error_options!.error_page);
+					let content = await resolve_bootstrap_content(error_options.error_page);
 
 					if (options.base !== undefined)
 						content = await parse_template(await resolve_bootstrap_content(options.base), { content }, false);
@@ -1299,17 +1301,26 @@ export function http_serve(port: number, hostname?: string) {
 					}, global_sub_table);
 
 					content = await parse_template(content, sub_table, true);
-					return new Response(content, { status: status_code });
-				}
+					return content;
+				};
 
-				this.error((err: Error) => {
+				const default_handler = async (req: Request, status_code: number): Promise<Response> => {
+					if (cache) {
+						return cache.request(req, `error_${status_code}`, create_error_content_generator(status_code), status_code);
+					} else {
+						const content = await create_error_content_generator(status_code)();
+						return new Response(content, { status: status_code });
+					}
+				};
+
+				this.error((err, req) => {
 					if (options.error?.use_canary_reporting)
 						caution(err?.message ?? err);
 	
-					return default_handler(500);
+					return default_handler(req, 500);
 				});
 				
-				this.default((req, status_code) => default_handler(status_code));
+				this.default((req, status_code) => default_handler(req, status_code));
 			}
 			
 			const static_options = options.static;
