@@ -718,21 +718,12 @@ async function generate_directory_index(file_path: string, request_path: string)
 	}
 }
 
-function default_directory_handler(file_path: string, file: BunFile, stat: DirStat, request: Request): HandlerReturnType {
-	// ignore hidden files by default, return 404 to prevent file sniffing
-	if (path.basename(file_path).startsWith('.'))
-		return 404; // Not Found
-	
-	if (stat.isDirectory())
-		return 401; // Unauthorized
-	
-	return http_apply_range(file, request);
-}
 
 function route_directory(route_path: string, dir: string, handler_or_options: DirHandler | DirOptions): RequestHandler {
 	const is_handler = typeof handler_or_options === 'function';
 	const handler = is_handler ? handler_or_options as DirHandler : null;
-	const options = is_handler ? { ignore_hidden: true, index_directories: false, support_ranges: true } : { ignore_hidden: true, index_directories: false, support_ranges: true, ...handler_or_options as DirOptions };
+	const default_options = { ignore_hidden: true, index_directories: false, support_ranges: true };
+	const options = is_handler ? default_options : { ...default_options, ...handler_or_options as DirOptions };
 	
 	return async (req: Request, url: URL) => {
 		const file_path = path.join(dir, url.pathname.slice(route_path.length));
@@ -1105,7 +1096,7 @@ export function http_serve(port: number, hostname?: string) {
 			if (path.endsWith('/'))
 				path = path.slice(0, -1);
 			
-			const final_handler_or_options = handler_or_options ?? default_directory_handler;
+			const final_handler_or_options = handler_or_options ?? { ignore_hidden: true, index_directories: false, support_ranges: true };
 			routes.push([[...path.split('/'), '*'], route_directory(path, dir, final_handler_or_options), method]);
 		},
 		
