@@ -226,7 +226,7 @@ server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
 		await server.stop(false);
 		process.exit();
 	});
-	return 200;
+	return HTTP_STATUS_CODE.X_200_OK;
 });
 ```
 
@@ -743,7 +743,7 @@ server.route('/test/route', (req, url) => {
 `spooder` does not provide a built-in redirection handler since it's trivial to implement one using [`Response.redirect`](https://developer.mozilla.org/en-US/docs/Web/API/Response/redirect_static), part of the standard Web API.
 
 ```ts
-server.route('/redirect', () => Response.redirect('/redirected', 301));
+server.route('/redirect', () => Response.redirect('/redirected', HTTP_STATUS_CODE.X_301_MovedPermanently));
 ```
 
 ### Status Code Text
@@ -831,7 +831,7 @@ Wildcards can be used to match any path that starts with a given path.
 
 ```ts
 server.route('/test/*', (req, url) => {
-	return new Response('Hello, world!', { status: 200 });
+	return new Response('Hello, world!', { status: HTTP_STATUS_CODE.X_200_OK });
 });
 ```
 
@@ -839,8 +839,8 @@ server.route('/test/*', (req, url) => {
 > Routes are [FIFO](https://en.wikipedia.org/wiki/FIFO_(computing_and_electronics)) and wildcards are greedy. Wildcards should be registered last to ensure they do not consume more specific routes.
 
 ```ts
-server.route('/*', () => 301);
-server.route('/test', () => 200);
+server.route('/*', () => HTTP_STATUS_CODE.X_301_MovedPermanently);
+server.route('/test', () => HTTP_STATUS_CODE.X_200_OK);
 
 // Accessing /test returns 301 here, because /* matches /test first.
 ```
@@ -850,8 +850,8 @@ server.route('/test', () => 200);
 ### 🔧 `server.handle(status_code: number, handler: RequestHandler)`
 Register a custom handler for a specific status code.
 ```ts
-server.handle(500, (req) => {
-	return new Response('Custom Internal Server Error Message', { status: 500 });
+server.handle(HTTP_STATUS_CODE.X_500_InternalServerError, (req) => {
+	return new Response('Custom Internal Server Error Message', { status: HTTP_STATUS_CODE.X_500_InternalServerError });
 });
 ```
 
@@ -872,7 +872,7 @@ Register a handler for uncaught errors.
 > Unlike other handlers, this should only return `Response` or `Promise<Response>`.
 ```ts
 server.error((err, req, url) => {
-	return new Response('Custom Internal Server Error Message', { status: 500 });
+	return new Response('Custom Internal Server Error Message', { status: HTTP_STATUS_CODE.X_500_InternalServerError });
 });
 ```
 
@@ -885,7 +885,7 @@ server.error((err, req, url) => {
 	caution({ err, url });
 
 	// Return a response to the client.
-	return new Response('Custom Internal Server Error Message', { status: 500 });
+	return new Response('Custom Internal Server Error Message', { status: HTTP_STATUS_CODE.X_500_InternalServerError });
 });
 ```
 
@@ -993,10 +993,10 @@ For complete control, provide a custom handler function:
 server.dir('/static', '/static', (file_path, file, stat, request, url) => {
 	// ignore hidden files by default, return 404 to prevent file sniffing
 	if (path.basename(file_path).startsWith('.'))
-		return 404; // Not Found
+		return HTTP_STATUS_CODE.X_404_NotFound;
 
 	if (stat.isDirectory())
-		return 401; // Unauthorized
+		return HTTP_STATUS_CODE.X_401_Unauthorized;
 
 	return http_apply_range(file, request);
 });
@@ -1099,7 +1099,7 @@ Setup a webhook handler.
 ```ts
 server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
 	// React to the webhook.
-	return 200;
+	return HTTP_STATUS_CODE.X_200_OK;
 });
 ```
 
@@ -1111,13 +1111,13 @@ You can optionally filter webhooks by branch name using the `branches` parameter
 // Only trigger for main branch
 server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
 	// This will only fire for pushes to main branch
-	return 200;
+	return HTTP_STATUS_CODE.X_200_OK;
 }, 'main');
 
 // Trigger for multiple branches
 server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
 	// This will fire for pushes to main or staging branches
-	return 200;
+	return HTTP_STATUS_CODE.X_200_OK;
 }, ['main', 'staging']);
 ```
 
@@ -1226,7 +1226,7 @@ async function default_handler(status_code: number): Promise<Response> {
 
 server.error((err: Error) => {
 	caution(err?.message ?? err);
-	return default_handler(500);
+	return default_handler(HTTP_STATUS_CODE.X_500_InternalServerError);
 });
 
 server.default((req, status_code) => default_handler(status_code));
@@ -1234,10 +1234,10 @@ server.default((req, status_code) => default_handler(status_code));
 server.dir('/static', './static', async (file_path, file, stat, request) => {
 	// ignore hidden files by default, return 404 to prevent file sniffing
 	if (path.basename(file_path).startsWith('.'))
-		return 404; // Not Found
+		return HTTP_STATUS_CODE.X_404_NotFound;
 	
 	if (stat.isDirectory())
-		return 401; // Unauthorized
+		return HTTP_STATUS_CODE.X_401_Unauthorized;
 
 	// cache busting
 	const ext = path.extname(file_path);
