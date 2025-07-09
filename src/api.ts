@@ -1127,7 +1127,7 @@ export function http_serve(port: number, hostname?: string) {
 			ws_drain_handler = handlers.drain;
 		},
 		
-		webhook: (secret: string, path: string, handler: WebhookHandler): void => {
+		webhook: (secret: string, path: string, handler: WebhookHandler, branches?: string | string[]): void => {
 			routes.push([path.split('/'), async (req: Request) => {
 				if (req.headers.get('Content-Type') !== 'application/json')
 					return 400; // Bad Request
@@ -1145,6 +1145,19 @@ export function http_serve(port: number, hostname?: string) {
 				
 				if (!crypto.timingSafeEqual(sig_buffer, hmac_buffer))
 					return 401; // Unauthorized
+				
+				// Branch filtering logic
+				if (branches !== undefined) {
+					const branch_list = Array.isArray(branches) ? branches : [branches];
+					const payload = body as any;
+					
+					if (payload.ref && typeof payload.ref === 'string') {
+						const branch_name = payload.ref.split('/').pop() || payload.ref;
+						
+						if (!branch_list.includes(branch_name))
+							return 200; // OK
+					}
+				}
 				
 				return handler(body);
 			}, 'POST']);

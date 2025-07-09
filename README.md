@@ -503,7 +503,7 @@ server.dir(path: string, dir: string, options?: DirOptions | DirHandler, method?
 server.sse(path: string, handler: ServerSentEventHandler);
 
 // webhooks
-server.webhook(secret: string, path: string, handler: WebhookHandler);
+server.webhook(secret: string, path: string, handler: WebhookHandler, branches?: string | string[]);
 
 // websockets
 server.websocket(path: string, handlers: WebsocketHandlers);
@@ -1082,7 +1082,7 @@ server.sse('/sse', (req, url, client) => {
 <a id="api-http-webhooks"></a>
 ## API > HTTP > Webhooks
 
-### 🔧 `server.webhook(secret: string, path: string, handler: WebhookHandler)`
+### 🔧 `server.webhook(secret: string, path: string, handler: WebhookHandler, branches?: string | string[])`
 
 Setup a webhook handler.
 
@@ -1093,12 +1093,33 @@ server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
 });
 ```
 
+#### Branch Filtering
+
+You can optionally filter webhooks by branch name using the `branches` parameter:
+
+```ts
+// Only trigger for main branch
+server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
+	// This will only fire for pushes to main branch
+	return 200;
+}, 'main');
+
+// Trigger for multiple branches
+server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
+	// This will fire for pushes to main or staging branches
+	return 200;
+}, ['main', 'staging']);
+```
+
+When branch filtering is enabled, the webhook handler will only be called for pushes to the specified branches. The branch name is extracted from the payload's `ref` field (e.g., `refs/heads/main` becomes `main`).
+
 A webhook callback will only be called if the following critera is met by a request:
 - Request method is `POST` (returns `405` otherwise)
 - Header `X-Hub-Signature-256` is present (returns `400` otherwise)
 - Header `Content-Type` is `application/json` (returns `401` otherwise)
 - Request body is a valid JSON object (returns `500` otherwise)
 - HMAC signature of the request body matches the `X-Hub-Signature-256` header (returns `401` otherwise)
+- If branch filtering is enabled, the push must be to one of the specified branches (returns `200` but ignores otherwise)
 
 > [!NOTE]
 > Constant-time comparison is used to prevent timing attacks when comparing the HMAC signature.
