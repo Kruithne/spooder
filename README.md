@@ -577,7 +577,8 @@ cache.request(req: Request, cache_key: string, content_generator: () => string |
 filesize(bytes: number): string;
 
 // constants
-HTTP_STATUS_CODE: Record<number, string>;
+HTTP_STATUS_TEXT: Record<number, string>;
+HTTP_STATUS_CODE: { X_200_OK: 200, X_404_NotFound: 404, ... };
 ```
 
 <a id="api-logging"></a>
@@ -747,15 +748,24 @@ server.route('/redirect', () => Response.redirect('/redirected', 301));
 
 ### Status Code Text
 
-`spooder` exposes `HTTP_STATUS_CODE` to convieniently access status code text.
+`spooder` exposes `HTTP_STATUS_TEXT` to conveniently access status code text, and `HTTP_STATUS_CODE` for named status code constants.
 
 ```ts
-import { HTTP_STATUS_CODE } from 'spooder';
+import { HTTP_STATUS_TEXT, HTTP_STATUS_CODE } from 'spooder';
 
 server.default((req, status_code) => {
 	// status_code: 404
 	// Body: Not Found
-	return new Response(HTTP_STATUS_CODE[status_code], { status: status_code });
+	return new Response(HTTP_STATUS_TEXT[status_code], { status: status_code });
+});
+
+// Using named constants for better readability
+server.route('/api/users', (req, url) => {
+	if (!isValidUser(req))
+		return HTTP_STATUS_CODE.X_401_Unauthorized;
+	
+	// Process user request
+	return HTTP_STATUS_CODE.X_200_OK;
 });
 ```
 
