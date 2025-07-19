@@ -1341,6 +1341,120 @@ server.bootstrap({
 });
 ```
 
+#### Bootstrap Options
+
+The `BootstrapOptions` object accepts the following properties:
+
+##### `base?: string | BunFile`
+Optional base template that wraps all route content. The base template should include `{{content}}` where the route content will be inserted.
+
+```ts
+// Base template: base.html
+<html>
+<head><title>{{title}}</title></head>
+<body>{{content}}</body>
+</html>
+
+// Usage
+server.bootstrap({
+	base: Bun.file('./templates/base.html'),
+	routes: {
+		'/': {
+			content: '<h1>Welcome</h1>',
+			subs: { title: 'Home' }
+		}
+	}
+});
+```
+
+##### `routes: Record<string, BootstrapRoute>`
+**Required.** Defines the routes and their content. Each route can have:
+- `content`: The page content (string or BunFile)
+- `subs?`: Template substitutions specific to this route
+
+```ts
+routes: {
+	'/about': {
+		content: Bun.file('./pages/about.html'),
+		subs: { 
+			title: 'About Us',
+			description: 'Learn more about our company'
+		}
+	}
+}
+```
+
+##### `cache?: CacheOptions | ReturnType<typeof cache_http>`
+Optional HTTP caching configuration. Can be:
+- A `CacheOptions` object (creates new cache instance)
+- An existing cache instance from `cache_http()`
+- Omitted to disable caching
+
+```ts
+cache: {
+	ttl: 5 * 60 * 1000,     // 5 minutes
+	max_size: 10 * 1024 * 1024, // 10 MB
+	use_etags: true,
+	use_canary_reporting: true
+}
+```
+
+##### `cache_bust?: boolean`
+When `true`, automatically generates git hash-based substitutions for cache busting. Creates variables like `{{hash=path/to/file.css}}` that resolve to the file's git hash.
+
+```ts
+// In templates: <link rel="stylesheet" href="/css/style.css?v={{hash=static/css/style.css}}">
+// Resolves to: <link rel="stylesheet" href="/css/style.css?v=a1b2c3d">
+```
+
+##### `error?: object`
+Optional error page configuration:
+- `error_page`: Template for error pages (string or BunFile)
+- `use_canary_reporting?`: Whether to report errors via canary
+
+Error templates receive `{{error_code}}` and `{{error_text}}` substitutions.
+
+```ts
+error: {
+	error_page: Bun.file('./templates/error.html'),
+	use_canary_reporting: true
+}
+```
+
+##### `static?: object`
+Optional static file serving configuration:
+- `route`: URL path prefix for static files
+- `directory`: Local directory containing static files
+- `sub_ext?`: Array of file extensions that should have template substitution applied
+
+```ts
+static: {
+	route: '/assets',
+	directory: './public',
+	sub_ext: ['.css', '.js']  // These files get template processing
+}
+```
+
+Files with extensions in `sub_ext` will have template substitutions applied before serving.
+
+##### `global_subs?: Record<string, BootstrapSub>`
+Optional global template substitutions available to all routes, error pages, and static files with `sub_ext`.
+
+```ts
+global_subs: {
+	site_name: 'My Website',
+	version: '1.0.0',
+	api_url: 'https://api.example.com'
+}
+```
+
+#### Template Processing Order
+
+1. Route content is loaded
+2. If `base` is defined, content is wrapped using `{{content}}` substitution
+3. Route-specific `subs` and `global_subs` are applied
+4. Cache busting hashes (if enabled) are applied
+
 <a id="api-error-handling"></a>
 ## API > Error Handling
 
