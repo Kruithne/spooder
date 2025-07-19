@@ -549,14 +549,22 @@ export async function get_git_hashes(length = 7): Promise<Record<string, string>
 	return hash_map;
 }
 
-export async function generate_hash_subs(length = 7, prefix = 'hash=', hashes?: Record<string, string>): Promise<Record<string, string>> {	
+export async function generate_hash_subs(length = 7, prefix = 'hash=', hashes?: Record<string, string>, format?: string): Promise<Record<string, string>> {	
 	const hash_map: Record<string, string> = {};
 	
 	if (!hashes)
 		hashes = await get_git_hashes(length);
 	
-	for (const [file, hash] of Object.entries(hashes))
-		hash_map[prefix + file] = hash;
+	for (const [file, hash] of Object.entries(hashes)) {
+		if (format !== undefined) {
+			const formatted_value = format
+				.replace(/\$file/g, file)
+				.replace(/\$hash/g, hash);
+			hash_map[prefix + file] = formatted_value;
+		} else {
+			hash_map[prefix + file] = hash;
+		}
+	}
 	
 	return hash_map;
 }
@@ -987,7 +995,12 @@ type BootstrapOptions = {
 	base?: string | BunFile;
 	routes: Record<string, BootstrapRoute>;
 	cache?: ReturnType<typeof cache_http> | CacheOptions;
-	cache_bust?: boolean;
+	hash_subs?: boolean | {
+		length?: number;
+		prefix?: string;
+		format?: string;
+		hashes?: Record<string, string>;
+	};
 	error?: {
 		use_canary_reporting?: boolean;
 		error_page: string | BunFile;
@@ -1407,7 +1420,17 @@ export function http_serve(port: number, hostname?: string) {
 		
 		/* Bootstrap a static web server */
 		bootstrap: async function(options: BootstrapOptions) {
-			const hash_sub_table = options.cache_bust ? await generate_hash_subs() : {};
+			let hash_sub_table = {};
+			
+			if (options.hash_subs) {
+				if (options.hash_subs === true) {
+					hash_sub_table = await generate_hash_subs();
+				} else {
+					const { length, prefix, format, hashes } = options.hash_subs;
+					hash_sub_table = await generate_hash_subs(length, prefix, hashes, format);
+				}
+			}
+			
 			const global_sub_table = sub_table_merge(hash_sub_table, options.global_subs);
 
 			let cache = options.cache;

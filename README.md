@@ -526,7 +526,7 @@ pipe.off(event: string): void;
 
 // templates
 parse_template(template: string, replacements: Record<string, string>, drop_missing?: boolean): Promise<string>;
-generate_hash_subs(length?: number, prefix?: string, hashes?: Record<string, string>): Promise<Record<string, string>>;
+generate_hash_subs(length?: number, prefix?: string, hashes?: Record<string, string>, format?: string): Promise<Record<string, string>>;
 get_git_hashes(length: number): Promise<Record<string, string>>;
 
 // database interface
@@ -1300,7 +1300,7 @@ server.bootstrap({
 		error_page: Bun.file('./html/error.html')
 	},
 	
-	cache_bust: true,
+	hash_subs: true,
 
 	static: {
 		directory: './static',
@@ -1399,12 +1399,35 @@ cache: {
 }
 ```
 
-##### `cache_bust?: boolean`
-When `true`, automatically generates git hash-based substitutions for cache busting. Creates variables like `{{hash=path/to/file.css}}` that resolve to the file's git hash.
+##### `hash_subs?: boolean | object`
+When enabled, automatically generates git hash-based substitutions. Can be a boolean for defaults or an object for custom options.
 
+**Boolean usage (uses defaults):**
 ```ts
-// In templates: <link rel="stylesheet" href="/css/style.css?v={{hash=static/css/style.css}}">
-// Resolves to: <link rel="stylesheet" href="/css/style.css?v=a1b2c3d">
+hash_subs: true  // Equivalent to { length: 7, prefix: 'hash=' }
+```
+
+**Object usage (custom options):**
+```ts
+hash_subs: {
+	length: 7,           // Hash length (default: 7)
+	prefix: 'asset=',    // Substitution prefix (default: 'hash=')
+	format: '$file?v=$hash',  // Custom format (default: just hash)
+	hashes: { ... }      // Pre-generated hash map from get_git_hashes (optional)
+}
+```
+
+**Examples:**
+```ts
+// Default hash substitutions
+hash_subs: true
+// Creates: {{hash=static/css/style.css}} -> "a1b2c3d"
+// Usage: <link href="/css/style.css?v={{hash=static/css/style.css}}">
+
+// Asset-style substitutions (reduces verbosity)
+hash_subs: { prefix: 'asset=', format: '$file?v=$hash' }
+// Creates: {{asset=static/css/style.css}} -> "static/css/style.css?v=a1b2c3d" 
+// Usage: <link href="{{asset=static/css/style.css}}">
 ```
 
 ##### `error?: object`
@@ -1453,7 +1476,7 @@ global_subs: {
 1. Route content is loaded
 2. If `base` is defined, content is wrapped using `{{content}}` substitution
 3. Route-specific `subs` and `global_subs` are applied
-4. Cache busting hashes (if enabled) are applied
+4. Hash substitutions (if enabled) are applied
 
 <a id="api-error-handling"></a>
 ## API > Error Handling
@@ -1917,7 +1940,7 @@ await parse_template(..., {
 </t-for>
 ```
 
-### 🔧 `generate_hash_subs(length: number, prefix: string, hashes?: Record<string, string>): Promise<Record<string, string>>`
+### 🔧 `generate_hash_subs(length: number, prefix: string, hashes?: Record<string, string>, format?: string): Promise<Record<string, string>>`
 
 Generate a replacement table for mapping file paths to hashes in templates. This is useful for cache-busting static assets.
 
@@ -1960,6 +1983,25 @@ server.route('/test', (req, url) => {
 	return parse_template('Hello world {{$#docs/project-logo.png}}', hash_sub_table);
 });
 ```
+
+#### Custom Format Parameter
+
+The optional `format` parameter allows you to customize how the substitution values are formatted. Use `$file` and `$hash` placeholders within the format string:
+
+```ts
+// Asset-style substitutions - reduces verbosity
+const asset_subs = await generate_hash_subs(7, 'asset=', undefined, '$file?v=$hash');
+
+// Usage in templates:
+// <link rel="stylesheet" href="{{asset=static/css/shared.css}}">
+// Resolves to: static/css/shared.css?v=a1b2c3d
+
+// Custom format example:
+await generate_hash_subs(7, 'url=', undefined, 'https://assets.example.com/$file?hash=$hash');
+// Result: { 'url=app.js': 'https://assets.example.com/app.js?hash=a1b2c3d' }
+```
+
+When `format` is omitted, the default behavior returns just the hash value (backward compatible).
 
 ### 🔧 ``get_git_hashes(length: number): Promise<Record<string, string>>``
 
