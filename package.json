@@ -1,7 +1,7 @@
 {
 	"name": "spooder",
 	"type": "module",
-	"version": "5.0.0",
+	"version": "5.0.1",
 	"module": "./src/api.ts",
 	"bin": {
 		"spooder": "./src/cli.ts"
