@@ -399,7 +399,10 @@ export async function safe(target_fn: Callable) {
 // region templates
 type ReplacerFn = (key: string) => string | Array<string> | undefined;
 type AsyncReplaceFn = (key: string) => Promise<string | Array<string> | undefined>;
-type Replacements = Record<string, string | Array<string> | object | object[]> | ReplacerFn | AsyncReplaceFn;
+type ReplacementValueFn = () => string | Array<string> | undefined;
+type AsyncReplacementValueFn = () => Promise<string | Array<string> | undefined>;
+type ReplacementValue = string | Array<string> | object | object[] | ReplacementValueFn | AsyncReplacementValueFn;
+type Replacements = Record<string, ReplacementValue> | ReplacerFn | AsyncReplaceFn;
 
 function get_nested_property(obj: any, path: string): any {
 	const keys = path.split('.');
@@ -502,6 +505,9 @@ export async function parse_template(template: string, replacements: Replacement
 					}
 				}
 			}
+			
+			if (replacement !== undefined && typeof replacement === 'function')
+				replacement = await replacement();
 			
 			if (replacement !== undefined)
 				return replacement;
@@ -988,7 +994,7 @@ type WebsocketHandlers = {
 	drain?: (ws: WebSocket) => void
 };
 
-type BootstrapSub = string | string[];
+type BootstrapSub = ReplacementValue;
 
 type BootstrapRoute = {
 	content: string | BunFile;

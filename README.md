@@ -525,7 +525,8 @@ pipe.once(event: string, callback: (data: object) => void | Promise<void>): void
 pipe.off(event: string): void;
 
 // templates
-parse_template(template: string, replacements: Record<string, string>, drop_missing?: boolean): Promise<string>;
+Replacements = Record<string, string | Array<string> | object | object[]> | ReplacerFn | AsyncReplaceFn;
+parse_template(template: string, replacements: Replacements, drop_missing?: boolean): Promise<string>;
 generate_hash_subs(length?: number, prefix?: string, hashes?: Record<string, string>, format?: string): Promise<Record<string, string>>;
 get_git_hashes(length: number): Promise<Record<string, string>>;
 
@@ -1458,7 +1459,25 @@ static: {
 }
 ```
 
-Files with extensions in `sub_ext` will have template substitutions applied before serving.
+Files with extensions in `sub_ext` will have template substitutions applied before serving. This includes support for functions to generate dynamic content:
+
+```ts
+// Dynamic CSS with function-based substitutions
+static: {
+	route: '/assets',
+	directory: './public',
+	sub_ext: ['.css']
+},
+
+global_subs: {
+	theme_color: () => {
+		const hour = new Date().getHours();
+		return hour < 6 || hour > 18 ? '#2d3748' : '#4a5568';
+	}
+}
+```
+
+This allows CSS files to use dynamic substitutions: `color: {{theme_color}};`
 
 ##### `global_subs?: Record<string, BootstrapSub>`
 Optional global template substitutions available to all routes, error pages, and static files with `sub_ext`.
@@ -1467,9 +1486,27 @@ Optional global template substitutions available to all routes, error pages, and
 global_subs: {
 	site_name: 'My Website',
 	version: '1.0.0',
-	api_url: 'https://api.example.com'
+	api_url: 'https://api.example.com',
+	
+	// Function-based substitutions for dynamic content
+	current_year: () => new Date().getFullYear().toString(),
+	
+	build_time: async () => {
+		// Example: fetch build timestamp from git
+		const process = Bun.spawn(['git', 'log', '-1', '--format=%ct']);
+		const output = await Bun.readableStreamToText(process.stdout);
+		return new Date(parseInt(output.trim()) * 1000).toISOString();
+	},
+	
+	user_count: async () => {
+		// Example: dynamic user count from database
+		const count = await db.count('SELECT COUNT(*) as count FROM users');
+		return count.toLocaleString();
+	}
 }
 ```
+
+Functions in `global_subs` and route-specific `subs` are called during template processing, allowing for dynamic content generation. Both synchronous and asynchronous functions are supported.
 
 #### Template Processing Order
 
@@ -1829,28 +1866,34 @@ await parse_template(template, replacements, true);
 </html>
 ```
 
-`parse_template` supports passing a function instead of a replacement object. This function will be called for each placeholder and the return value will be used as the replacement. This function can be a Promise/async function.
+#### Custom Replacer Function
+
+`parse_template` supports passing a function instead of a replacement object. This function will be called for each placeholder and the return value will be used as the replacement. Both synchronous and asynchronous functions are supported.
 
 ```ts
-const replacer = (placeholder: string) => {
-	return placeholder.toUpperCase();
+const dynamicReplacer = (key: string) => {
+	switch (key) {
+		case 'timestamp': return Date.now().toString();
+		case 'random': return Math.random().toString(36).substring(7);
+		case 'greeting': return 'Hello, World!';
+		default: return undefined;
+	}
 };
 
-await parse_template('Hello {{world}}', replacer);
+await parse_template('Generated at {{timestamp}}: {{greeting}} (ID: {{random}})', dynamicReplacer);
+// Result: "Generated at 1635789123456: Hello, World! (ID: x7k2p9m)"
 ```
 
-```html
-<html>
-	<head>
-		<title>TITLE</title>
-	</head>
-	<body>
-		<h1>TITLE</h1>
-		<p>CONTENT</p>
-		<p>IGNORED</p>
-	</body>
-</html>
+Custom replacer functions are supported on a per-key basis, mixing with static string replacement.
+
+```ts
+await parse_template('Hello {{foo}}, it is {{now}}', {
+	foo: 'world',
+	now: () => Date.now()
+});
 ```
+
+#### Conditional Rendering
 
 `parse_template` supports conditional rendering with the following syntax.
 
