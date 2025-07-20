@@ -1962,6 +1962,34 @@ const html = await parse_template(template, replacements);
 </ul>
 ```
 
+#### Simple Array Iteration
+
+For simple arrays containing strings, you can iterate directly over the array items:
+
+```ts
+const template = `
+	<ul>
+		<t-for items="fruits" as="fruit">
+			<li>{{fruit}}</li>
+		</t-for>
+	</ul>
+`;
+
+const replacements = {
+	fruits: ['apple', 'banana', 'orange']
+};
+
+const html = await parse_template(template, replacements);
+```
+
+```html
+<ul>
+	<li>apple</li>
+	<li>banana</li>
+	<li>orange</li>
+</ul>
+```
+
 #### Dot Notation Property Access
 
 You can access nested object properties using dot notation:
