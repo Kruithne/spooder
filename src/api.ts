@@ -397,11 +397,13 @@ export async function safe(target_fn: Callable) {
 // endregion
 
 // region templates
-type ReplacerFn = (key: string) => string | Array<string> | undefined;
-type AsyncReplaceFn = (key: string) => Promise<string | Array<string> | undefined>;
+type ReplacerFn = (key: string, value?: string) => string | Array<string> | undefined;
+type AsyncReplaceFn = (key: string, value?: string) => Promise<string | Array<string> | undefined>;
 type ReplacementValueFn = () => string | Array<string> | undefined;
 type AsyncReplacementValueFn = () => Promise<string | Array<string> | undefined>;
-type ReplacementValue = string | Array<string> | object | object[] | ReplacementValueFn | AsyncReplacementValueFn;
+type ReplacementValueWithKeyFn = (value?: string) => string | Array<string> | undefined;
+type AsyncReplacementValueWithKeyFn = (value?: string) => Promise<string | Array<string> | undefined>;
+type ReplacementValue = string | Array<string> | object | object[] | ReplacementValueFn | AsyncReplacementValueFn | ReplacementValueWithKeyFn | AsyncReplacementValueWithKeyFn;
 type Replacements = Record<string, ReplacementValue> | ReplacerFn | AsyncReplaceFn;
 
 function get_nested_property(obj: any, path: string): any {
@@ -485,15 +487,31 @@ export async function parse_template(template: string, replacements: Replacement
 		result = await replace_async(result, var_regex, async (match, var_name) => {
 			// Trim whitespace from variable name
 			var_name = var_name.trim();
+			
+			// Check for key=value syntax
+			let key = var_name;
+			let value: string | undefined = undefined;
+			const equals_index = var_name.indexOf('=');
+
+			if (equals_index !== -1) {
+				key = var_name.substring(0, equals_index);
+				value = var_name.substring(equals_index + 1);
+			}
+			
 			let replacement;
 			
 			if (is_replacer_fn) {
-				replacement = await replacements(var_name);
+				replacement = await replacements(key, value);
 			} else {
 				// First try direct key lookup (handles hash keys with dots like "hash=.gitignore")
 				replacement = replacements[var_name];
 				
-				// If direct lookup fails and variable contains dots, try nested property access
+				// If direct lookup fails and we have key=value syntax, try key lookup
+				if (replacement === undefined && value !== undefined) {
+					replacement = replacements[key];
+				}
+				
+				// If still undefined and variable contains dots, try nested property access
 				if (replacement === undefined && var_name.includes('.')) {
 					const dot_index = var_name.indexOf('.');
 					const base_key = var_name.substring(0, dot_index);
@@ -506,8 +524,12 @@ export async function parse_template(template: string, replacements: Replacement
 				}
 			}
 			
-			if (replacement !== undefined && typeof replacement === 'function')
-				replacement = await replacement();
+			if (replacement !== undefined && typeof replacement === 'function') {
+				if (value !== undefined && replacement.length > 0)
+					replacement = await replacement(value);
+				else
+					replacement = await replacement();
+			}
 			
 			if (replacement !== undefined)
 				return replacement;

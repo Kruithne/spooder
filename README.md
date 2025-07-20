@@ -1871,7 +1871,7 @@ await parse_template(template, replacements, true);
 `parse_template` supports passing a function instead of a replacement object. This function will be called for each placeholder and the return value will be used as the replacement. Both synchronous and asynchronous functions are supported.
 
 ```ts
-const dynamicReplacer = (key: string) => {
+const replacer = (key: string) => {
 	switch (key) {
 		case 'timestamp': return Date.now().toString();
 		case 'random': return Math.random().toString(36).substring(7);
@@ -1880,7 +1880,7 @@ const dynamicReplacer = (key: string) => {
 	}
 };
 
-await parse_template('Generated at {{timestamp}}: {{greeting}} (ID: {{random}})', dynamicReplacer);
+await parse_template('Generated at {{timestamp}}: {{greeting}} (ID: {{random}})', replacer);
 // Result: "Generated at 1635789123456: Hello, World! (ID: x7k2p9m)"
 ```
 
@@ -1891,6 +1891,31 @@ await parse_template('Hello {{foo}}, it is {{now}}', {
 	foo: 'world',
 	now: () => Date.now()
 });
+```
+
+#### Key/Value Based Substitutions
+
+`parse_template` supports key/value based substitutions using the `{{key=value}}` syntax. When a function replacer is provided for the key, the value is passed as a parameter to the function.
+
+```ts
+await parse_template('Color: {{hex=blue}}', {
+	hex: (color) => {
+		const colors = { blue: '#0000ff', red: '#ff0000', green: '#00ff00' };
+		return colors[color] || color;
+	}
+});
+// Result: "Color: #0000ff"
+```
+
+Global replacer functions also support the value parameter:
+
+```ts
+await parse_template('Transform: {{upper=hello}} and {{lower=WORLD}}', (key, value) => {
+	if (key === 'upper' && value) return value.toUpperCase();
+	if (key === 'lower' && value) return value.toLowerCase();
+	return 'unknown';
+});
+// Result: "Transform: HELLO and world"
 ```
 
 #### Conditional Rendering
