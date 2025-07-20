@@ -435,11 +435,14 @@ export async function parse_template(template: string, replacements: Replacement
 					
 					if (typeof replacements === 'function') {
 						scoped_replacements = async (key: string) => {
-							if (key === alias_name) return loop_entry;
+							if (key === alias_name)
+								return loop_entry;
+
 							if (key.startsWith(alias_name + '.')) {
 								const prop_path = key.substring(alias_name.length + 1);
 								return get_nested_property(loop_entry, prop_path);
 							}
+
 							return await replacements(key);
 						};
 					} else {
@@ -467,6 +470,7 @@ export async function parse_template(template: string, replacements: Replacement
 			
 			if (!drop_missing && !condition_value)
 				return match;
+			
 			if (condition_value)
 				return await parse_template(if_content, replacements, drop_missing);
 			
