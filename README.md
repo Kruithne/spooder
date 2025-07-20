@@ -527,7 +527,6 @@ pipe.off(event: string): void;
 // templates
 Replacements = Record<string, string | Array<string> | object | object[]> | ReplacerFn | AsyncReplaceFn;
 parse_template(template: string, replacements: Replacements, drop_missing?: boolean): Promise<string>;
-generate_hash_subs(length?: number, prefix?: string, hashes?: Record<string, string>, format?: string): Promise<Record<string, string>>;
 get_git_hashes(length: number): Promise<Record<string, string>>;
 
 // database interface
@@ -1198,7 +1197,7 @@ server.websocket('/path/to/websocket', {
 For simpler projects, the scaffolding can often look the same, potentially something similar to below.
 
 ```ts
-import { http_serve, cache_http, generate_hash_subs, parse_template, http_apply_range } from 'spooder';
+import { http_serve, cache_http, parse_template, http_apply_range, get_git_hashes } from 'spooder';
 import path from 'node:path';
 
 const server = http_serve(80);
@@ -1210,7 +1209,7 @@ const cache = cache_http({
 });
 
 const base_file = await Bun.file('./html/base_template.html').text();
-const hash_table = await generate_hash_subs();
+const git_hash_table = await get_git_hashes();
 
 async function default_handler(status_code: number): Promise<Response> {
 	const error_text = HTTP_STATUS_CODE[status_code] as string;
@@ -1240,10 +1239,12 @@ server.dir('/static', './static', async (file_path, file, stat, request) => {
 	if (stat.isDirectory())
 		return HTTP_STATUS_CODE.Unauthorized_401;
 
-	// cache busting
+	// serve css/js files directly
 	const ext = path.extname(file_path);
 	if (ext === '.css' || ext === '.js') {
-		const content = await parse_template(await file.text(), hash_table, true);
+		const content = await parse_template(await file.text(), {
+			asset: (file) => git_hash_table[file]
+		}, true);
 
 		return new Response(content, {
 			headers: {
@@ -1262,8 +1263,8 @@ function add_route(route: string, file: string, title: string) {
 			const template = await parse_template(base_file, {
 				title: title,
 				content: file_content,
-				...hash_table	
-			}, false);
+				asset: (file) => git_hash_table[file]
+			}, true);
 
 			return template;
 		});
@@ -1301,7 +1302,7 @@ server.bootstrap({
 		error_page: Bun.file('./html/error.html')
 	},
 	
-	hash_subs: true,
+	cache_bust: true,
 
 	static: {
 		directory: './static',
@@ -1400,36 +1401,29 @@ cache: {
 }
 ```
 
-##### `hash_subs?: boolean | object`
-When enabled, automatically generates git hash-based substitutions. Can be a boolean for defaults or an object for custom options.
+##### `cache_bust?: boolean`
+When enabled, automatically generates git hash-based cache busting for static assets using dynamic template resolvers.
 
-**Boolean usage (uses defaults):**
 ```ts
-hash_subs: true  // Equivalent to { length: 7, prefix: 'hash=' }
+cache_bust: true
 ```
 
-**Object usage (custom options):**
+With `cache_bust` enabled, you can use the `{{asset=filename}}` template function to generate cache-busted URLs:
+
+**Usage:**
 ```ts
-hash_subs: {
-	length: 7,           // Hash length (default: 7)
-	prefix: 'asset=',    // Substitution prefix (default: 'hash=')
-	format: '$file?v=$hash',  // Custom format (default: just hash)
-	hashes: { ... }      // Pre-generated hash map from get_git_hashes (optional)
-}
+cache_bust: true
+// Creates dynamic asset resolver: {{asset=static/css/style.css}} -> "static/css/style.css?v=a1b2c3d"
 ```
 
-**Examples:**
-```ts
-// Default hash substitutions
-hash_subs: true
-// Creates: {{hash=static/css/style.css}} -> "a1b2c3d"
-// Usage: <link href="/css/style.css?v={{hash=static/css/style.css}}">
-
-// Asset-style substitutions (reduces verbosity)
-hash_subs: { prefix: 'asset=', format: '$file?v=$hash' }
-// Creates: {{asset=static/css/style.css}} -> "static/css/style.css?v=a1b2c3d" 
-// Usage: <link href="{{asset=static/css/style.css}}">
+**Template usage:**
+```html
+<link href="{{asset=static/css/style.css}}">
+<script src="{{asset=static/js/app.js}}"></script>
+<img src="{{asset=static/images/logo.png}}">
 ```
+
+The `asset` function automatically appends the git hash as a query parameter for cache busting, or returns the original filename if no hash is available.
 
 ##### `error?: object`
 Optional error page configuration:
@@ -2008,72 +2002,10 @@ await parse_template(..., {
 </t-for>
 ```
 
-### 🔧 `generate_hash_subs(length: number, prefix: string, hashes?: Record<string, string>, format?: string): Promise<Record<string, string>>`
-
-Generate a replacement table for mapping file paths to hashes in templates. This is useful for cache-busting static assets.
-
-> [!IMPORTANT]
-> Internally `generate_hash_subs()` uses `git ls-tree -r HEAD`, so the working directory must be a git repository.
-
-```ts
-let hash_sub_table = {};
-
-generate_hash_subs().then(subs => hash_sub_table = subs).catch(caution);
-
-server.route('/test', (req, url) => {
-	return parse_template('Hello world {{hash=docs/project-logo.png}}', hash_sub_table);
-});
-```
-
-```html
-Hello world 754d9ea
-```
-
-> [!IMPORTANT]
-> Specify paths as they appear in git, relative to the repository root and with forward slashes (no leading slash).
-
-By default hashes are truncated to `7` characters (a short hash), a custom length can be provided instead.
-
-```ts
-generate_hash_subs(40).then(...);
-// d65c52a41a75db43e184d2268c6ea9f9741de63e
-```
-
-> [!NOTE]
-> SHA-1 hashes are `40` characters. Git is transitioning to SHA-256, which are `64` characters. Short hashes of `7` are generally sufficient for cache-busting.
-
-Use a different prefix other than `hash=` by passing it as the first parameter.
-
-```ts
-generate_hash_subs(7, '$#').then(subs => hash_sub_table = subs).catch(caution);
-
-server.route('/test', (req, url) => {
-	return parse_template('Hello world {{$#docs/project-logo.png}}', hash_sub_table);
-});
-```
-
-#### Custom Format Parameter
-
-The optional `format` parameter allows you to customize how the substitution values are formatted. Use `$file` and `$hash` placeholders within the format string:
-
-```ts
-// Asset-style substitutions - reduces verbosity
-const asset_subs = await generate_hash_subs(7, 'asset=', undefined, '$file?v=$hash');
-
-// Usage in templates:
-// <link rel="stylesheet" href="{{asset=static/css/shared.css}}">
-// Resolves to: static/css/shared.css?v=a1b2c3d
-
-// Custom format example:
-await generate_hash_subs(7, 'url=', undefined, 'https://assets.example.com/$file?hash=$hash');
-// Result: { 'url=app.js': 'https://assets.example.com/app.js?hash=a1b2c3d' }
-```
-
-When `format` is omitted, the default behavior returns just the hash value (backward compatible).
 
 ### 🔧 ``get_git_hashes(length: number): Promise<Record<string, string>>``
 
-Internally, `generate_hash_subs()` uses `get_git_hashes()` to retrieve the hash table from git. This function is exposed for convenience.
+Retrieve git hashes for all files in the repository. This is useful for implementing cache-busting functionality or creating file integrity checks.
 
 > [!IMPORTANT]
 > Internally `get_git_hashes()` uses `git ls-tree -r HEAD`, so the working directory must be a git repository.
@@ -2083,14 +2015,11 @@ const hashes = await get_git_hashes(7);
 // { 'docs/project-logo.png': '754d9ea' }
 ```
 
-If you're using `generate_hash_subs()` and `get_git_hashes()` at the same time, it is more efficient to pass the result of `get_git_hashes()` directly to `generate_hash_subs()` to prevent redundant calls to git.
+You can specify the hash length (default is 7 characters for short hashes):
 
 ```ts
-const hashes = await get_git_hashes(7);
-const subs = await generate_hash_subs(7, undefined, hashes);
-
-// hashes[0] -> { 'docs/project-logo.png': '754d9ea' }
-// subs[0] -> { 'hash=docs/project-logo.png': '754d9ea' }
+const full_hashes = await get_git_hashes(40);
+// { 'docs/project-logo.png': 'd65c52a41a75db43e184d2268c6ea9f9741de63e' }
 ```
 
 <a id="api-database"></a>
