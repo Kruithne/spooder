@@ -570,9 +570,25 @@ export function cache_bust_get_hash_table(): Record<string, string> {
 	return cache_bust_map;
 }
 
-export function cache_bust(path: string, format = cache_bust_global_format): string {
-	const hash = cache_bust_get_hash_table()[path] || '';
-	return format.replace('$file', path).replace('$hash', hash);
+export function cache_bust(paths: string|string[], format = cache_bust_global_format): string|string[] {
+	const hash_table = cache_bust_get_hash_table();
+
+	if (Array.isArray(paths)) {
+		const n_paths = paths.length;
+		const result = Array<string>(n_paths);
+
+		for (let i = 0; i < n_paths; i++) {
+			const path = paths[i];
+			const hash = hash_table[path] ?? '';
+
+			result[i] = format.replace('$file', path).replace('$hash', hash);
+		}
+
+		return result;
+	} else {
+		const hash = cache_bust_get_hash_table()[paths] ?? '';
+		return format.replace('$file', paths).replace('$hash', hash);
+	}
 }
 
 export function cache_bust_set_hash_length(length: number): void {

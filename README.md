@@ -531,7 +531,7 @@ Replacements = Record<string, string | Array<string> | object | object[]> | Repl
 parse_template(template: string, replacements: Replacements, drop_missing?: boolean): Promise<string>;
 
 // cache busting
-cache_bust(string: path, format: string): string
+cache_bust(string|string[]: path, format: string): string|string[]
 cache_bust_set_hash_length(length: number): void;
 cache_bust_set_format(format: string): void;
 cache_bust_get_hash_table(): Record<string, string>;
@@ -2048,12 +2048,26 @@ await parse_template(..., {
 <a id="api-cache-busting"></a>
 ## API > Cache Busting
 
-### 🔧 ``cache_bust(string: path, format: string): string``
+### 🔧 ``cache_bust(string|string[]: path, format: string): string|string[]``
 
 Appends a hash-suffix to the provided string, formatted by default as a query parameter, for cache-busting purposes.
 
 ```ts
 cache_bust('static/my_image.png'); // > static/my_image.png?v=123fea
+```
+
+This works on an array of paths as well.
+
+```ts
+cache_bust([
+	'static/js/script1.js',
+	'static/js/script2.js'
+]);
+
+// [
+//    'static/js/script1.js?v=fffffff',
+//    'static/js/script2.js?v=fffffff'
+// ]
 ```
 
 > ![NOTE]
