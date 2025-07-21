@@ -1477,18 +1477,10 @@ export function http_serve(port: number, hostname?: string) {
 		
 		/* Bootstrap a static web server */
 		bootstrap: async function(options: BootstrapOptions) {
-			let git_hash_table: Record<string, string> = {};
 			let cache_bust_subs = {};
 			
-			if (options.cache_bust) {
-				git_hash_table = await git_get_hashes();
-				cache_bust_subs = {
-					asset: (file: string) => {
-						const hash = git_hash_table[file];
-						return hash ? `${file}?v=${hash}` : file;
-					}
-				};
-			}
+			if (options.cache_bust)
+				cache_bust_subs = { asset: cache_bust };
 			
 			const global_sub_table = sub_table_merge(cache_bust_subs, options.global_subs);
 
