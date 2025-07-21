@@ -96,6 +96,8 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 - [API > Workers](#api-workers)
 - [API > Caching](#api-caching)
 - [API > Templating](#api-templating)
+- [API > Cache Busting](#api-cache-busting)
+- [API > Git](#api-git)
 - [API > Database](#api-database)
 	- [API > Database > Schema](#api-database-schema)
 	- [API > Database > Interface](#api-database-interface)
@@ -527,7 +529,15 @@ pipe.off(event: string): void;
 // templates
 Replacements = Record<string, string | Array<string> | object | object[]> | ReplacerFn | AsyncReplaceFn;
 parse_template(template: string, replacements: Replacements, drop_missing?: boolean): Promise<string>;
+
+// cache busting
+cache_bust(string: path, format: string): string
+cache_bust_set_hash_length(length: number): void;
+cache_bust_set_format(format: string): void;
+
+// git
 get_git_hashes(length: number): Promise<Record<string, string>>;
+get_git_hashes_sync(length: number): Record<string, string>
 
 // database interface
 db_sqlite(filename: string, options: number|object): db_sqlite;
@@ -2030,8 +2040,50 @@ await parse_template(..., {
 </t-for>
 ```
 
+<a id="api-cache-busting"></a>
+## API > Cache Busting
+
+### 🔧 ``cache_bust(string: path, format: string): string``
+
+Appends a hash-suffix to the provided string, formatted by default as a query parameter, for cache-busting purposes.
+
+```ts
+cache_bust('static/my_image.png'); // > static/my_image.png?v=123fea
+```
+
+> ![NOTE]
+> Internally `cache_bust()` uses `get_git_hashes()` to hash paths, requiring the input `path` to be a valid git path. If the path cannot be resolved in git, an empty hash is substituted.
+
+### 🔧 ``cache_bust_set_format(format: string): void``
+
+The default format for used for `cache_bust()` is `$file?v=$hash`, this can be customized per-call with the `format` parameter, or globally using `cache_bust_set_format()`
+
+```ts
+cache_bust('dogs.txt'); // > dogs.txt?v=fff
+cache_bust('dogs.txt', '$file?hash=$hash'); // > dogs.txt?hash=fff
+
+cache_bust_set_format('$file#$hash');
+cache_bust('dogs.txt'); // > dogs#fff
+```
+
+### 🔧 ``cache_bust_set_hash_length(length: number): void``
+
+The default hash-length used by `cache_bust()` is 7. This can be changed with `cache_bust_set_hash_length()`.
+
+> ![NOTE]
+> Hashes are cached once at the specified length, therefore `cache_bust_set_hash_length()` must be called before calling `cache_bust()` and has no effect calling it after.
+
+```ts
+cache_bust_set_hash_length(10);
+cache_bust('dogs.txt'); // > dogs.txt?v=ffffffffff
+```
+
+<a id="api-templating"></a>
+## API > Git
 
 ### 🔧 ``get_git_hashes(length: number): Promise<Record<string, string>>``
+
+### 🔧 ``get_git_hashes_sync(length: number): Record<string, string>``
 
 Retrieve git hashes for all files in the repository. This is useful for implementing cache-busting functionality or creating file integrity checks.
 
@@ -2049,6 +2101,7 @@ You can specify the hash length (default is 7 characters for short hashes):
 const full_hashes = await get_git_hashes(40);
 // { 'docs/project-logo.png': 'd65c52a41a75db43e184d2268c6ea9f9741de63e' }
 ```
+
 
 <a id="api-database"></a>
 <a id="api-database-interface"></a>

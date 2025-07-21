@@ -556,7 +556,31 @@ async function replace_async(str: string, regex: RegExp, replacer_fn: (match: st
 	
 	return result;
 }
+// endregion
 
+// region cache busting
+let cache_bust_map: Record<string, string> | null = null;
+let cache_bust_global_length = 7;
+let cache_bust_global_format = '$file?v=$hash';
+
+export function cache_bust(path: string, format = cache_bust_global_format): string {
+	if (cache_bust_map === null)
+		cache_bust_map = get_git_hashes_sync(cache_bust_global_length);
+	
+	const hash = cache_bust_map[path] || '';
+	return format.replace('$file', path).replace('$hash', hash);
+}
+
+export function cache_bust_set_hash_length(length: number): void {
+	cache_bust_global_length = length;
+}
+
+export function cache_bust_set_format(format: string): void {
+	cache_bust_global_format = format;
+}
+// endregion
+
+// region git
 export async function get_git_hashes(length = 7): Promise<Record<string, string>> {
 	const cmd = ['git', 'ls-tree', '-r', 'HEAD'];
 	const process = Bun.spawn(cmd, {
@@ -581,6 +605,27 @@ export async function get_git_hashes(length = 7): Promise<Record<string, string>
 	return hash_map;
 }
 
+export function get_git_hashes_sync(length = 7): Record<string, string> {
+	const cmd = ['git', 'ls-tree', '-r', 'HEAD'];
+	const process = Bun.spawnSync(cmd, {
+		stdout: 'pipe',
+		stderr: 'pipe'
+	});
+	
+	if (process.exitCode > 0)
+		throw new Error('get_git_hashes_sync() failed, `' + cmd.join(' ') + '` exited with non-zero exit code.');
+	
+	const stdout = process.stdout.toString();
+	const hash_map: Record<string, string> = {};
+	
+	const regex = /([^\s]+)\s([^\s]+)\s([^\s]+)\t(.+)/g;
+	let match: RegExpExecArray | null;
+	
+	while (match = regex.exec(stdout))
+		hash_map[match[4]] = match[3].substring(0, length);
+	
+	return hash_map;
+}
 // endregion
 
 // region serving
