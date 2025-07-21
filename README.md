@@ -474,8 +474,8 @@ In addition to the information provided by the developer, `spooder` also include
 
 ```ts
 // logging
-log(message: string);
-log_error(message: string);
+log(message: string, ...params: any[]);
+log_error(message: string, ...params: any[]);
 log_create_logger(prefix: string, color: ColorInput);
 log_list(input: any[], delimiter = ', ');
 
@@ -595,7 +595,7 @@ HTTP_STATUS_CODE: { OK_200: 200, NotFound_404: 404, ... };
 <a id="api-logging"></a>
 ## API > Logging
 
-### 🔧 `log(message: string)`
+### 🔧 `log(message: string, ...params: any[])`
 Print a message to the console using the default logger. Wrapping text segments in curly braces will highlight those segments with colour.
 
 ```ts
@@ -603,7 +603,24 @@ log('Hello, {world}!');
 // > [info] Hello, world!
 ```
 
-### 🔧 `log_error(message: string)`
+Formatting parameters are supported using standard console logging formatters.
+
+```ts
+log('My object: %o', { foo: 'bar' });
+// > [info] My object: { foo: 'bar' }
+```
+
+| Specifier | Description |
+|-----------|-------------|
+| `%s` | String |
+| `%d` | Integer |
+| `%i` | Integer (same as %d) |
+| `%f` | Floating point |
+| `%o` | Object (pretty-printed) |
+| `%O` | Object (expanded/detailed) |
+| `%j` | JSON string |
+
+### 🔧 `log_error(message: string, ...params: any[])`
 Print an error message to the console. Wrapping text segments in curly braces will highlight those segments. This works the same as `log()` except it's red, so you know it's bad.
 
 ```ts
