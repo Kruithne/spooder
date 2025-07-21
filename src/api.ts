@@ -1589,8 +1589,7 @@ export function http_serve(port: number, hostname?: string) {
 					if (stat.isDirectory())
 						return 401; // Unauthorized
 
-					const ext = path.extname(file_path);
-					if (static_options.sub_ext?.includes(ext)) {
+					if (static_options.sub_ext?.some(ext => file_path.endsWith(ext))) {
 						const content = await parse_template(await file.text(), global_sub_table, true);
 						return new Response(content, {
 							headers: {
