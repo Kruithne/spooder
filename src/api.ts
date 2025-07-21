@@ -1077,6 +1077,8 @@ type BootstrapCacheBust = {
 
 type BootstrapOptions = {
 	base?: string | BunFile;
+	drop_missing_subs?: boolean;
+
 	routes: Record<string, BootstrapRoute>;
 	cache?: ReturnType<typeof cache_http> | CacheOptions;
 
@@ -1522,6 +1524,7 @@ export function http_serve(port: number, hostname?: string) {
 			if (cache !== undefined && !is_cache_http(cache))
 				cache = cache_http(cache);
 
+			const drop_missing = options.drop_missing_subs ?? true;
 			for (const [route, route_opts] of Object.entries(options.routes)) {
 				const content_generator = async () => {
 					let content = await resolve_bootstrap_content(route_opts.content);
@@ -1530,7 +1533,7 @@ export function http_serve(port: number, hostname?: string) {
 						content = await parse_template(await resolve_bootstrap_content(options.base), { content }, false);
 					
 					const sub_table = sub_table_merge({}, global_sub_table, route_opts.subs);
-					content = await parse_template(content, sub_table, true);
+					content = await parse_template(content, sub_table, drop_missing);
 					
 					return content;
 				};

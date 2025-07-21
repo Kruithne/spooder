@@ -1317,6 +1317,7 @@ const server = http_serve(80);
 
 server.bootstrap({
 	base: Bun.file('./html/base_template.html'),
+	drop_missing_subs: false,
 
 	cache: {
 		ttl: 5 * 60 * 60 * 1000, // 5 minutes
@@ -1400,6 +1401,13 @@ server.bootstrap({
 	}
 });
 ```
+
+##### `drop_missing_subs: boolean`
+
+**Optional**. Defaults to true. If explicitly disabled, templating parsing will not drop unknown substitutions.
+
+> ![NOTE]
+> If you are using a client-side framework that uses the double-brace syntax ``{{foo}}`` such as Vue, you should set this to `false` to ensure compatibility.
 
 ##### `routes: Record<string, BootstrapRoute>`
 **Required.** Defines the routes and their content. Each route can have:
