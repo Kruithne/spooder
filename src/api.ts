@@ -106,8 +106,8 @@ export function log_create_logger(label: string, color: ColorInput = 'blue') {
 	const ansi = Bun.color(color, 'ansi-256') ?? '\x1b[38;5;6m';
 	const prefix = `[${ansi}${label}\x1b[0m] `;
 	
-	return (message: string) => {
-		process.stdout.write(prefix + message.replace(/\{([^}]+)\}/g, `${ansi}$1\x1b[0m`) + '\n');
+	return (message: string, ...params: any[]) => {
+		console.log(prefix + message.replace(/\{([^}]+)\}/g, `${ansi}$1\x1b[0m`), ...params);
 	};
 }
 
@@ -366,7 +366,7 @@ async function handle_error(prefix: string, err_message_or_obj: string | object,
 	if (process.env.SPOODER_ENV === 'dev') {
 		log_spooder(`[{dev}] dispatch_report ${prefix + error_message}`);
 		log_spooder('[{dev}] without {--dev}, this would raise a canary report');
-		log_spooder(`[{dev}] ${final_err}`);
+		log_spooder('[{dev}] %O', final_err);
 	} else {
 		await dispatch_report(prefix + error_message, final_err);
 	}
