@@ -563,11 +563,15 @@ let cache_bust_map: Record<string, string> | null = null;
 let cache_bust_global_length = 7;
 let cache_bust_global_format = '$file?v=$hash';
 
-export function cache_bust(path: string, format = cache_bust_global_format): string {
+export function cache_bust_get_hash_table(): Record<string, string> {
 	if (cache_bust_map === null)
 		cache_bust_map = git_get_hashes_sync(cache_bust_global_length);
-	
-	const hash = cache_bust_map[path] || '';
+
+	return cache_bust_map;
+}
+
+export function cache_bust(path: string, format = cache_bust_global_format): string {
+	const hash = cache_bust_get_hash_table()[path] || '';
 	return format.replace('$file', path).replace('$hash', hash);
 }
 

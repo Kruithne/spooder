@@ -534,6 +534,7 @@ parse_template(template: string, replacements: Replacements, drop_missing?: bool
 cache_bust(string: path, format: string): string
 cache_bust_set_hash_length(length: number): void;
 cache_bust_set_format(format: string): void;
+cache_bust_get_hash_table(): Record<string, string>;
 
 // git
 git_get_hashes(length: number): Promise<Record<string, string>>;
@@ -2077,6 +2078,10 @@ The default hash-length used by `cache_bust()` is 7. This can be changed with `c
 cache_bust_set_hash_length(10);
 cache_bust('dogs.txt'); // > dogs.txt?v=ffffffffff
 ```
+
+### 🔧 ``cache_bust_get_hash_table(): Record<string, string>``
+
+This function returns the internal hash table used by `cache_bust()`. This is exposed to userland in the event that you which to use the hashes for other purposes, avoiding the need to call and store `git_get_hashes()` twice.
 
 <a id="api-templating"></a>
 ## API > Git
