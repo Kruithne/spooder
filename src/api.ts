@@ -565,7 +565,7 @@ let cache_bust_global_format = '$file?v=$hash';
 
 export function cache_bust(path: string, format = cache_bust_global_format): string {
 	if (cache_bust_map === null)
-		cache_bust_map = get_git_hashes_sync(cache_bust_global_length);
+		cache_bust_map = git_get_hashes_sync(cache_bust_global_length);
 	
 	const hash = cache_bust_map[path] || '';
 	return format.replace('$file', path).replace('$hash', hash);
@@ -581,7 +581,7 @@ export function cache_bust_set_format(format: string): void {
 // endregion
 
 // region git
-export async function get_git_hashes(length = 7): Promise<Record<string, string>> {
+export async function git_get_hashes(length = 7): Promise<Record<string, string>> {
 	const cmd = ['git', 'ls-tree', '-r', 'HEAD'];
 	const process = Bun.spawn(cmd, {
 		stdout: 'pipe',
@@ -591,7 +591,7 @@ export async function get_git_hashes(length = 7): Promise<Record<string, string>
 	await process.exited;
 	
 	if (process.exitCode as number > 0)
-		throw new Error('get_git_hashes() failed, `' + cmd.join(' ') + '` exited with non-zero exit code.');
+		throw new Error('git_get_hashes() failed, `' + cmd.join(' ') + '` exited with non-zero exit code.');
 	
 	const stdout = await Bun.readableStreamToText(process.stdout as ReadableStream);
 	const hash_map: Record<string, string> = {};
@@ -605,7 +605,7 @@ export async function get_git_hashes(length = 7): Promise<Record<string, string>
 	return hash_map;
 }
 
-export function get_git_hashes_sync(length = 7): Record<string, string> {
+export function git_get_hashes_sync(length = 7): Record<string, string> {
 	const cmd = ['git', 'ls-tree', '-r', 'HEAD'];
 	const process = Bun.spawnSync(cmd, {
 		stdout: 'pipe',
@@ -613,7 +613,7 @@ export function get_git_hashes_sync(length = 7): Record<string, string> {
 	});
 	
 	if (process.exitCode > 0)
-		throw new Error('get_git_hashes_sync() failed, `' + cmd.join(' ') + '` exited with non-zero exit code.');
+		throw new Error('git_get_hashes_sync() failed, `' + cmd.join(' ') + '` exited with non-zero exit code.');
 	
 	const stdout = process.stdout.toString();
 	const hash_map: Record<string, string> = {};
@@ -1477,7 +1477,7 @@ export function http_serve(port: number, hostname?: string) {
 			let cache_bust_subs = {};
 			
 			if (options.cache_bust) {
-				git_hash_table = await get_git_hashes();
+				git_hash_table = await git_get_hashes();
 				cache_bust_subs = {
 					asset: (file: string) => {
 						const hash = git_hash_table[file];

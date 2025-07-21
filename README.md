@@ -536,8 +536,8 @@ cache_bust_set_hash_length(length: number): void;
 cache_bust_set_format(format: string): void;
 
 // git
-get_git_hashes(length: number): Promise<Record<string, string>>;
-get_git_hashes_sync(length: number): Record<string, string>
+git_get_hashes(length: number): Promise<Record<string, string>>;
+git_get_hashes_sync(length: number): Record<string, string>
 
 // database interface
 db_sqlite(filename: string, options: number|object): db_sqlite;
@@ -1207,7 +1207,7 @@ server.websocket('/path/to/websocket', {
 For simpler projects, the scaffolding can often look the same, potentially something similar to below.
 
 ```ts
-import { http_serve, cache_http, parse_template, http_apply_range, get_git_hashes } from 'spooder';
+import { http_serve, cache_http, parse_template, http_apply_range, git_get_hashes } from 'spooder';
 import path from 'node:path';
 
 const server = http_serve(80);
@@ -1219,7 +1219,7 @@ const cache = cache_http({
 });
 
 const base_file = await Bun.file('./html/base_template.html').text();
-const git_hash_table = await get_git_hashes();
+const git_hash_table = await git_get_hashes();
 
 async function default_handler(status_code: number): Promise<Response> {
 	const error_text = HTTP_STATUS_CODE[status_code] as string;
@@ -2052,7 +2052,7 @@ cache_bust('static/my_image.png'); // > static/my_image.png?v=123fea
 ```
 
 > ![NOTE]
-> Internally `cache_bust()` uses `get_git_hashes()` to hash paths, requiring the input `path` to be a valid git path. If the path cannot be resolved in git, an empty hash is substituted.
+> Internally `cache_bust()` uses `git_get_hashes()` to hash paths, requiring the input `path` to be a valid git path. If the path cannot be resolved in git, an empty hash is substituted.
 
 ### 🔧 ``cache_bust_set_format(format: string): void``
 
@@ -2081,24 +2081,24 @@ cache_bust('dogs.txt'); // > dogs.txt?v=ffffffffff
 <a id="api-templating"></a>
 ## API > Git
 
-### 🔧 ``get_git_hashes(length: number): Promise<Record<string, string>>``
+### 🔧 ``git_get_hashes(length: number): Promise<Record<string, string>>``
 
-### 🔧 ``get_git_hashes_sync(length: number): Record<string, string>``
+### 🔧 ``git_get_hashes_sync(length: number): Record<string, string>``
 
 Retrieve git hashes for all files in the repository. This is useful for implementing cache-busting functionality or creating file integrity checks.
 
 > [!IMPORTANT]
-> Internally `get_git_hashes()` uses `git ls-tree -r HEAD`, so the working directory must be a git repository.
+> Internally `git_get_hashes()` uses `git ls-tree -r HEAD`, so the working directory must be a git repository.
 
 ```ts
-const hashes = await get_git_hashes(7);
+const hashes = await git_get_hashes(7);
 // { 'docs/project-logo.png': '754d9ea' }
 ```
 
 You can specify the hash length (default is 7 characters for short hashes):
 
 ```ts
-const full_hashes = await get_git_hashes(40);
+const full_hashes = await git_get_hashes(40);
 // { 'docs/project-logo.png': 'd65c52a41a75db43e184d2268c6ea9f9741de63e' }
 ```
 
