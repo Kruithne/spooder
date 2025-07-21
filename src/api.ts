@@ -1053,11 +1053,19 @@ type BootstrapRoute = {
 	subs?: Record<string, BootstrapSub>;
 };
 
+type BootstrapCacheBust = {
+	prefix?: string;
+	hash_length?: number;
+	format?: string;
+};
+
 type BootstrapOptions = {
 	base?: string | BunFile;
 	routes: Record<string, BootstrapRoute>;
 	cache?: ReturnType<typeof cache_http> | CacheOptions;
-	cache_bust?: boolean;
+
+	cache_bust?: boolean | BootstrapCacheBust;
+
 	error?: {
 		use_canary_reporting?: boolean;
 		error_page: string | BunFile;
@@ -1477,10 +1485,20 @@ export function http_serve(port: number, hostname?: string) {
 		
 		/* Bootstrap a static web server */
 		bootstrap: async function(options: BootstrapOptions) {
-			let cache_bust_subs = {};
+			let cache_bust_subs: Record<string, ReplacementValue> = {};
 			
-			if (options.cache_bust)
+			const cache_bust_opts = options.cache_bust;
+			if (typeof cache_bust_opts === 'object' && cache_bust_opts !== null) {
+				if (typeof cache_bust_opts.hash_length === 'number')
+					cache_bust_set_hash_length(cache_bust_opts.hash_length);
+
+				if (typeof cache_bust_opts.format === 'string')
+					cache_bust_set_format(cache_bust_opts.format);
+
+				cache_bust_subs[cache_bust_opts.prefix ?? 'cache_bust'] = cache_bust;
+			} else if (cache_bust_opts === true) {
 				cache_bust_subs = { cache_bust };
+			}
 			
 			const global_sub_table = sub_table_merge(cache_bust_subs, options.global_subs);
 

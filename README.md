@@ -1254,7 +1254,7 @@ server.dir('/static', './static', async (file_path, file, stat, request) => {
 	const ext = path.extname(file_path);
 	if (ext === '.css' || ext === '.js') {
 		const content = await parse_template(await file.text(), {
-			asset: (file) => git_hash_table[file]
+			cache_bust: (file) => `${file}?v=${git_hash_table[file]}`
 		}, true);
 
 		return new Response(content, {
@@ -1313,7 +1313,11 @@ server.bootstrap({
 		error_page: Bun.file('./html/error.html')
 	},
 	
-	cache_bust: true,
+	cache_bust: { // true or options
+		format: '$file#$hash', // default: $file?v=$hash
+		hash_length: 20, // default: 7
+		prefix: 'bust' // default: cache_bust
+	},
 
 	static: {
 		directory: './static',
@@ -1412,7 +1416,7 @@ cache: {
 }
 ```
 
-##### `cache_bust?: boolean`
+##### `cache_bust?: CacheBustOptions | boolean`
 Enables the use of the [`cache_bust()`](#api-cache-busting) API inside templates using the ``{{cache_bust=file}}`` directive.
 
 ```html
@@ -1422,6 +1426,19 @@ Enables the use of the [`cache_bust()`](#api-cache-busting) API inside templates
 ```
 
 Since this uses the [`cache_bust()`](#api-cache-busting) API internally, it is effected by the `cache_bust_set_hash_length` and `cache_bust_set_format` global functions.
+
+Setting `cache_bust` to `true` assumes the normal defaults, however this can be customized by providing an options object.
+
+```ts
+cache_bust: { // true or options
+	format: '$file#$hash', // default: $file?v=$hash
+	hash_length: 20, // default: 7
+	prefix: 'bust' // default: cache_bust
+},
+```
+
+> ![IMPORTANT]
+> `format` and `hash_length` internally call `cache_bust_set_format` and `cache_bust_set_hash_length` respectively, so these values will effect `cache_bust()` globally.
 
 ##### `error?: object`
 Optional error page configuration:
