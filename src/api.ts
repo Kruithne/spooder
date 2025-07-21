@@ -1480,7 +1480,7 @@ export function http_serve(port: number, hostname?: string) {
 			let cache_bust_subs = {};
 			
 			if (options.cache_bust)
-				cache_bust_subs = { asset: cache_bust };
+				cache_bust_subs = { cache_bust };
 			
 			const global_sub_table = sub_table_merge(cache_bust_subs, options.global_subs);
 

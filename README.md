@@ -1413,28 +1413,15 @@ cache: {
 ```
 
 ##### `cache_bust?: boolean`
-When enabled, automatically generates git hash-based cache busting for static assets using dynamic template resolvers.
+Enables the use of the [`cache_bust()`](#api-cache-busting) API inside templates using the ``{{cache_bust=file}}`` directive.
 
-```ts
-cache_bust: true
-```
-
-With `cache_bust` enabled, you can use the `{{asset=filename}}` template function to generate cache-busted URLs:
-
-**Usage:**
-```ts
-cache_bust: true
-// Creates dynamic asset resolver: {{asset=static/css/style.css}} -> "static/css/style.css?v=a1b2c3d"
-```
-
-**Template usage:**
 ```html
-<link href="{{asset=static/css/style.css}}">
-<script src="{{asset=static/js/app.js}}"></script>
-<img src="{{asset=static/images/logo.png}}">
+<link href="{{cache_bust=static/css/style.css}}">
+<script src="{{cache_bust=static/js/app.js}}"></script>
+<img src="{{cache_bust=static/images/logo.png}}">
 ```
 
-The `asset` function automatically appends the git hash as a query parameter for cache busting, or returns the original filename if no hash is available.
+Since this uses the [`cache_bust()`](#api-cache-busting) API internally, it is effected by the `cache_bust_set_hash_length` and `cache_bust_set_format` global functions.
 
 ##### `error?: object`
 Optional error page configuration:
