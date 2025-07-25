@@ -431,41 +431,46 @@ export async function parse_template(template: string, replacements: Replacement
 		// Parse t-for tags first (outermost structures)
 		const for_regex = /<t-for\s+items="([^"]+)"\s+as="([^"]+)"\s*>(.*?)<\/t-for>/gs;
 		result = await replace_async(result, for_regex, async (match, entries_key, alias_name, loop_content) => {
-			const loop_entries = is_replacer_fn ? await replacements(entries_key) : replacements[entries_key];
-			
-			if (loop_entries !== undefined && Array.isArray(loop_entries)) {
-				let loop_result = '';
-				for (const loop_entry of loop_entries) {
-					let scoped_replacements: Replacements;
-					
-					if (typeof replacements === 'function') {
-						scoped_replacements = async (key: string) => {
-							if (key === alias_name)
-								return loop_entry;
+			let loop_entries = is_replacer_fn ? await replacements(entries_key) : replacements[entries_key];
 
-							if (key.startsWith(alias_name + '.')) {
-								const prop_path = key.substring(alias_name.length + 1);
-								return get_nested_property(loop_entry, prop_path);
-							}
+			if (loop_entries !== undefined) {
+				if (typeof loop_entries === 'function')
+					loop_entries = await loop_entries();
 
-							return await replacements(key);
-						};
-					} else {
-						scoped_replacements = {
-							...replacements,
-							[alias_name]: loop_entry
-						};
+				if (Array.isArray(loop_entries)) {
+					let loop_result = '';
+					for (const loop_entry of loop_entries) {
+						let scoped_replacements: Replacements;
+						
+						if (typeof replacements === 'function') {
+							scoped_replacements = async (key: string) => {
+								if (key === alias_name)
+									return loop_entry;
+
+								if (key.startsWith(alias_name + '.')) {
+									const prop_path = key.substring(alias_name.length + 1);
+									return get_nested_property(loop_entry, prop_path);
+								}
+
+								return await replacements(key);
+							};
+						} else {
+							scoped_replacements = {
+								...replacements,
+								[alias_name]: loop_entry
+							};
+						}
+						
+						loop_result += await parse_template(loop_content, scoped_replacements, drop_missing);
 					}
-					
-					loop_result += await parse_template(loop_content, scoped_replacements, drop_missing);
+					return loop_result;
 				}
-				return loop_result;
-			} else {
-				if (!drop_missing)
-					return match;
-				
-				return '';
 			}
+
+			if (!drop_missing)
+				return match;
+
+			return '';
 		});
 		
 		// Parse t-if tags
