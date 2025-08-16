@@ -103,7 +103,8 @@ async function start_server() {
 	const include_crash_history = crash_console_history > 0;
 
 	const std_mode = include_crash_history ? 'pipe' : 'inherit';
-	const proc = Bun.spawn(parse_command_line(config.run), {
+	const run_command = is_dev_mode && config.run_dev !== '' ? config.run_dev : config.run;
+	const proc = Bun.spawn(parse_command_line(run_command), {
 		cwd: process.cwd(),
 		env: { ...process.env, SPOODER_ENV: is_dev_mode ? 'dev' : 'prod' },
 		stdout: std_mode,

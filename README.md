@@ -37,6 +37,10 @@ Below is a full map of the available configuration options in their default stat
 {
 	"spooder": {
 
+		// see CLI > Usage
+		"run": "bun run index.ts",
+		"run_dev": "",
+
 		// see CLI > Auto Restart
 		"auto_restart": true,
 		"auto_restart_max": 30000,
@@ -149,6 +153,7 @@ spooder --dev
 
 The following differences will be observed when running in development mode:
 
+- If `run_dev` is configured, it will be used instead of the default `run` command.
 - Update commands defined in `spooder.update` will not be executed when starting a server.
 - If the server crashes and `auto_restart` is enabled, the server will not be restarted, and spooder will exit with the same exit code as the server.
 - If canary is configured, reports will not be dispatched to GitHub and instead be printed to the console; this includes crash reports.
@@ -158,6 +163,19 @@ It is possible to detect in userland if a server is running in development mode 
 ```ts
 if (process.env.SPOODER_ENV === 'dev') {
 	// Server is running in development mode.
+}
+```
+
+### Development Command Override
+
+You can configure a different command to run when in development mode using the `run_dev` option:
+
+```json
+{
+	"spooder": {
+		"run": "bun run server.ts",
+		"run_dev": "bun run server.ts --inspect"
+	}
 }
 ```
 
