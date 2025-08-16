@@ -1573,7 +1573,12 @@ export function http_serve(port: number, hostname?: string) {
 						return cache.request(req, `error_${status_code}`, create_error_content_generator(status_code), status_code);
 					} else {
 						const content = await create_error_content_generator(status_code)();
-						return new Response(content, { status: status_code });
+						return new Response(content, {
+							status: status_code,
+							headers: {
+								'content-type': 'text/html'
+							}
+						});
 					}
 				};
 
