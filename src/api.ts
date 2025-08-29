@@ -1011,7 +1011,7 @@ function print_request_info(req: Request, res: Response, url: URL, request_time:
 	// format request time based on range (0-100ms is green, 100-500ms is yellow, 500ms+ is red), use ansi colors.
 	const time_fmt = request_time < 100 ? '\x1b[32m' : request_time < 500 ? '\x1b[33m' : '\x1b[31m';
 	const request_time_str = time_fmt + request_time + 'ms\x1b[0m';
-	
+
 	log_spooder(`[${status_code}] {${req.method}} ${url.pathname} ${search_params} [{${request_time_str}}]`);
 	return res;
 }
@@ -1060,7 +1060,7 @@ async function resolve_bootstrap_content(content: string | BunFile): Promise<str
 type WebsocketAcceptReturn = object | boolean;
 type WebsocketHandlers = {
 	accept?: (req: Request) => WebsocketAcceptReturn | Promise<WebsocketAcceptReturn>,
-	message?: (ws: WebSocket, message: string) => void,
+	message?: (ws: WebSocket, message: string | Buffer) => void,
 	message_json?: (ws: WebSocket, message: JsonSerializable) => void,
 	open?: (ws: WebSocket) => void,
 	close?: (ws: WebSocket, code: number, reason: string) => void,
