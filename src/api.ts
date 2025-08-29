@@ -1059,7 +1059,7 @@ async function resolve_bootstrap_content(content: string | BunFile): Promise<str
 
 type WebsocketAcceptReturn = object | boolean;
 type WebsocketHandlers = {
-	accept?: (req: Request) => WebsocketAcceptReturn | Promise<WebsocketAcceptReturn>,
+	accept?: (req: Request, url: URL) => WebsocketAcceptReturn | Promise<WebsocketAcceptReturn>,
 	message?: (ws: WebSocket, message: string | Buffer) => void,
 	message_json?: (ws: WebSocket, message: JsonSerializable) => void,
 	open?: (ws: WebSocket) => void,
@@ -1347,10 +1347,10 @@ export function http_serve(port: number, hostname?: string) {
 		
 		/** Add a route to upgrade connections to websockets. */
 		websocket: (path: string, handlers: WebsocketHandlers): void => {
-			routes.push([path.split('/'), async (req: Request) => {
+			routes.push([path.split('/'), async (req: Request, url: URL) => {
 				let context_data = undefined;
 				if (handlers.accept) {
-					const res = await handlers.accept(req);
+					const res = await handlers.accept(req, url);
 					
 					if (typeof res === 'object') {
 						context_data = res;

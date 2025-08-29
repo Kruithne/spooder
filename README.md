@@ -1191,10 +1191,11 @@ Register a route which handles websocket connections.
 server.websocket('/path/to/websocket', {
 	// all of these handlers are OPTIONAL
 
-	accept: (req) => {
+	accept: (req, url) => {
 		// validates a request before it is upgraded
 		// returns HTTP 401 if FALSE is returned
 		// allows you to check headers/authentication
+		// url parameter contains query parameters from route
 
 		// if an OBJECT is returned, the object will
 		// be accessible on the websocket as ws.data.*
