@@ -1212,7 +1212,7 @@ server.websocket('/path/to/websocket', {
 
 	message: (ws, message) => {
 		// called when a websocket message is received
-		// message is a string
+		// message is a string or buffer
 	},
 
 	message_json: (ws, data) => {
