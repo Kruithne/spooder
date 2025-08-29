@@ -820,7 +820,10 @@ export function http_apply_range(file: BunFile, request: Request): BunFile {
 			if (start_is_nan && end_is_nan)
 				return file;
 			
-			file = file.slice(start_is_nan ? file.size - end : start, end_is_nan || start_is_nan ? undefined : end);
+			file = file.slice(
+				start_is_nan ? file.size - end : start,
+				end_is_nan || start_is_nan ? undefined : end + 1
+			);
 		}
 	}
 	return file;
