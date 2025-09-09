@@ -17,45 +17,87 @@ export function db_serialize_set<T extends string>(set: Set<T> | null): string {
 // endregion
 
 // region schema
-interface DependencyTarget {
+interface RevisionTarget {
+	schema_name: string;
 	file_name: string;
+	revision_id: number;
+	sql: string;
+	comment: string;
 	deps: string[];
 }
 
-function order_schema_dep_tree<T extends DependencyTarget>(deps: T[]): T[] {
+function order_revisions_by_dependency(schemas: any[]): RevisionTarget[] {
+	// First, create a map of schema names to all their pending revisions
+	const schema_revisions_map = new Map<string, RevisionTarget[]>();
+	const all_revisions: RevisionTarget[] = [];
+
+	for (const schema of schemas) {
+		const schema_revisions: RevisionTarget[] = [];
+		for (const rev_id of schema.chunk_keys) {
+			const revision = schema.revisions.get(rev_id);
+			const revision_target: RevisionTarget = {
+				schema_name: schema.name,
+				file_name: schema.file_name,
+				revision_id: rev_id,
+				sql: revision.sql,
+				comment: revision.comment,
+				deps: revision.deps || []
+			};
+			schema_revisions.push(revision_target);
+			all_revisions.push(revision_target);
+		}
+		schema_revisions_map.set(schema.name, schema_revisions);
+	}
+
+	// Now sort revisions using topological sort
 	const visited = new Set<string>();
 	const temp = new Set<string>();
-	const result: T[] = [];
-	const map = new Map(deps.map(d => [d.file_name, d]));
- 
-	function visit(node: T): void {
-		if (temp.has(node.file_name))
-			throw new Error(`Cyclic dependency {${node.file_name}}`);
- 
-		if (visited.has(node.file_name))
-			return;
- 
-		temp.add(node.file_name);
- 
-		for (const dep of node.deps) {
-			const dep_node = map.get(dep);
-			if (!dep_node)
-				throw new Error(`Missing dependency {${dep}}`);
-			
-			visit(dep_node as T);
-		}
- 
-		temp.delete(node.file_name);
-		visited.add(node.file_name);
-		result.push(node);
+	const result: RevisionTarget[] = [];
+
+	function get_revision_key(rev: RevisionTarget): string {
+		return `${rev.schema_name}:${rev.revision_id}`;
 	}
- 
-	for (const dep of deps)
-		if (!visited.has(dep.file_name))
-			visit(dep);
- 
+
+	function visit(revision: RevisionTarget): void {
+		const rev_key = get_revision_key(revision);
+		
+		if (temp.has(rev_key))
+			throw new Error(`Cyclic dependency detected involving ${rev_key}`);
+
+		if (visited.has(rev_key))
+			return;
+
+		temp.add(rev_key);
+
+		// Process dependencies: if this revision depends on a schema, 
+		// all pending revisions of that schema must execute first
+		for (const dep_schema_file of revision.deps) {
+			const dep_schema_name = path.basename(dep_schema_file, '.sql');
+			const dep_revisions = schema_revisions_map.get(dep_schema_name);
+			
+			if (!dep_revisions)
+				throw new Error(`Missing dependency schema {${dep_schema_name}} required by ${rev_key}`);
+			
+			// Visit all pending revisions of the dependency schema
+			for (const dep_revision of dep_revisions) {
+				visit(dep_revision);
+			}
+		}
+
+		temp.delete(rev_key);
+		visited.add(rev_key);
+		result.push(revision);
+	}
+
+	// Visit all revisions
+	for (const revision of all_revisions) {
+		if (!visited.has(get_revision_key(revision))) {
+			visit(revision);
+		}
+	}
+
 	return result;
- }
+}
 
 type Row_DBSchema = { db_schema_table_name: string, db_schema_version: number };
 type SchemaVersionMap = Map<string, number>;
@@ -79,26 +121,26 @@ async function db_load_schema(schema_dir: string, schema_versions: SchemaVersion
 		const schema_path = path.join(schema_file_ent.parentPath, schema_file);
 		const schema = await fs.readFile(schema_path, 'utf8');
 
-		const deps = new Array<string>();
-
 		const revisions = new Map();
 		let current_rev_id = 0;
 		let current_rev = '';
 		let current_rev_comment = '';
+		let current_rev_deps = new Array<string>();
 
 		for (const line of schema.split(/\r?\n/)) {
 			const line_identifier = line.match(/^--\s*\[(\d+|deps)\]/);
 			if (line_identifier !== null) {
 				if (line_identifier[1] === 'deps') {
-					// Line contains schema dependencies, example: -- [deps] schema_b.sql,schema_c.sql
+					// Line contains schema dependencies for current revision, example: -- [deps] schema_b.sql,schema_c.sql
 					const deps_raw = line.substring(line.indexOf(']') + 1);
-					deps.push(...deps_raw.split(',').map(e => e.trim().toLowerCase()));
+					current_rev_deps.push(...deps_raw.split(',').map(e => e.trim().toLowerCase()));
 				} else {
 					// New chunk definition detected, store the current chunk and start a new one.
 					if (current_rev_id > 0) {
-						revisions.set(current_rev_id, { sql: current_rev, comment: current_rev_comment });
+						revisions.set(current_rev_id, { sql: current_rev, comment: current_rev_comment, deps: current_rev_deps });
 						current_rev = '';
 						current_rev_comment = '';
+						current_rev_deps = new Array<string>();
 					}
 
 					const rev_number = parseInt(line_identifier[1]);
@@ -118,28 +160,33 @@ async function db_load_schema(schema_dir: string, schema_versions: SchemaVersion
 
 		// There may be something left in current_chunk once we reach end of the file.
 		if (current_rev_id > 0)
-			revisions.set(current_rev_id, { sql: current_rev, comment: current_rev_comment });
+			revisions.set(current_rev_id, { sql: current_rev, comment: current_rev_comment, deps: current_rev_deps });
 
 		if (revisions.size === 0) {
 			db_log(`{${schema_file}} contains no valid revisions`);
 			continue;
 		}
 
-		if (deps.length > 0)
-			db_log(`{${schema_file}} dependencies: ${log_list(deps)}`);
-
 		const current_schema_version = schema_versions.get(schema_name) ?? 0;
+		const pending_revisions = Array.from(revisions.keys()).filter(chunk_id => chunk_id > current_schema_version).sort((a, b) => a - b);
+		
+		// Log any revision-level dependencies
+		for (const rev_id of pending_revisions) {
+			const revision = revisions.get(rev_id);
+			if (revision.deps.length > 0)
+				db_log(`{${schema_file}} revision [${rev_id}] dependencies: ${log_list(revision.deps)}`);
+		}
+
 		schema_out.push({
 			revisions,
 			file_name: schema_file_lower,
 			name: schema_name,
 			current_version: current_schema_version,
-			deps,
-			chunk_keys: Array.from(revisions.keys()).filter(chunk_id => chunk_id > current_schema_version).sort((a, b) => a - b)
+			chunk_keys: pending_revisions
 		});
 	}
 
-	return order_schema_dep_tree(schema_out);
+	return schema_out;
 }
 // endregion
 
@@ -179,20 +226,28 @@ export async function db_update_schema_mysql(db: mysql_types.Connection, schema_
 	`);
 
 	const schemas = await db_load_schema(schema_dir, schema_versions);
-	for (const schema of schemas) {
-		let newest_schema_version = schema.current_version;
-		for (const rev_id of schema.chunk_keys) {
-			const revision = schema.revisions.get(rev_id);
-			const comment_text = revision.comment ? ` "{${revision.comment}}"` : '';
-			db_log(`applying revision [{${rev_id}}]${comment_text} to {${schema.name}}`);
+	const revisions = order_revisions_by_dependency(schemas);
+	
+	// Track the newest version for each schema
+	const schema_versions_tracking = new Map<string, number>();
+	for (const schema of schemas)
+		schema_versions_tracking.set(schema.name, schema.current_version);
 
-			await db.query(revision.sql);
-			newest_schema_version = rev_id;
-		}
+	// Execute revisions in dependency order
+	for (const revision of revisions) {
+		const comment_text = revision.comment ? ` "{${revision.comment}}"` : '';
+		db_log(`applying revision [{${revision.revision_id}}]${comment_text} to {${revision.schema_name}}`);
 
-		if (newest_schema_version > schema.current_version) {
-			db_log(`updated table {${schema.name}} to revision {${newest_schema_version}}`);
-			await update_schema_query.execute([newest_schema_version, schema.name]);
+		await db.query(revision.sql);
+		schema_versions_tracking.set(revision.schema_name, revision.revision_id);
+	}
+
+	// Update schema version tracking for all modified schemas
+	for (const [schema_name, newest_version] of schema_versions_tracking) {
+		const original_version = schemas.find(s => s.name === schema_name)?.current_version || 0;
+		if (newest_version > original_version) {
+			db_log(`updated table {${schema_name}} to revision {${newest_version}}`);
+			await update_schema_query.execute([newest_version, schema_name]);
 		}
 	}
 
@@ -451,20 +506,27 @@ export async function db_update_schema_sqlite(db: Database, schema_dir: string, 
 			`);
 	
 			const schemas = await db_load_schema(schema_dir, schema_versions);
-	
-			for (const schema of schemas) {
-				let newest_schema_version = schema.current_version;
-				for (const rev_id of schema.chunk_keys) {
-					const revision = schema.revisions.get(rev_id);
-					const comment_text = revision.comment ? ` "{${revision.comment}}"` : '';
-					db_log(`applying revision [{${rev_id}}]${comment_text} to {${schema.name}}`);
-					db.transaction(() => db.run(revision.sql))();
-					newest_schema_version = rev_id;
-				}
-		
-				if (newest_schema_version > schema.current_version) {
-					db_log(`updated table {${schema.name}} to revision {${newest_schema_version}}`);
-					update_schema_query.run(newest_schema_version, schema.name);
+			const revisions = order_revisions_by_dependency(schemas);
+			
+			// Track the newest version for each schema
+			const schema_versions_tracking = new Map<string, number>();
+			for (const schema of schemas)
+				schema_versions_tracking.set(schema.name, schema.current_version);
+
+			// Execute revisions in dependency order
+			for (const revision of revisions) {
+				const comment_text = revision.comment ? ` "{${revision.comment}}"` : '';
+				db_log(`applying revision [{${revision.revision_id}}]${comment_text} to {${revision.schema_name}}`);
+				db.transaction(() => db.run(revision.sql))();
+				schema_versions_tracking.set(revision.schema_name, revision.revision_id);
+			}
+
+			// Update schema version tracking for all modified schemas
+			for (const [schema_name, newest_version] of schema_versions_tracking) {
+				const original_version = schemas.find(s => s.name === schema_name)?.current_version || 0;
+				if (newest_version > original_version) {
+					db_log(`updated table {${schema_name}} to revision {${newest_version}}`);
+					update_schema_query.run(newest_version, schema_name);
 				}
 			}
 

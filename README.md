@@ -2666,15 +2666,26 @@ try {
 ```
 
 ### Schema Dependencies
-By default, schema files are executed in the order they are provided by the operating system (generally alphabetically).
+By default, schema files are executed in the order they are provided by the operating system (generally alphabetically). Individual revisions within files are always executed in ascending order.
 
-If you have a schema file that depends on one or more other schema files to be executed before it (for example, using foreign keys), you can specify dependencies.
+If a specific revision depends on one or more other schema files to be executed before it (for example, when adding foreign keys), you can specify dependencies at the revision level.
 
 ```sql
--- [deps] table_b_schema.sql, table_c_schema.sql
--- [1] create table_a
-CREATE ...
+-- [1] create table_a (no dependencies)
+CREATE TABLE table_a (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL
+);
+
+-- [2] add foreign key to table_b
+-- [deps] table_b_schema.sql
+ALTER TABLE table_a ADD COLUMN table_b_id INTEGER REFERENCES table_b(id);
 ```
+
+When a revision specifies dependencies, all revisions of the dependent schema files will be executed before that specific revision runs. This allows you to create tables independently and then add dependencies in later revisions.
+
+>[!IMPORTANT]
+> Dependencies are specified per-revision, not per-file. A `-- [deps]` line applies only to the revision it appears in.
 
 >[!IMPORTANT]
 > Cyclic or missing dependencies will throw an error.
