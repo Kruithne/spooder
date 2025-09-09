@@ -128,6 +128,7 @@ type CacheOptions = {
 	use_etags?: boolean;
 	headers?: Record<string, string>,
 	use_canary_reporting?: boolean;
+	enabled?: boolean;
 };
 
 type CacheEntry = {
@@ -154,6 +155,7 @@ export function cache_http(options?: CacheOptions) {
 	const use_etags = options?.use_etags ?? true;
 	const cache_headers = options?.headers ?? {};
 	const canary_report = options?.use_canary_reporting ?? false;
+	const enabled = options?.enabled ?? true;
 	
 	const entries = new Map<string, CacheEntry>();
 	let total_cache_size = 0;
@@ -267,7 +269,8 @@ export function cache_http(options?: CacheOptions) {
 						cached_ts: now_ts
 					};
 					
-					store_cache_entry(file_path, entry, now_ts);
+					if (enabled)
+						store_cache_entry(file_path, entry, now_ts);
 				}
 				
 				return build_response(entry, req, 200);
@@ -290,7 +293,8 @@ export function cache_http(options?: CacheOptions) {
 					cached_ts: now_ts
 				};
 				
-				store_cache_entry(cache_key, entry, now_ts);
+				if (enabled)
+					store_cache_entry(cache_key, entry, now_ts);
 			}
 			
 			return build_response(entry, req, status_code);

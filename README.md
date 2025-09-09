@@ -1784,6 +1784,10 @@ server.route('/', cache.file('./index.html'));
 
 // Use with server routes for dynamic content
 server.route('/dynamic', async (req) => cache.request(req, 'dynamic-page', () => 'Dynamic Content'));
+
+// Disable caching (useful for development mode)
+const devCache = cache_http({ enabled: process.env.SPOODER_ENV !== 'dev' });
+server.route('/no-cache', devCache.file('./index.html')); // Always reads from disk
 ```
 
 The `cache_http()` function returns an object with two methods:
@@ -1827,7 +1831,8 @@ server.route('/api/stats', async (req) => {
 | `max_size` | `number` | `5242880` (5 MB) | Maximum total size of all cached files in bytes |
 | `use_etags` | `boolean` | `true` | Generate and use ETag headers for cache validation |
 | `headers` | `Record<string, string>` | `{}` | Additional HTTP headers to include in responses |
-| `use_canary_reporting` | `boolean` | `false` | Reports faults to canary (see below).
+| `use_canary_reporting` | `boolean` | `false` | Reports faults to canary (see below) |
+| `enabled` | `boolean` | `true` | When false, content is generated but not stored
 
 #### Canary Reporting
 
