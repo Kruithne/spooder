@@ -93,6 +93,7 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 
 - [API > Cheatsheet](#api-cheatsheet)
 - [API > Logging](#api-logging)
+- [API > IPC](#api-ipc)
 - [API > HTTP](#api-http)
 	- [API > HTTP > Directory Serving](#api-http-directory)
 	- [API > HTTP > Server-Sent Events (SSE)](#api-http-sse)
@@ -219,6 +220,8 @@ If the server exits with a `0` exit code, this will be considered an **intention
 > [!TIP]
 > An **intentional shutdown** can be useful for auto-updating in response to events, such as webhooks.
 
+If the server exits with `42` (SPOODER_AUTO_RESTART), the update commands will **not** be executed before starting the server. [See Auto Update for information](#cli-auto-update).
+
 <a id="cli-auto-update"></a>
 ## CLI > Auto Update
 
@@ -247,7 +250,7 @@ Each command should be a separate entry in the array and will be executed in seq
 
 If a command in the sequence fails, the remaining commands will not be executed, however the server will still be started. This is preferred over entering a restart loop or failing to start the server at all.
 
-You can utilize this to automatically update your server in response to a webhook by exiting the process.
+You can combine this with [Auto Restart](#cli-auto-restart) to automatically update your server in response to a webhook by exiting the process.
 
 ```ts
 server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
@@ -258,6 +261,34 @@ server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
 	return HTTP_STATUS_CODE.OK_200;
 });
 ```
+
+### Multi-instance Auto Restart
+
+Combining [Auto Restart](#cli-auto-restart) and [Auto Update](#cli-auto-update), when a server process exits with a zero exit code, the update commands will be run as the server restarts. This is suitable for a single-instance setup.
+
+In the event of multiple instances, this does not work. One server instance would receive the webhook and exit, resulting in the update commands being run and that instance being restarted, leaving the other instances still running.
+
+A solution might be to send the web-hook to every instance, but now each instance is going to restart individually, running the update commands unnecessarily and, if at the same time, causing conflicts. In addition, the concept of multiple instances in spooder is that they operate from a single codebase, which makes sending multiple webhooks a challenge - so don't do this.
+
+The solution is to the use the [IPC](#api-ipc) to instruct the host process to handle this.
+
+```ts
+server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
+	setImmediate(async () => {
+		ipc_send(IPC_TARGET.SPOODER, IPC_OP.CMSG_TRIGGER_UPDATE);
+	});
+	return HTTP_STATUS_CODE.OK_200;
+});
+
+ipc_register(IPC_OP.SMSG_UPDATE_READY, async () => {
+	await server.stop(false);
+	process.exit(EXIT_CODE.SPOODER_AUTO_UPDATE);
+});
+```
+
+In this scenario, we instruct the host process from one instance receiving the webhook to apply the updates. Once the update commands have been run, all instances are send the `SMSG_UPDATE_READY` event, indicating they can restart.
+
+Exiting with the `SPOODER_AUTO_UPDATE` exit code instructs spooder that we're exiting as part of this process, and prevents auto-update from running on restart.
 
 ### Skip Updates
 
@@ -615,9 +646,17 @@ cache.request(req: Request, cache_key: string, content_generator: () => string |
 // utilities
 filesize(bytes: number): string;
 
+// ipc
+ipc_register(op: number, callback: IPC_Callback);
+ipc_send(target: number, op: number, data?: object);
+
 // constants
 HTTP_STATUS_TEXT: Record<number, string>;
 HTTP_STATUS_CODE: { OK_200: 200, NotFound_404: 404, ... };
+EXIT_CODE: Record<string, number>;
+EXIT_CODE_NAMES: Record<number, string>;
+IPC_TARGET: Record<string, number>;
+IPC_OP: Record<string, number>;
 ```
 
 <a id="api-logging"></a>
@@ -675,6 +714,53 @@ Utility function that joins an array of items together with each element wrapped
 const fruit = ['apple', 'orange', 'peach'];
 log(`Fruit must be one of ${fruit.map(e => `{${e}}`).join(', ')}`);
 log(`Fruit must be one of ${log_list(fruit)}`);
+```
+
+<a id="api-ipc"></a>
+## API > IPC
+
+`spooder` provides a way to send/receive messages between different instances via IPC.
+
+```
+// todo: instancing
+```
+
+This can also be used to communicate with the host process for certain functionality, such as [auto-restarting](#cli-auto-restart).
+
+#### OpCodes
+
+When sending/receiving IPC messages, the message will include an op-code. When communicating with the host process, that will be one of the following:
+
+```ts
+IPC_OP = {
+	CMSG_TRIGGER_UPDATE: 0,
+	SMSG_UPDATE_READY: 1,
+};
+```
+
+When sending/receiving your own messages, you can define and use your own ID schema. This can re-use the above op-codes if desired, since they are only useful when communicating directly with the host, and do not conflict with instance-to-instance communication.
+
+### `ipc_register(op: number, callback: IPC_Callback)`
+
+Register a listener for IPC events. The callback will receive an object with this structure:
+
+```ts
+type IPC_Message = {
+	op: number; // opcode received
+	peer: number; // sender
+	data?: object // payload data (optional)
+};
+```
+
+### `ipc_send(target: number, op: number, data?: object)`
+
+Send an IPC event. The target can either be the ID of another instance (such as the `peer` ID from an `IPC_Message`) or one of the following constants.
+
+```ts
+IPC_TARGET = {
+	SPOODER: -1, // communicate with host
+	BROADCAST: 0 // broadcast to all instances
+};
 ```
 
 <a id="api-http"></a>

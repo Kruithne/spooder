@@ -7,6 +7,20 @@ import { Blob } from 'node:buffer';
 import { ColorInput } from 'bun';
 import packageJson from '../package.json' with { type: 'json' };
 
+// region exit codes
+export const EXIT_CODE = {
+	SUCCESS: 0,
+	GENERAL_ERROR: 1,
+
+	// 3-125 are free for application errors
+	SPOODER_AUTO_UPDATE: 42
+};
+
+export const EXIT_CODE_NAMES = Object.fromEntries(
+	Object.entries(EXIT_CODE).map(([key, value]) => [value, key])
+);
+// endregion
+
 // region api forwarding
 export * from './api_db';
 // endregion
@@ -119,6 +133,66 @@ const log_spooder = log_create_logger('spooder', 'spooder');
 export const log = log_create_logger('info', 'blue');
 export const log_error = log_create_logger('error', 'red');
 
+// endregion
+
+// region spooder ipc
+export const IPC_TARGET = {
+	SPOODER: -1,
+	BROADCAST: 0
+};
+
+export const IPC_OP = {
+	CMSG_TRIGGER_UPDATE: 0,
+	SMSG_UPDATE_READY: 1,
+};
+
+type IPC_Callback = (data: IPC_Message) => void;
+type IPC_Message = {
+	op: number;
+	peer: number;
+	data?: object
+};
+
+
+let ipc_fail_announced = false;
+let ipc_listener_attached = false;
+
+const ipc_listeners = new Map<number, Set<IPC_Callback>>();
+
+function ipc_on_message(payload: IPC_Message) {
+	const listeners = ipc_listeners.get(payload.op);
+	if (listeners) {
+		for (const callback of listeners)
+			callback(payload);
+	}
+}
+
+export function ipc_send(target: number, op: number, data?: object) {
+	if (!process.send) {
+		if (!ipc_fail_announced) {
+			log_spooder(`{ipc_send} failed, process not spawned with ipc channel`);
+			caution('ipc_send failed', { e: 'process not spawned with ipc channel' });
+			ipc_fail_announced = true;
+		}
+
+		return;
+	}
+
+	process.send({ target, op, data });
+}
+
+export function ipc_register(op: number, callback: IPC_Callback) {
+	if (!ipc_listener_attached) {
+		process.on('message', ipc_on_message);
+		ipc_listener_attached = true;
+	}
+
+	const listeners = ipc_listeners.get(op);
+	if (listeners)
+		listeners.add(callback);
+	else
+		ipc_listeners.set(op, new Set([callback]));
+}
 // endregion
 
 // region cache

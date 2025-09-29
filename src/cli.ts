@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { get_config } from './config';
 import { dispatch_report } from './dispatch';
-import { log_create_logger } from './api';
+import { log_create_logger, IPC_OP, IPC_TARGET, EXIT_CODE, EXIT_CODE_NAMES } from './api';
 
 const log_cli = log_create_logger('spooder_cli', 'spooder');
 
@@ -53,21 +53,12 @@ function parse_command_line(command: string): string[] {
 	return args;
 }
 
-async function start_server() {
-	log_cli('start_server');
-
+async function apply_updates(config: Awaited<ReturnType<typeof get_config>>) {
 	const argv = process.argv.slice(2);
-	const is_dev_mode = argv.includes('--dev');
-	const skip_updates = argv.includes('--no-update');
 
-	if (is_dev_mode)
-		log_cli('[{dev}] spooder has been started in {dev mode}');
-
-	const config = await get_config();
-
-	if (is_dev_mode) {
+	if (argv.includes('--dev')) {
 		log_cli('[{update}] skipping update commands in {dev mode}');
-	} else if (skip_updates) {
+	} else if (argv.includes('--no-update')) {
 		log_cli('[{update}] skipping update commands due to {--no-update} flag');
 	} else {
 		const update_commands = config.update;
@@ -98,6 +89,21 @@ async function start_server() {
 			}
 		}
 	}
+}
+
+async function start_server(update = true) {
+	log_cli('start_server');
+
+	const argv = process.argv.slice(2);
+	const is_dev_mode = argv.includes('--dev');
+
+	if (is_dev_mode)
+		log_cli('[{dev}] spooder has been started in {dev mode}');
+
+	const config = await get_config();
+
+	if (update)
+		await apply_updates(config);
 
 	const crash_console_history = config.canary.crash_console_history;
 	const include_crash_history = crash_console_history > 0;
@@ -108,7 +114,15 @@ async function start_server() {
 		cwd: process.cwd(),
 		env: { ...process.env, SPOODER_ENV: is_dev_mode ? 'dev' : 'prod' },
 		stdout: std_mode,
-		stderr: std_mode
+		stderr: std_mode,
+		async ipc(payload, proc) {
+			if (payload.target === IPC_TARGET.SPOODER) {
+				if (payload.op === IPC_OP.CMSG_TRIGGER_UPDATE) {
+					await apply_updates(config);
+					proc.send({ op: IPC_OP.SMSG_UPDATE_READY });
+				}
+			}
+		}
 	});
 
 	const stream_history = new Array<string>();
@@ -139,9 +153,10 @@ async function start_server() {
 	}
 	
 	const proc_exit_code = await proc.exited;
-	log_cli(`server exited with code {${proc_exit_code}}`);
-	
-	if (proc_exit_code !== 0) {
+	log_cli(`server exited with code {${proc_exit_code}} ({${EXIT_CODE_NAMES[proc_exit_code] ?? 'UNKNOWN'}})`);
+
+	let is_safe_exit = proc_exit_code === EXIT_CODE.SUCCESS || proc_exit_code === EXIT_CODE.SPOODER_AUTO_UPDATE;
+	if (!is_safe_exit) {
 		const console_output = include_crash_history ? strip_color_codes(stream_history.join('\n')) : undefined;
 
 		if (is_dev_mode) {
@@ -162,8 +177,9 @@ async function start_server() {
 		if (is_dev_mode) {
 			log_cli(`[{dev}] auto-restart is {disabled} in {dev mode}`);
 			process.exit(proc_exit_code ?? 0);
-		} else if (proc_exit_code === 0) {
-			start_server();
+		} else if (is_safe_exit) {
+			const should_apply_updates = proc_exit_code !== EXIT_CODE.SPOODER_AUTO_UPDATE;
+			start_server(should_apply_updates);
 		} else {
 			if (restart_success_timer) {
 				clearTimeout(restart_success_timer);
