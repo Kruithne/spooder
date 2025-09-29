@@ -188,7 +188,9 @@ You can configure a different command to run when in development mode using the 
 > [!NOTE]
 > This feature is not enabled by default.
 
-In the event that the server process exits with a non-zero exit code, `spooder` can automatically restart it using an exponential backoff strategy. To enable this feature set `auto_restart` to `true` in the configuration.
+In the event that the server process exits, `spooder` can automatically restart it.
+
+If the server exits with a non-zero exit code, this will be considered an **unexpected shutdown**. The process will be restarted using an exponential backoff strategy.
 
 ```json
 {
@@ -201,14 +203,17 @@ In the event that the server process exits with a non-zero exit code, `spooder` 
 }
 ```
 
+If the server exits with a `0` exit code, this will be considered an **intentional shutdown** and `spooder` will execute the update commands before restarting the server.
+
+> [!TIP]
+> An **intentional shutdown** can be useful for auto-updating in response to events, such as webhooks.
+
 ### Configuration Options
 
 - **`auto_restart`** (boolean, default: `false`): Enable or disable the auto-restart feature
 - **`auto_restart_max`** (number, default: `30000`): Maximum delay in milliseconds between restart attempts
 - **`auto_restart_attempts`** (number, default: `-1`): Maximum number of restart attempts before giving up. Set to `-1` for unlimited attempts
 - **`auto_restart_grace`** (number, default: `30000`): Period of time after which the backoff protocol disables if the server remains stable.
-
-If the server exits with a zero exit code (successful termination), auto-restart will not trigger.
 
 <a id="cli-auto-update"></a>
 ## CLI > Auto Update
@@ -244,7 +249,7 @@ You can utilize this to automatically update your server in response to a webhoo
 server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
 	setImmediate(async () => {
 		await server.stop(false);
-		process.exit();
+		process.exit(0);
 	});
 	return HTTP_STATUS_CODE.OK_200;
 });

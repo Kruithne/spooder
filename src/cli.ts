@@ -159,7 +159,9 @@ async function start_server() {
 		if (is_dev_mode) {
 			log_cli(`[{dev}] auto-restart is {disabled} in {dev mode}`);
 			process.exit(proc_exit_code ?? 0);
-		} else if (proc_exit_code !== 0) {
+		} else if (proc_exit_code === 0) {
+			start_server();
+		} else {
 			if (restart_success_timer) {
 				clearTimeout(restart_success_timer);
 				restart_success_timer = null;
