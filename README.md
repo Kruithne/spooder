@@ -193,7 +193,7 @@ You can configure a different command to run when in development mode using the 
 
 In the event that the server process exits, `spooder` can automatically restart it.
 
-If the server exits with a non-zero exit code, this will be considered an **unexpected shutdown**. The process will be restarted using an exponential backoff strategy.
+If the server exits with a non-zero exit code, this will be considered an **unexpected shutdown**. The process will be restarted using an [exponential backoff strategy](https://en.wikipedia.org/wiki/Exponential_backoff).
 
 ```json
 {
