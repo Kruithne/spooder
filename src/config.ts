@@ -14,6 +14,7 @@ const internal_config = {
 	},
 	update: [],
 	canary: {
+		enabled: false,
 		account: '',
 		repository: '',
 		labels: [],

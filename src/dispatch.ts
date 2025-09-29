@@ -279,6 +279,9 @@ export async function dispatch_report(report_title: string, report_body: Array<u
 	try {
 		const config = await get_config();
 
+		if (!config.canary.enabled)
+			return;
+
 		const canary_account = config.canary.account;
 		const canary_repostiory = config.canary.repository;
 

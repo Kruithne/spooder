@@ -57,6 +57,7 @@ Below is a full map of the available configuration options in their default stat
 
 		// see CLI > Canary
 		"canary": {
+			"enabled": false,
 			"account": "",
 			"repository": "",
 			"labels": [],
@@ -299,6 +300,7 @@ Each server that intends to use the canary feature will need to have the private
 ```json
 "spooder": {
 	"canary": {
+		"enabled": true,
 		"account": "<GITHUB_ACCOUNT_NAME>",
 		"repository": "<GITHUB_REPOSITORY>",
 		"labels": ["some-label"]
