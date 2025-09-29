@@ -6,10 +6,12 @@ const log_config = log_create_logger('config', 'spooder');
 const internal_config = {
 	run: 'bun run index.ts',
 	run_dev: '',
-	auto_restart: false,
-	auto_restart_max: 30000,
-	auto_restart_attempts: -1,
-	auto_restart_grace: 30000,
+	auto_restart: {
+		enabled: false,
+		backoff_max: 30000, // 30s
+		backoff_grace: 30000, // 30s
+		max_attempts: -1,
+	},
 	update: [],
 	canary: {
 		account: '',

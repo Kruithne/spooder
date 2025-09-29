@@ -155,7 +155,10 @@ async function start_server() {
 		}
 	}
 
-	if (config.auto_restart) {
+	if (config.auto_restart.enabled) {
+		const max_attempts = config.auto_restart.max_attempts;
+		const backoff_max = config.auto_restart.backoff_max;
+
 		if (is_dev_mode) {
 			log_cli(`[{dev}] auto-restart is {disabled} in {dev mode}`);
 			process.exit(proc_exit_code ?? 0);
@@ -167,24 +170,24 @@ async function start_server() {
 				restart_success_timer = null;
 			}
 			
-			if (config.auto_restart_attempts !== -1 && restart_attempts >= config.auto_restart_attempts) {
-				log_cli(`maximum restart attempts ({${config.auto_restart_attempts}}) reached, stopping auto-restart`);
+			if (max_attempts !== -1 && restart_attempts >= max_attempts) {
+				log_cli(`maximum restart attempts ({${max_attempts}}) reached, stopping auto-restart`);
 				process.exit(proc_exit_code ?? 0);
 			}
 			
 			restart_attempts++;
-			const current_delay = Math.min(restart_delay, config.auto_restart_max);
+			const current_delay = Math.min(restart_delay, backoff_max);
+			const max_attempt_str = max_attempts === -1 ? '∞' : max_attempts;
 			
-			const max_attempt_str = config.auto_restart_attempts === -1 ? '∞' : config.auto_restart_attempts;
-			log_cli(`restarting server in {${current_delay}ms} (attempt {${restart_attempts}}/{${max_attempt_str}}, delay capped at {${config.auto_restart_max}ms})`);
+			log_cli(`restarting server in {${current_delay}ms} (attempt {${restart_attempts}}/{${max_attempt_str}}, delay capped at {${backoff_max}ms})`);
 			
 			setTimeout(() => {
-				restart_delay = Math.min(restart_delay * 2, config.auto_restart_max);
+				restart_delay = Math.min(restart_delay * 2, backoff_max);
 				restart_success_timer = setTimeout(() => {
 					restart_delay = 100;
 					restart_attempts = 0;
 					restart_success_timer = null;
-				}, config.auto_restart_grace);
+				}, config.auto_restart.backoff_grace);
 				start_server();
 			}, current_delay);
 		}

@@ -42,10 +42,12 @@ Below is a full map of the available configuration options in their default stat
 		"run_dev": "",
 
 		// see CLI > Auto Restart
-		"auto_restart": true,
-		"auto_restart_max": 30000,
-		"auto_restart_attempts": 10,
-		"auto_restart_grace": 30000,
+		"auto_restart": {
+			"enabled": false,
+			"backoff_max": 30000,
+			"backoff_grace": 30000,
+			"max_attempts": -1
+		},
 
 		// see CLI > Auto Update
 		"update": [
@@ -155,7 +157,7 @@ The following differences will be observed when running in development mode:
 
 - If `run_dev` is configured, it will be used instead of the default `run` command.
 - Update commands defined in `spooder.update` will not be executed when starting a server.
-- If the server crashes and `auto_restart` is enabled, the server will not be restarted, and spooder will exit with the same exit code as the server.
+- If the server crashes and `auto_restart` is configured, the server will not be restarted, and spooder will exit with the same exit code as the server.
 - If canary is configured, reports will not be dispatched to GitHub and instead be printed to the console; this includes crash reports.
 
 It is possible to detect in userland if a server is running in development mode by checking the `SPOODER_ENV` environment variable.
@@ -195,10 +197,18 @@ If the server exits with a non-zero exit code, this will be considered an **unex
 ```json
 {
 	"spooder": {
-		"auto_restart": true,
-		"auto_restart_max": 30000,
-		"auto_restart_attempts": 10,
-		"auto_restart_grace": 30000
+		"auto_restart": {
+			"enabled": true,
+
+			// max restarts before giving up
+			"max_attempts": -1, // default (unlimited)
+
+			// max delay (ms) between restart attempts
+			"backoff_max": 30000, // default 30s
+
+			// grace period after which the backoff protocol
+			"backoff_grace": 30000 // default 30s
+		}
 	}
 }
 ```
@@ -207,13 +217,6 @@ If the server exits with a `0` exit code, this will be considered an **intention
 
 > [!TIP]
 > An **intentional shutdown** can be useful for auto-updating in response to events, such as webhooks.
-
-### Configuration Options
-
-- **`auto_restart`** (boolean, default: `false`): Enable or disable the auto-restart feature
-- **`auto_restart_max`** (number, default: `30000`): Maximum delay in milliseconds between restart attempts
-- **`auto_restart_attempts`** (number, default: `-1`): Maximum number of restart attempts before giving up. Set to `-1` for unlimited attempts
-- **`auto_restart_grace`** (number, default: `30000`): Period of time after which the backoff protocol disables if the server remains stable.
 
 <a id="cli-auto-update"></a>
 ## CLI > Auto Update
