@@ -44,7 +44,7 @@ Below is a full map of the available configuration options in their default stat
 		// see CLI > Auto Restart
 		"auto_restart": {
 			"enabled": false,
-			"backoff_max": 30000,
+			"backoff_max": 300000,
 			"backoff_grace": 30000,
 			"max_attempts": -1
 		},
@@ -205,7 +205,7 @@ If the server exits with a non-zero exit code, this will be considered an **unex
 			"max_attempts": -1, // default (unlimited)
 
 			// max delay (ms) between restart attempts
-			"backoff_max": 30000, // default 30s
+			"backoff_max": 300000, // default 5 min
 
 			// grace period after which the backoff protocol
 			"backoff_grace": 30000 // default 30s

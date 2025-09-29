@@ -8,7 +8,7 @@ const internal_config = {
 	run_dev: '',
 	auto_restart: {
 		enabled: false,
-		backoff_max: 30000, // 30s
+		backoff_max: 5 * 60 * 1000, // 5min
 		backoff_grace: 30000, // 30s
 		max_attempts: -1,
 	},
