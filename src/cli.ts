@@ -3,7 +3,7 @@ import { get_config } from './config';
 import { dispatch_report } from './dispatch';
 import { log_create_logger } from './api';
 
-const log_cli = log_create_logger('spooder_cli');
+const log_cli = log_create_logger('spooder_cli', 'spooder');
 
 let restart_delay = 100;
 let restart_attempts = 0;
@@ -178,7 +178,7 @@ async function start_server() {
 			restart_attempts++;
 			const current_delay = Math.min(restart_delay, backoff_max);
 			const max_attempt_str = max_attempts === -1 ? '∞' : max_attempts;
-			
+
 			log_cli(`restarting server in {${current_delay}ms} (attempt {${restart_attempts}}/{${max_attempt_str}}, delay capped at {${backoff_max}ms})`);
 			
 			setTimeout(() => {
