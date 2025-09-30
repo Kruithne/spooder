@@ -296,6 +296,9 @@ async function start_server() {
 	} else {
 		log_cli('starting server instance [{0}] {main}');
 
+		if (config.run.length === 0)
+			return log_cli_err(`cannot start main instance, missing {run} property`);
+
 		start_instance({
 			id: 'main',
 			run: config.run,

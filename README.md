@@ -38,7 +38,7 @@ Below is a full map of the available configuration options in their default stat
 	"spooder": {
 
 		// see CLI > Usage
-		"run": "bun run index.ts",
+		"run": "",
 		"run_dev": "",
 
 		// see CLI > Auto Restart
@@ -127,7 +127,7 @@ cd /var/www/my-website-about-fish.net/
 spooder
 ```
 
-`spooder` will launch your server either by executing the `run` command provided in the configuration, or by executing `bun run index.ts` by default.
+`spooder` will launch your server either by executing the `run` command provided in the configuration. If this is not defined, an error will be thrown.
 
 ```json
 {

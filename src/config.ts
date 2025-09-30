@@ -4,7 +4,7 @@ import { log_create_logger } from './api';
 const log_config = log_create_logger('config', 'spooder');
 
 const internal_config = {
-	run: 'bun run index.ts',
+	run: '',
 	run_dev: '',
 	auto_restart: {
 		enabled: false,
