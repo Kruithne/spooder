@@ -780,14 +780,14 @@ This can also be used to communicate with the host process for certain functiona
 
 #### OpCodes
 
-When sending/receiving IPC messages, the message will include an op-code. When communicating with the host process, that will be one of the following:
+When sending/receiving IPC messages, the message will include an opcode. When communicating with the host process, that will be one of the following:
 
 ```ts
-IPC_OP.CMSG_TRIGGER_UPDATE = 0;
-IPC_OP.SMSG_UPDATE_READY = 1;
+IPC_OP.CMSG_TRIGGER_UPDATE = -1;
+IPC_OP.SMSG_UPDATE_READY = -2;
 ```
 
-When sending/receiving your own messages, you can define and use your own ID schema. This can re-use the above op-codes if desired, since they are only useful when communicating directly with the host, and do not conflict with instance-to-instance communication.
+When sending/receiving your own messages, you can define and use your own ID schema. To prevent conflict with internal opcodes, always use positive values; `spooder` internal opcodes will always be negative.
 
 ### `ipc_register(op: number, callback: IPC_Callback)`
 

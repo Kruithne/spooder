@@ -137,8 +137,8 @@ export const log_error = log_create_logger('error', 'red');
 
 // region spooder ipc
 export const IPC_OP = {
-	CMSG_TRIGGER_UPDATE: 0,
-	SMSG_UPDATE_READY: 1,
+	CMSG_TRIGGER_UPDATE: -1,
+	SMSG_UPDATE_READY: -2,
 };
 
 // internal targets should always use __X__ as this format is
