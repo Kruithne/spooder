@@ -109,6 +109,35 @@ async function apply_updates(config: Config) {
 	}
 }
 
+async function handle_ipc(this: { instance_id: string, config: Config }, payload: any, proc: ProcessRef) {
+	if (payload.peer === IPC_TARGET.SPOODER) {
+		if (payload.op === IPC_OP.CMSG_TRIGGER_UPDATE) {
+			await apply_updates(this.config);
+
+			const payload = { op: IPC_OP.SMSG_UPDATE_READY };
+			for (const instance of instances.values())
+				instance.process.send(payload);
+		} else if (payload.op === IPC_OP.CMSG_REGISTER_LISTENER) {
+			instance_ipc_listeners.get(proc)?.add(payload.data.op);
+		}
+	} else if (payload.peer === IPC_TARGET.BROADCAST) {
+		payload.peer = this.instance_id;
+		for (const instance of instances.values()) {
+			if (instance.process === proc)
+				continue;
+
+			if (instance.ipc_listeners.has(payload.op))
+				instance.process.send(payload);
+		}
+	} else {
+		const target = instances.get(payload.peer);
+		if (target !== undefined && target.ipc_listeners.has(payload.op)) {
+			payload.peer = this.instance_id;
+			target.process.send(payload);
+		}
+	}
+}
+
 async function start_instance(instance: InstanceConfig, config: Config, update = false) {
 	log_cli(`starting server instance {${instance.id}}`);
 
@@ -126,35 +155,7 @@ async function start_instance(instance: InstanceConfig, config: Config, update =
 		env: { ...process.env, SPOODER_ENV: is_dev_mode ? 'dev' : 'prod' },
 		stdout: std_mode,
 		stderr: std_mode,
-
-		async ipc(payload, proc) {
-			if (payload.peer === IPC_TARGET.SPOODER) {
-				if (payload.op === IPC_OP.CMSG_TRIGGER_UPDATE) {
-					await apply_updates(config);
-
-					const payload = { op: IPC_OP.SMSG_UPDATE_READY };
-					for (const instance of instances.values())
-						instance.process.send(payload);
-				} else if (payload.op === IPC_OP.CMSG_REGISTER_LISTENER) {
-					instance_ipc_listeners.get(proc)?.add(payload.data.op);
-				}
-			} else if (payload.peer === IPC_TARGET.BROADCAST) {
-				payload.peer = instance.id;
-				for (const instance of instances.values()) {
-					if (instance.process === proc)
-						continue;
-
-					if (instance.ipc_listeners.has(payload.op))
-						instance.process.send(payload);
-				}
-			} else {
-				const target = instances.get(payload.peer);
-				if (target !== undefined && target.ipc_listeners.has(payload.op)) {
-					payload.peer = instance.id;
-					target.process.send(payload);
-				}
-			}
-		}
+		ipc: handle_ipc.bind({ instance_id: instance.id, config })
 	});
 
 	const ipc_listeners = new Set<number>();
