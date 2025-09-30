@@ -168,7 +168,7 @@ function ipc_on_message(payload: IPC_Message) {
 	}
 }
 
-export function ipc_send(target: string, op: number, data?: object) {
+export function ipc_send(peer: string, op: number, data?: object) {
 	if (!process.send) {
 		if (!ipc_fail_announced) {
 			log_spooder(`{ipc_send} failed, process not spawned with ipc channel`);
@@ -179,7 +179,7 @@ export function ipc_send(target: string, op: number, data?: object) {
 		return;
 	}
 
-	process.send({ target, op, data });
+	process.send({ peer, op, data });
 }
 
 export function ipc_register(op: number, callback: IPC_Callback) {

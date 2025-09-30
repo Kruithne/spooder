@@ -121,13 +121,27 @@ async function start_instance(instance: Instance, config: Config, update = false
 		stderr: std_mode,
 
 		async ipc(payload, proc) {
-			if (payload.target === IPC_TARGET.SPOODER) {
+			if (payload.peer === IPC_TARGET.SPOODER) {
 				if (payload.op === IPC_OP.CMSG_TRIGGER_UPDATE) {
 					await apply_updates(config);
 
 					const payload = { op: IPC_OP.SMSG_UPDATE_READY };
 					for (const instance of instances.values())
 						instance.send(payload);
+				}
+			} else if (payload.peer === IPC_TARGET.BROADCAST) {
+				payload.peer = instance.id;
+				for (const instance of instances.values()) {
+					if (instance === proc)
+						continue;
+
+					instance.send(payload);
+				}
+			} else {
+				const target = instances.get(payload.peer);
+				if (target !== undefined) {
+					payload.peer = instance.id;
+					target.send(payload);
 				}
 			}
 		}

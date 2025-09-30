@@ -770,10 +770,20 @@ log(`Fruit must be one of ${log_list(fruit)}`);
 <a id="api-ipc"></a>
 ## API > IPC
 
-`spooder` provides a way to send/receive messages between different instances via IPC.
+`spooder` provides a way to send/receive messages between different instances via IPC. See [CLI > Instancing](#cli-instancing) for documentation on instances.
 
-```
-// todo: instancing
+```ts
+// listen for a message
+ipc_register(0x1, msg => {
+	// msg.peer, msg.op, msg.data
+	console.log(msg.data.foo); // 42
+});
+
+// send a message to dev02
+ipc_send('dev02', 0x1, { foo: 42 });
+
+// send a message to all other instances
+ipc_send(IPC_TARGET.BROADCAST, 0x1, { foo: 42 });
 ```
 
 This can also be used to communicate with the host process for certain functionality, such as [auto-restarting](#cli-auto-restart).
@@ -801,7 +811,7 @@ type IPC_Message = {
 };
 ```
 
-### `ipc_send(target: string, op: number, data?: object)`
+### `ipc_send(peer: string, op: number, data?: object)`
 
 Send an IPC event. The target can either be the ID of another instance (such as the `peer` ID from an `IPC_Message`) or one of the following constants.
 
