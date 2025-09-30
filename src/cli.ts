@@ -4,11 +4,17 @@ import { dispatch_report } from './dispatch';
 import { log_create_logger, IPC_OP, IPC_TARGET, EXIT_CODE, EXIT_CODE_NAMES } from './api';
 
 type Config = Awaited<ReturnType<typeof get_config>>;
+type ProcessRef = ReturnType<typeof Bun.spawn>;
 
-type Instance = {
+type InstanceConfig = {
 	id: string;
 	run: string;
 	run_dev?: string;
+};
+
+type Instance = {
+	process: ProcessRef;
+	ipc_listeners: Set<number>;
 };
 
 const log_cli = log_create_logger('spooder_cli', 'spooder');
@@ -16,7 +22,8 @@ const log_cli = log_create_logger('spooder_cli', 'spooder');
 const argv = process.argv.slice(2);
 const is_dev_mode = argv.includes('--dev');
 
-const instances = new Map<string, ReturnType<typeof Bun.spawn>>();
+const instances = new Map<string, Instance>();
+const instance_ipc_listeners = new Map<ProcessRef, Set<number>>();
 
 let restart_delay = 100;
 let restart_attempts = 0;
@@ -102,7 +109,7 @@ async function apply_updates(config: Config) {
 	}
 }
 
-async function start_instance(instance: Instance, config: Config, update = false) {
+async function start_instance(instance: InstanceConfig, config: Config, update = false) {
 	log_cli(`starting server instance {${instance.id}}`);
 
 	if (update)
@@ -127,27 +134,33 @@ async function start_instance(instance: Instance, config: Config, update = false
 
 					const payload = { op: IPC_OP.SMSG_UPDATE_READY };
 					for (const instance of instances.values())
-						instance.send(payload);
+						instance.process.send(payload);
+				} else if (payload.op === IPC_OP.CMSG_REGISTER_LISTENER) {
+					instance_ipc_listeners.get(proc)?.add(payload.data.op);
 				}
 			} else if (payload.peer === IPC_TARGET.BROADCAST) {
 				payload.peer = instance.id;
 				for (const instance of instances.values()) {
-					if (instance === proc)
+					if (instance.process === proc)
 						continue;
 
-					instance.send(payload);
+					if (instance.ipc_listeners.has(payload.op))
+						instance.process.send(payload);
 				}
 			} else {
 				const target = instances.get(payload.peer);
-				if (target !== undefined) {
+				if (target !== undefined && target.ipc_listeners.has(payload.op)) {
 					payload.peer = instance.id;
-					target.send(payload);
+					target.process.send(payload);
 				}
 			}
 		}
 	});
 
-	instances.set(instance.id, proc);
+	const ipc_listeners = new Set<number>();
+
+	instances.set(instance.id, { process: proc, ipc_listeners });
+	instance_ipc_listeners.set(proc, ipc_listeners);
 
 	const stream_history = new Array<string>();
 	if (include_crash_history) {
@@ -178,6 +191,7 @@ async function start_instance(instance: Instance, config: Config, update = false
 	
 	const proc_exit_code = await proc.exited;
 	instances.delete(instance.id);
+	instance_ipc_listeners.delete(proc);
 
 	log_cli(`server exited with code {${proc_exit_code}} ({${EXIT_CODE_NAMES[proc_exit_code] ?? 'UNKNOWN'}})`);
 

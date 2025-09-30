@@ -795,6 +795,7 @@ When sending/receiving IPC messages, the message will include an opcode. When co
 ```ts
 IPC_OP.CMSG_TRIGGER_UPDATE = -1;
 IPC_OP.SMSG_UPDATE_READY = -2;
+IPC_OP.CMSG_REGISTER_LISTENER = -3; // used internally by ipc_register
 ```
 
 When sending/receiving your own messages, you can define and use your own ID schema. To prevent conflict with internal opcodes, always use positive values; `spooder` internal opcodes will always be negative.

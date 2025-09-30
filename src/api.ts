@@ -139,6 +139,7 @@ export const log_error = log_create_logger('error', 'red');
 export const IPC_OP = {
 	CMSG_TRIGGER_UPDATE: -1,
 	SMSG_UPDATE_READY: -2,
+	CMSG_REGISTER_LISTENER: -3,
 };
 
 // internal targets should always use __X__ as this format is
@@ -162,10 +163,11 @@ const ipc_listeners = new Map<number, Set<IPC_Callback>>();
 
 function ipc_on_message(payload: IPC_Message) {
 	const listeners = ipc_listeners.get(payload.op);
-	if (listeners) {
-		for (const callback of listeners)
-			callback(payload);
-	}
+	if (!listeners)
+		return;
+
+	for (const callback of listeners)
+		callback(payload);
 }
 
 export function ipc_send(peer: string, op: number, data?: object) {
@@ -193,6 +195,8 @@ export function ipc_register(op: number, callback: IPC_Callback) {
 		listeners.add(callback);
 	else
 		ipc_listeners.set(op, new Set([callback]));
+
+	ipc_send(IPC_TARGET.SPOODER, IPC_OP.CMSG_REGISTER_LISTENER, { op });
 }
 // endregion
 
