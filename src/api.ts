@@ -136,23 +136,24 @@ export const log_error = log_create_logger('error', 'red');
 // endregion
 
 // region spooder ipc
-export const IPC_TARGET = {
-	SPOODER: -1,
-	BROADCAST: 0
-};
-
 export const IPC_OP = {
 	CMSG_TRIGGER_UPDATE: 0,
 	SMSG_UPDATE_READY: 1,
 };
 
+// internal targets should always use __X__ as this format is
+// reserved; userland instances cannot be named this way
+export const IPC_TARGET = {
+	SPOODER: '__spooder__',
+	BROADCAST: '__broadcast__'
+};
+
 type IPC_Callback = (data: IPC_Message) => void;
 type IPC_Message = {
 	op: number;
-	peer: number;
+	peer: string;
 	data?: object
 };
-
 
 let ipc_fail_announced = false;
 let ipc_listener_attached = false;

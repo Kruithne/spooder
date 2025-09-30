@@ -699,14 +699,14 @@ filesize(bytes: number): string;
 
 // ipc
 ipc_register(op: number, callback: IPC_Callback);
-ipc_send(target: number, op: number, data?: object);
+ipc_send(target: string, op: number, data?: object);
 
 // constants
 HTTP_STATUS_TEXT: Record<number, string>;
 HTTP_STATUS_CODE: { OK_200: 200, NotFound_404: 404, ... };
 EXIT_CODE: Record<string, number>;
 EXIT_CODE_NAMES: Record<number, string>;
-IPC_TARGET: Record<string, number>;
+IPC_TARGET: Record<string, string>;
 IPC_OP: Record<string, number>;
 ```
 
@@ -783,10 +783,8 @@ This can also be used to communicate with the host process for certain functiona
 When sending/receiving IPC messages, the message will include an op-code. When communicating with the host process, that will be one of the following:
 
 ```ts
-IPC_OP = {
-	CMSG_TRIGGER_UPDATE: 0,
-	SMSG_UPDATE_READY: 1,
-};
+IPC_OP.CMSG_TRIGGER_UPDATE = 0;
+IPC_OP.SMSG_UPDATE_READY = 1;
 ```
 
 When sending/receiving your own messages, you can define and use your own ID schema. This can re-use the above op-codes if desired, since they are only useful when communicating directly with the host, and do not conflict with instance-to-instance communication.
@@ -798,20 +796,18 @@ Register a listener for IPC events. The callback will receive an object with thi
 ```ts
 type IPC_Message = {
 	op: number; // opcode received
-	peer: number; // sender
+	peer: string; // sender
 	data?: object // payload data (optional)
 };
 ```
 
-### `ipc_send(target: number, op: number, data?: object)`
+### `ipc_send(target: string, op: number, data?: object)`
 
 Send an IPC event. The target can either be the ID of another instance (such as the `peer` ID from an `IPC_Message`) or one of the following constants.
 
 ```ts
-IPC_TARGET = {
-	SPOODER: -1, // communicate with host
-	BROADCAST: 0 // broadcast to all instances
-};
+IPC_TARGET.SPOODER; // communicate with the host
+IPC_TARGET.BROADCAST; // broadcast to all other instances
 ```
 
 <a id="api-http"></a>
