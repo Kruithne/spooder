@@ -211,18 +211,18 @@ async function start_instance(instance: InstanceConfig, config: Config, update =
 	instances.delete(instance.id);
 	instance_ipc_listeners.delete(proc);
 
-	log_cli(`server exited with code {${proc_exit_code}} ({${EXIT_CODE_NAMES[proc_exit_code] ?? 'UNKNOWN'}})`);
+	log_cli(`server {${instance.id}} exited with code {${proc_exit_code}} ({${EXIT_CODE_NAMES[proc_exit_code] ?? 'UNKNOWN'}})`);
 
 	let is_safe_exit = proc_exit_code === EXIT_CODE.SUCCESS || proc_exit_code === EXIT_CODE.SPOODER_AUTO_UPDATE;
 	if (!is_safe_exit) {
 		const console_output = include_crash_history ? strip_color_codes(stream_history.join('\n')) : undefined;
 
 		if (is_dev_mode) {
-			log_cli_err(`[{dev}] crash: server exited unexpectedly (exit code {${proc_exit_code}}`);
+			log_cli_err(`[{dev}] crash: server {${instance.id}} exited unexpectedly (exit code {${proc_exit_code}}`);
 			log_cli_err(`[{dev}] without {--dev}, this would raise a canary report`);
 			log_cli_err(`[{dev}] console output:\n${console_output}`);
 		} else {
-			dispatch_report('crash: server exited unexpectedly', [{
+			dispatch_report(`crash: server ${instance.id} exited unexpectedly`, [{
 				proc_exit_code, console_output, instance
 			}]);
 		}
