@@ -82,6 +82,7 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 - [CLI > Dev Mode](#cli-dev-mode)
 - [CLI > Auto Restart](#cli-auto-restart)
 - [CLI > Auto Update](#cli-auto-update)
+- [CLI > Instancing](#cli-instancing)
 - [CLI > Canary](#cli-canary)
 	- [CLI > Canary > Crash](#cli-canary-crash)
 	- [CLI > Canary > Sanitization](#cli-canary-sanitization)
@@ -262,6 +263,60 @@ server.webhook(process.env.WEBHOOK_SECRET, '/webhook', payload => {
 });
 ```
 
+### Multi-Instance Auto Update
+
+See [Instancing](#cli-instancing) for instructions on how to use [Auto Update](#cli-auto-update) with multiple instances.
+
+### Skip Updates
+
+In addition to being skipped in [dev mode](#cli-dev-mode), updates can also be skipped in production mode by passing the `--no-update` flag.
+
+<a id="cli-instancing"></a>
+## CLI > Instancing
+
+> [!NOTE]
+> This feature is not enabled by default.
+
+By default, `spooder` will start and manage a single process as defined by the `run` and `run_dev` configuration properties. In some scenarios, you may want multiple processes for a single codebase, such as variant sub-domains.
+
+This can be configured in `spooder` using the `instances` array, with each entry defining a unique instance.
+
+```json
+"spooder": {
+	"instances": [
+		{
+			"id": "dev01",
+			"run": "bun run --env-file=.env.a index.ts",
+			"run_dev": "bun run --env-file=.env.a.dev index.ts --inspect"
+		},
+		{
+			"id": "dev02",
+			"run": "bun run --env-file=.env.b index.ts",
+			"run_dev": "bun run --env-file=.env.b.dev index.ts --inspect"
+		}
+	]
+}
+```
+
+Instances will be managed individually in the same manner that a single process would be, including auto-restarting and other functionality.
+
+### Canary
+
+The [canary](#cli-canary) feature functions the same for multiple instances as it would for a single instance with the caveat that the `instance` object as defined in the configuration is included in the crash report for diagnostics.
+
+This allows you to define custom properties on the instance which will be included as part of the crash report.
+
+```json
+{
+	"id": "dev01",
+	"run": "bun run --env-file=.env.a index.ts",
+	"sub_domain": "dev01.spooder.dev" // custom, for diagnostics
+}
+```
+
+> ![IMPORTANT]
+> You should not include sensitive or confidential credentials in your instance configuration for this reason. This should always be handled using environment variables or credential storage.
+
 ### Multi-instance Auto Restart
 
 Combining [Auto Restart](#cli-auto-restart) and [Auto Update](#cli-auto-update), when a server process exits with a zero exit code, the update commands will be run as the server restarts. This is suitable for a single-instance setup.
@@ -289,10 +344,6 @@ ipc_register(IPC_OP.SMSG_UPDATE_READY, async () => {
 In this scenario, we instruct the host process from one instance receiving the webhook to apply the updates. Once the update commands have been run, all instances are send the `SMSG_UPDATE_READY` event, indicating they can restart.
 
 Exiting with the `SPOODER_AUTO_UPDATE` exit code instructs spooder that we're exiting as part of this process, and prevents auto-update from running on restart.
-
-### Skip Updates
-
-In addition to being skipped in [dev mode](#cli-dev-mode), updates can also be skipped in production mode by passing the `--no-update` flag.
 
 <a id="cli-canary"></a>
 ## CLI > Canary

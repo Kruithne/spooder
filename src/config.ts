@@ -12,6 +12,7 @@ const internal_config = {
 		backoff_grace: 30000, // 30s
 		max_attempts: -1,
 	},
+	instances: [],
 	update: [],
 	canary: {
 		enabled: false,

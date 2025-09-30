@@ -3,7 +3,20 @@ import { get_config } from './config';
 import { dispatch_report } from './dispatch';
 import { log_create_logger, IPC_OP, IPC_TARGET, EXIT_CODE, EXIT_CODE_NAMES } from './api';
 
+type Config = Awaited<ReturnType<typeof get_config>>;
+
+type Instance = {
+	id: string;
+	run: string;
+	run_dev?: string;
+};
+
 const log_cli = log_create_logger('spooder_cli', 'spooder');
+
+const argv = process.argv.slice(2);
+const is_dev_mode = argv.includes('--dev');
+
+const instances = new Map<string, ReturnType<typeof Bun.spawn>>();
 
 let restart_delay = 100;
 let restart_attempts = 0;
@@ -53,10 +66,8 @@ function parse_command_line(command: string): string[] {
 	return args;
 }
 
-async function apply_updates(config: Awaited<ReturnType<typeof get_config>>) {
-	const argv = process.argv.slice(2);
-
-	if (argv.includes('--dev')) {
+async function apply_updates(config: Config) {
+	if (is_dev_mode) {
 		log_cli('[{update}] skipping update commands in {dev mode}');
 	} else if (argv.includes('--no-update')) {
 		log_cli('[{update}] skipping update commands due to {--no-update} flag');
@@ -91,16 +102,8 @@ async function apply_updates(config: Awaited<ReturnType<typeof get_config>>) {
 	}
 }
 
-async function start_server(update = true) {
-	log_cli('start_server');
-
-	const argv = process.argv.slice(2);
-	const is_dev_mode = argv.includes('--dev');
-
-	if (is_dev_mode)
-		log_cli('[{dev}] spooder has been started in {dev mode}');
-
-	const config = await get_config();
+async function start_instance(instance: Instance, config: Config, update = false) {
+	log_cli(`starting server instance {${instance.id}}`);
 
 	if (update)
 		await apply_updates(config);
@@ -109,21 +112,28 @@ async function start_server(update = true) {
 	const include_crash_history = crash_console_history > 0;
 
 	const std_mode = include_crash_history ? 'pipe' : 'inherit';
-	const run_command = is_dev_mode && config.run_dev !== '' ? config.run_dev : config.run;
+
+	const run_command = is_dev_mode && instance.run_dev ? instance.run_dev : instance.run;
 	const proc = Bun.spawn(parse_command_line(run_command), {
 		cwd: process.cwd(),
 		env: { ...process.env, SPOODER_ENV: is_dev_mode ? 'dev' : 'prod' },
 		stdout: std_mode,
 		stderr: std_mode,
+
 		async ipc(payload, proc) {
 			if (payload.target === IPC_TARGET.SPOODER) {
 				if (payload.op === IPC_OP.CMSG_TRIGGER_UPDATE) {
 					await apply_updates(config);
-					proc.send({ op: IPC_OP.SMSG_UPDATE_READY });
+
+					const payload = { op: IPC_OP.SMSG_UPDATE_READY };
+					for (const instance of instances.values())
+						instance.send(payload);
 				}
 			}
 		}
 	});
+
+	instances.set(instance.id, proc);
 
 	const stream_history = new Array<string>();
 	if (include_crash_history) {
@@ -153,6 +163,8 @@ async function start_server(update = true) {
 	}
 	
 	const proc_exit_code = await proc.exited;
+	instances.delete(instance.id);
+
 	log_cli(`server exited with code {${proc_exit_code}} ({${EXIT_CODE_NAMES[proc_exit_code] ?? 'UNKNOWN'}})`);
 
 	let is_safe_exit = proc_exit_code === EXIT_CODE.SUCCESS || proc_exit_code === EXIT_CODE.SPOODER_AUTO_UPDATE;
@@ -165,7 +177,7 @@ async function start_server(update = true) {
 			log_cli(`[{dev}] console output:\n${console_output}`);
 		} else {
 			dispatch_report('crash: server exited unexpectedly', [{
-				proc_exit_code, console_output
+				proc_exit_code, console_output, instance
 			}]);
 		}
 	}
@@ -179,7 +191,7 @@ async function start_server(update = true) {
 			process.exit(proc_exit_code ?? 0);
 		} else if (is_safe_exit) {
 			const should_apply_updates = proc_exit_code !== EXIT_CODE.SPOODER_AUTO_UPDATE;
-			start_server(should_apply_updates);
+			setImmediate(() => start_instance(instance, config, should_apply_updates));
 		} else {
 			if (restart_success_timer) {
 				clearTimeout(restart_success_timer);
@@ -204,11 +216,30 @@ async function start_server(update = true) {
 					restart_attempts = 0;
 					restart_success_timer = null;
 				}, config.auto_restart.backoff_grace);
-				start_server();
+
+				start_instance(instance, config, true);
 			}, current_delay);
 		}
 	} else {
 		log_cli(`auto-restart is {disabled}, exiting`);
+	}
+}
+
+async function start_server() {
+	if (is_dev_mode)
+		log_cli('[{dev}] spooder has been started in {dev mode}');
+
+	const config = await get_config();
+	
+	if (config.instances.length > 0) {
+		for (const instance of config.instances)
+			start_instance(instance, config);
+	} else {
+		start_instance({
+			id: 'main',
+			run: config.run,
+			run_dev: config.run_dev !== '' ? config.run_dev : undefined
+		}, config);
 	}
 }
 
