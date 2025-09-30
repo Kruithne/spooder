@@ -13,6 +13,7 @@ const internal_config = {
 		max_attempts: -1,
 	},
 	instances: [],
+	instance_stagger_interval: 0,
 	update: [],
 	canary: {
 		enabled: false,

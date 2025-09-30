@@ -26,6 +26,8 @@ const is_dev_mode = argv.includes('--dev');
 const instances = new Map<string, Instance>();
 const instance_ipc_listeners = new Map<ProcessRef, Set<number>>();
 
+let last_instance_start_time = 0;
+
 let restart_delay = 100;
 let restart_attempts = 0;
 let restart_success_timer: Timer | null = null;
@@ -140,6 +142,22 @@ async function handle_ipc(this: { instance_id: string, config: Config }, payload
 }
 
 async function start_instance(instance: InstanceConfig, config: Config, update = false) {
+	if (config.instance_stagger_interval > 0) {
+		const current_time = Date.now();
+
+		if (current_time > last_instance_start_time) {
+			last_instance_start_time = current_time + config.instance_stagger_interval;
+		} else {
+			const delta = last_instance_start_time - current_time;
+			last_instance_start_time += config.instance_stagger_interval;
+
+			log_cli(`delaying {${instance.id}} for {${delta}ms} to satisfy {${config.instance_stagger_interval}ms} instance stagger`);
+			await Bun.sleep(delta);
+		}
+	}
+
+	log_cli(`starting server instance {${instance.id}}`);
+
 	if (update)
 		await apply_updates(config);
 
@@ -289,13 +307,9 @@ async function start_server() {
 			}
 
 			instance_map.set(instance.id, i);
-
-			log_cli(`starting server instance [{${i}}] {${instance.id}}`);
 			start_instance(instance, config);
 		}
 	} else {
-		log_cli('starting server instance [{0}] {main}');
-
 		if (config.run.length === 0)
 			return log_cli_err(`cannot start main instance, missing {run} property`);
 

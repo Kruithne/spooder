@@ -300,6 +300,12 @@ This can be configured in `spooder` using the `instances` array, with each entry
 
 Instances will be managed individually in the same manner that a single process would be, including auto-restarting and other functionality.
 
+### Instance Stagger
+
+By default, instances are all launched instantly. This behavior can be configured with the `instance_stagger_interval` configuration property, which defines an interval between instance launches in milliseconds.
+
+This interval effects both server start-up, auto-restarting and crash recovery. No two instances will be launched within that interval regardless of the reason.
+
 ### Canary
 
 The [canary](#cli-canary) feature functions the same for multiple instances as it would for a single instance with the caveat that the `instance` object as defined in the configuration is included in the crash report for diagnostics.
