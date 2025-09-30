@@ -18,6 +18,7 @@ type Instance = {
 };
 
 const log_cli = log_create_logger('spooder_cli', 'spooder');
+const log_cli_err = log_create_logger('spooder_cli', 'red');
 
 const argv = process.argv.slice(2);
 const is_dev_mode = argv.includes('--dev');
@@ -101,7 +102,7 @@ async function apply_updates(config: Config) {
 				log_cli(`[{${i}}] exited with code {${update_proc.exitCode}}`);
 
 				if (update_proc.exitCode !== 0) {
-					log_cli(`aborting update due to non-zero exit code from [${i}]`);
+					log_cli_err(`aborting update due to non-zero exit code from [${i}]`);
 					break;
 				}
 			}
@@ -199,9 +200,9 @@ async function start_instance(instance: InstanceConfig, config: Config, update =
 		const console_output = include_crash_history ? strip_color_codes(stream_history.join('\n')) : undefined;
 
 		if (is_dev_mode) {
-			log_cli(`[{dev}] crash: server exited unexpectedly (exit code {${proc_exit_code}}`);
-			log_cli(`[{dev}] without {--dev}, this would raise a canary report`);
-			log_cli(`[{dev}] console output:\n${console_output}`);
+			log_cli_err(`[{dev}] crash: server exited unexpectedly (exit code {${proc_exit_code}}`);
+			log_cli_err(`[{dev}] without {--dev}, this would raise a canary report`);
+			log_cli_err(`[{dev}] console output:\n${console_output}`);
 		} else {
 			dispatch_report('crash: server exited unexpectedly', [{
 				proc_exit_code, console_output, instance
@@ -226,7 +227,7 @@ async function start_instance(instance: InstanceConfig, config: Config, update =
 			}
 			
 			if (max_attempts !== -1 && restart_attempts >= max_attempts) {
-				log_cli(`maximum restart attempts ({${max_attempts}}) reached, stopping auto-restart`);
+				log_cli_err(`maximum restart attempts ({${max_attempts}}) reached, stopping auto-restart`);
 				process.exit(proc_exit_code ?? 0);
 			}
 			
@@ -268,7 +269,7 @@ async function start_server() {
 			const instance = instances[i] as InstanceConfig;
 
 			if (typeof instance.run !== 'string') {
-				log_cli(`cannot start instance {${instance.id}}, missing {run} property`);
+				log_cli_err(`cannot start instance {${instance.id}}, missing {run} property`);
 				continue;
 			}
 
@@ -277,13 +278,13 @@ async function start_server() {
 
 			const used_idx = instance_map.get(instance.id);
 			if (used_idx !== undefined) {
-				log_cli(`cannot start instance {${instance.id}} (index {${i}}), instance ID already in use (index {${used_idx}})`);
+				log_cli_err(`cannot start instance {${instance.id}} (index {${i}}), instance ID already in use (index {${used_idx}})`);
 				continue;
 			}
 
 			if (instance.id.startsWith('__') && instance.id.endsWith('__')) {
-				log_cli(`cannot start instance {${instance.id}} using internal naming syntax`);
-				log_cli(`instance names with {__} prefix and suffix are reserved`);
+				log_cli_err(`cannot start instance {${instance.id}} using internal naming syntax`);
+				log_cli_err(`instance names with {__} prefix and suffix are reserved`);
 				continue;
 			}
 
