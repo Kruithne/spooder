@@ -15,6 +15,9 @@ type InstanceConfig = {
 type Instance = {
 	process: ProcessRef;
 	ipc_listeners: Set<number>;
+	restart_delay: number;
+	restart_attempts: number;
+	restart_success_timer: Timer | null;
 };
 
 const log_cli = log_create_logger('spooder_cli', 'spooder');
@@ -27,10 +30,6 @@ const instances = new Map<string, Instance>();
 const instance_ipc_listeners = new Map<ProcessRef, Set<number>>();
 
 let last_instance_start_time = 0;
-
-let restart_delay = 100;
-let restart_attempts = 0;
-let restart_success_timer: Timer | null = null;
 
 function strip_color_codes(str: string): string {
 	return str.replace(/\x1b\[[0-9;]*m/g, '');
@@ -177,7 +176,15 @@ async function start_instance(instance: InstanceConfig, config: Config, update =
 
 	const ipc_listeners = new Set<number>();
 
-	instances.set(instance.id, { process: proc, ipc_listeners });
+	const instance_state: Instance = {
+		process: proc,
+		ipc_listeners,
+		restart_delay: 100,
+		restart_attempts: 0,
+		restart_success_timer: null
+	};
+
+	instances.set(instance.id, instance_state);
 	instance_ipc_listeners.set(proc, ipc_listeners);
 
 	const stream_history = new Array<string>();
@@ -208,6 +215,13 @@ async function start_instance(instance: InstanceConfig, config: Config, update =
 	}
 	
 	const proc_exit_code = await proc.exited;
+	const instance_data = instances.get(instance.id);
+
+	if (instance_data?.restart_success_timer) {
+		clearTimeout(instance_data.restart_success_timer);
+		instance_data.restart_success_timer = null;
+	}
+
 	instances.delete(instance.id);
 	instance_ipc_listeners.delete(proc);
 
@@ -239,28 +253,33 @@ async function start_instance(instance: InstanceConfig, config: Config, update =
 			const should_apply_updates = proc_exit_code !== EXIT_CODE.SPOODER_AUTO_UPDATE;
 			setImmediate(() => start_instance(instance, config, should_apply_updates));
 		} else {
-			if (restart_success_timer) {
-				clearTimeout(restart_success_timer);
-				restart_success_timer = null;
+			if (!instance_data) {
+				log_cli_err(`cannot restart instance {${instance.id}}, instance data not found`);
+				return;
 			}
-			
-			if (max_attempts !== -1 && restart_attempts >= max_attempts) {
-				log_cli_err(`maximum restart attempts ({${max_attempts}}) reached, stopping auto-restart`);
-				process.exit(proc_exit_code ?? 0);
+
+			if (instance_data.restart_success_timer) {
+				clearTimeout(instance_data.restart_success_timer);
+				instance_data.restart_success_timer = null;
 			}
-			
-			restart_attempts++;
-			const current_delay = Math.min(restart_delay, backoff_max);
+
+			if (max_attempts !== -1 && instance_data.restart_attempts >= max_attempts) {
+				log_cli_err(`instance {${instance.id}} maximum restart attempts ({${max_attempts}}) reached, stopping auto-restart`);
+				return;
+			}
+
+			instance_data.restart_attempts++;
+			const current_delay = Math.min(instance_data.restart_delay, backoff_max);
 			const max_attempt_str = max_attempts === -1 ? '∞' : max_attempts;
 
-			log_cli(`restarting server in {${current_delay}ms} (attempt {${restart_attempts}}/{${max_attempt_str}}, delay capped at {${backoff_max}ms})`);
-			
+			log_cli(`restarting server {${instance.id}} in {${current_delay}ms} (attempt {${instance_data.restart_attempts}}/{${max_attempt_str}}, delay capped at {${backoff_max}ms})`);
+
 			setTimeout(() => {
-				restart_delay = Math.min(restart_delay * 2, backoff_max);
-				restart_success_timer = setTimeout(() => {
-					restart_delay = 100;
-					restart_attempts = 0;
-					restart_success_timer = null;
+				instance_data.restart_delay = Math.min(instance_data.restart_delay * 2, backoff_max);
+				instance_data.restart_success_timer = setTimeout(() => {
+					instance_data.restart_delay = 100;
+					instance_data.restart_attempts = 0;
+					instance_data.restart_success_timer = null;
 				}, config.auto_restart.backoff_grace);
 
 				start_instance(instance, config, true);
