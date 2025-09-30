@@ -139,8 +139,6 @@ async function handle_ipc(this: { instance_id: string, config: Config }, payload
 }
 
 async function start_instance(instance: InstanceConfig, config: Config, update = false) {
-	log_cli(`starting server instance {${instance.id}}`);
-
 	if (update)
 		await apply_updates(config);
 
@@ -259,11 +257,44 @@ async function start_server() {
 		log_cli('[{dev}] spooder has been started in {dev mode}');
 
 	const config = await get_config();
-	
-	if (config.instances.length > 0) {
-		for (const instance of config.instances)
+
+	const instances = config.instances;
+	const n_instances = instances.length;
+
+	if (instances.length > 0) {
+		const instance_map = new Map<string, number>();
+
+		for (let i = 0; i < n_instances; i++) {
+			const instance = instances[i] as InstanceConfig;
+
+			if (typeof instance.run !== 'string') {
+				log_cli(`cannot start instance {${instance.id}}, missing {run} property`);
+				continue;
+			}
+
+			if (typeof instance.id !== 'string')
+				instance.id = 'instance_' + (i + 1);
+
+			const used_idx = instance_map.get(instance.id);
+			if (used_idx !== undefined) {
+				log_cli(`cannot start instance {${instance.id}} (index {${i}}), instance ID already in use (index {${used_idx}})`);
+				continue;
+			}
+
+			if (instance.id.startsWith('__') && instance.id.endsWith('__')) {
+				log_cli(`cannot start instance {${instance.id}} using internal naming syntax`);
+				log_cli(`instance names with {__} prefix and suffix are reserved`);
+				continue;
+			}
+
+			instance_map.set(instance.id, i);
+
+			log_cli(`starting server instance [{${i}}] {${instance.id}}`);
 			start_instance(instance, config);
+		}
 	} else {
+		log_cli('starting server instance [{0}] {main}');
+
 		start_instance({
 			id: 'main',
 			run: config.run,
