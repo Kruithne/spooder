@@ -181,6 +181,7 @@ export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPoo
 				return;
 
 			message.peer = worker_id;
+			callbacks.get(message.id)?.(message);
 
 			for (const target_worker of pipe_workers.values()) {
 				if (target_worker === worker)
@@ -189,13 +190,18 @@ export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPoo
 				target_worker.postMessage(message);
 			}
 		} else {
-			const target_worker = pipe_workers.getByKey(message.peer);
+			const target_peer = message.peer;
+			const target_worker = pipe_workers.getByKey(target_peer);
 			const worker_id = pipe_workers.getByValue(worker);
 
 			if (worker_id === undefined)
 				return;
 
 			message.peer = worker_id;
+
+			if (target_peer === peer_id)
+				callbacks.get(message.id)?.(message);
+
 			target_worker?.postMessage(message);
 		}
 	}
