@@ -42,6 +42,7 @@ export interface WorkerPool {
 	off: (event: string) => void;
 }
 
+export const WORKER_EXIT_NO_RESTART = 42;
 const log_worker = log_create_logger('worker_pool', 'spooder');
 
 type AutoRestartConfig = {
@@ -136,15 +137,18 @@ export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPoo
 			handle_worker_message(worker, event);
 		});
 
-		worker.addEventListener('close', () => {
+		worker.addEventListener('close', (event: CloseEvent) => {
 			const worker_id = pipe_workers.getByValue(worker);
-			log_worker(`worker {${worker_id ?? 'unknown'}} closed`);
+			const exit_code = event.code;
+			log_worker(`worker {${worker_id ?? 'unknown'}} closed, exit code {${exit_code}}`);
 
 			if (worker_id)
 				pipe_workers.deleteByKey(worker_id);
 
-			if (auto_restart_enabled)
+			if (auto_restart_enabled && exit_code !== WORKER_EXIT_NO_RESTART)
 				restart_worker(worker);
+			else if (exit_code === WORKER_EXIT_NO_RESTART)
+				log_worker(`worker {${worker_id ?? 'unknown'}} exited with {WORKER_EXIT_NO_RESTART}, skipping auto-restart`);
 		});
 	}
 

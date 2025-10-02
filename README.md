@@ -2009,17 +2009,17 @@ pool.off('event_name');
 
 The `worker_pool` function supports automatic worker restart when workers crash or close unexpectedly. This feature includes an exponential backoff protocol to prevent restart loops.
 
-**Configuration:**
+#### Configuration:
 - `auto_restart`: `boolean | AutoRestartConfig` - Enable auto-restart (optional)
   - If `true`, uses default settings
   - If an object, allows customization of restart behavior
 
-**AutoRestartConfig Options:**
+#### AutoRestartConfig
 - `backoff_max`: `number` - Maximum delay between restart attempts in milliseconds (default: `5 * 60 * 1000` = 5 minutes)
 - `backoff_grace`: `number` - Time in milliseconds a worker must run successfully before restart attempts are reset (default: `30000` = 30 seconds)
 - `max_attempts`: `number` - Maximum number of restart attempts before giving up (default: `5`, use `-1` for unlimited)
 
-**Backoff Protocol:**
+#### Backoff Protocol
 1. Initial restart delay starts at 100ms
 2. Each subsequent restart doubles the delay
 3. Delay is capped at `backoff_max`
@@ -2036,6 +2036,16 @@ const pool = await worker_pool({
 		max_attempts: 5 // give up after 5 failed attempts
 	}
 });
+```
+
+#### Graceful Exit
+
+Workers can exit gracefully without triggering an auto-restart by using the `WORKER_EXIT_NO_RESTART` exit code (42):
+
+```ts
+// worker thread
+import { WORKER_EXIT_NO_RESTART } from 'spooder';
+process.exit(WORKER_EXIT_NO_RESTART); // exits without auto-restart
 ```
 
 > [!IMPORTANT]
