@@ -1889,6 +1889,12 @@ const pool = await worker_pool({
 	size: 5 // spawns 5 instances
 });
 
+// with custom response timeout
+const pool = await worker_pool({
+	worker: './worker.ts',
+	response_timeout: 10000 // 10 seconds (default: 5000ms, use -1 to disable)
+});
+
 // with auto-restart enabled (boolean)
 const pool = await worker_pool({
 	worker: './worker.ts',
@@ -1906,16 +1912,24 @@ const pool = await worker_pool({
 });
 ```
 
-### 🔧 `worker_connect(peer_id?: string): WorkerPool` (Worker Thread)
+### 🔧 `worker_connect(peer_id?: string, response_timeout?: number): WorkerPool` (Worker Thread)
 
 Connect a worker thread to the worker pool. This should be called from within a worker thread to establish communication with the main thread and other workers.
 
+**Parameters:**
+- `peer_id` - Optional worker ID (defaults to `worker-UUID`)
+- `response_timeout` - Optional timeout in milliseconds for request-response patterns (default: 5000ms, use -1 to disable)
+
 ```ts
 // worker thread
-const pool = worker_connect('my_worker'); // defaults to worker-UUID
+const pool = worker_connect('my_worker'); // defaults to worker-UUID, 5000ms timeout
 pool.on('test', msg => {
 	console.log(`Received ${msg.data.foo} from ${msg.peer}`);
 });
+
+// with custom timeout
+const pool = worker_connect('my_worker', 10000); // 10 second timeout
+const pool = worker_connect('my_worker', -1); // no timeout
 ```
 
 ### Basic Usage
@@ -1955,14 +1969,24 @@ const pool = worker_connect('worker_a');
 pool.send('worker_b', 'test', { foo: 500 });
 ```
 
-### 🔧 `pool.send(peer: string, id: string, data?: Record<string, any>): void`
+### 🔧 `pool.send(peer: string, id: string, data?: Record<string, any>, expect_response?: boolean): void | Promise<WorkerMessage>`
 
 Send a message to a specific peer in the pool, which can be the main host or another worker.
 
+When `expect_response` is `false` (default), the function returns `void`. When `true`, it returns a `Promise<WorkerMessage>` that resolves when the peer responds using `pool.respond()`.
+
 ```ts
+// Fire-and-forget (default behavior)
 pool.send('main', 'user_update', { user_id: 123, name: 'John' });
-pool.send('worker_b', 'simple_event'); // data defaults to {}
+pool.send('worker_b', 'simple_event');
+
+// Request-response pattern
+const response = await pool.send('worker_b', 'calculate', { value: 42 }, true);
+console.log('Result:', response.data);
 ```
+
+> [!NOTE]
+> When using `expect_response: true`, the promise will reject with a timeout error if no response is received within the configured timeout (default: 5000ms). You can configure this timeout in `worker_pool()` options or `worker_connect()` parameters, or disable it entirely by setting it to `-1`.
 
 ### 🔧 `pool.broadcast(id: string, data?: Record<string, any>): void`
 
@@ -2003,6 +2027,48 @@ Unregister an event handler for events with the specified event ID.
 
 ```ts
 pool.off('event_name');
+```
+
+### 🔧 `pool.respond(message: WorkerMessage, data?: Record<string, any>): void`
+
+Respond to a message that was sent with `expect_response: true`. This allows implementing request-response patterns between peers.
+
+```ts
+pool.on('calculate', msg => {
+	const result = msg.data.value * 2;
+	pool.respond(msg, { result });
+});
+
+const response = await pool.send('worker_a', 'calculate', { value: 42 }, true);
+console.log(response.data.result); // 84
+```
+
+**Message Structure:**
+- `message.id` - The event ID
+- `message.peer` - The sender's peer ID
+- `message.data` - The message payload
+- `message.uuid` - Unique identifier for this message
+- `message.response_to` - UUID of the message being responded to (only present in responses)
+
+### Request-Response Example
+
+```ts
+// main.ts
+const pool = await worker_pool({
+	id: 'main',
+	worker: './worker.ts'
+});
+
+const response = await pool.send('worker_a', 'MSG_REQUEST', { value: 42 }, true);
+console.log(`Got response ${response.data.value} from ${response.peer}`);
+
+// worker.ts
+const pool = worker_connect('worker_a');
+
+pool.on('MSG_REQUEST', msg => {
+	console.log(`Received request with value: ${msg.data.value}`);
+	pool.respond(msg, { value: msg.data.value * 2 });
+});
 ```
 
 ### Auto-Restart

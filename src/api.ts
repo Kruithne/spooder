@@ -31,12 +31,18 @@ type WorkerMessage = {
 	id: string;
 	peer: string;
 	data?: WorkerMessageData;
+	uuid: string;
+	response_to?: string;
 };
+
+const RESPONSE_TIMEOUT_MS = 5000;
 
 export interface WorkerPool {
 	id: string;
-	send: (peer: string, id: string, data?: WorkerMessageData) => void;
+	send(peer: string, id: string, data?: WorkerMessageData, expect_response?: false): void;
+	send(peer: string, id: string, data: WorkerMessageData | undefined, expect_response: true): Promise<WorkerMessage>;
 	broadcast: (id: string, data?: WorkerMessageData) => void;
+	respond: (message: WorkerMessage, data?: WorkerMessageData) => void;
 	on: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => void;
 	once: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => void;
 	off: (event: string) => void;
@@ -56,6 +62,7 @@ type WorkerPoolOptions = {
 	worker: string | string[];
 	size?: number;
 	auto_restart?: boolean | AutoRestartConfig;
+	response_timeout?: number;
 };
 
 type WorkerState = {
@@ -72,6 +79,7 @@ export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPoo
 	const worker_promises = new WeakMap<Worker, (value: void | PromiseLike<void>) => void>();
 
 	const peer_id = options.id ?? 'main';
+	const response_timeout = options.response_timeout ?? RESPONSE_TIMEOUT_MS;
 
 	const auto_restart_enabled = options.auto_restart !== undefined && options.auto_restart !== false;
 	const auto_restart_config = typeof options.auto_restart === 'object' ? options.auto_restart : {};
@@ -88,6 +96,7 @@ export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPoo
 	log_worker(`created worker pool {${peer_id}}`);
 
 	const callbacks = new Map<string, (data: WorkerMessage) => Promise<void> | void>();
+	const pending_responses = new Map<string, { resolve: (message: WorkerMessage) => void, reject: (error: Error) => void, timeout: Timer | undefined }>();
 
 	async function restart_worker(worker: Worker) {
 		if (!auto_restart_enabled)
@@ -199,8 +208,19 @@ export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPoo
 
 			message.peer = worker_id;
 
-			if (target_peer === peer_id)
+			if (target_peer === peer_id) {
+				if (message.response_to && pending_responses.has(message.response_to)) {
+					const pending = pending_responses.get(message.response_to)!;
+					if (pending.timeout)
+						clearTimeout(pending.timeout);
+
+					pending_responses.delete(message.response_to);
+					pending.resolve(message);
+					return;
+				}
+
 				callbacks.get(message.id)?.(message);
+			}
 
 			target_worker?.postMessage(message);
 		}
@@ -209,15 +229,49 @@ export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPoo
 	const pool: WorkerPool = {
 		id: peer_id,
 
-		send: (peer: string, id: string, data?: WorkerMessageData) => {
-			const target_worker = pipe_workers.getByKey(peer);
-			target_worker?.postMessage({ id, peer: peer_id, data });
+		send(peer: string, id: string, data?: WorkerMessageData, expect_response?: boolean): any {
+			const message: WorkerMessage = { id, peer: peer_id, data, uuid: Bun.randomUUIDv7() };
+
+			if (expect_response) {
+				return new Promise<WorkerMessage>((resolve, reject) => {
+					let timeout: Timer | undefined;
+
+					if (response_timeout !== -1) {
+						timeout = setTimeout(() => {
+							pending_responses.delete(message.uuid);
+							reject(new Error(`Response timeout after ${response_timeout}ms`));
+						}, response_timeout);
+					}
+
+					pending_responses.set(message.uuid, { resolve, reject, timeout });
+
+					const target_worker = pipe_workers.getByKey(peer);
+					target_worker?.postMessage(message);
+				});
+			} else {
+				const target_worker = pipe_workers.getByKey(peer);
+				target_worker?.postMessage(message);
+			}
 		},
 
 		broadcast: (id: string, data?: WorkerMessageData) => {
-			const message = { peer: peer_id, id, data };
+			const message: WorkerMessage = { peer: peer_id, id, data, uuid: Bun.randomUUIDv7() };
+			
 			for (const target_worker of pipe_workers.values())
 				target_worker.postMessage(message);
+		},
+
+		respond: (message: WorkerMessage, data?: WorkerMessageData) => {
+			const response: WorkerMessage = {
+				id: message.id,
+				peer: peer_id,
+				data,
+				uuid: Bun.randomUUIDv7(),
+				response_to: message.uuid
+			};
+
+			const target_worker = pipe_workers.getByKey(message.peer);
+			target_worker?.postMessage(response);
 		},
 
 		on: (event: string, callback: (data: WorkerMessage) => Promise<void> | void) => {
@@ -262,8 +316,9 @@ export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPoo
 	return pool;
 }
 
-export function worker_connect(peer_id?: string): WorkerPool {
+export function worker_connect(peer_id?: string, response_timeout?: number): WorkerPool {
 	const listeners = new Map<string, (message: WorkerMessage) => Promise<void> | void>();
+	const pending_responses = new Map<string, { resolve: (message: WorkerMessage) => void, reject: (error: Error) => void, timeout: Timer | undefined }>();
 
 	if (peer_id === undefined) {
 		// normally we would increment 'worker1', 'worker2' etc but we
@@ -274,11 +329,24 @@ export function worker_connect(peer_id?: string): WorkerPool {
 		peer_id = 'worker-' + Bun.randomUUIDv7();
 	}
 
+	response_timeout = response_timeout ?? RESPONSE_TIMEOUT_MS;
+
 	log_worker(`worker {${peer_id}} connected to pool`);
 
 	const worker = globalThis as unknown as Worker;
 	worker.onmessage = event => {
 		const message = event.data as WorkerMessage;
+
+		if (message.response_to && pending_responses.has(message.response_to)) {
+			const pending = pending_responses.get(message.response_to)!;
+			if (pending.timeout)
+				clearTimeout(pending.timeout);
+
+			pending_responses.delete(message.response_to);
+			pending.resolve(message);
+			return;
+		}
+
 		listeners.get(message.id)?.(message);
 	};
 
@@ -292,12 +360,43 @@ export function worker_connect(peer_id?: string): WorkerPool {
 	return {
 		id: peer_id,
 
-		send: (peer: string, id: string, data?: WorkerMessageData) => {
-			worker.postMessage({ id, peer, data });
+		send(peer: string, id: string, data?: WorkerMessageData, expect_response?: boolean): any {
+			const message: WorkerMessage = { id, peer, data, uuid: Bun.randomUUIDv7() };
+
+			if (expect_response) {
+				return new Promise<WorkerMessage>((resolve, reject) => {
+					let timeout: Timer | undefined;
+
+					if (response_timeout !== -1) {
+						timeout = setTimeout(() => {
+							pending_responses.delete(message.uuid);
+							reject(new Error(`Response timeout after ${response_timeout}ms`));
+						}, response_timeout);
+					}
+
+					pending_responses.set(message.uuid, { resolve, reject, timeout });
+					worker.postMessage(message);
+				});
+			} else {
+				worker.postMessage(message);
+			}
 		},
 
 		broadcast: (id: string, data?: WorkerMessageData) => {
-			worker.postMessage({ peer: '__broadcast__', id, data });
+			const message: WorkerMessage = { peer: '__broadcast__', id, data, uuid: Bun.randomUUIDv7() };
+			worker.postMessage(message);
+		},
+
+		respond: (message: WorkerMessage, data?: WorkerMessageData) => {
+			const response: WorkerMessage = {
+				id: message.id,
+				peer: message.peer,
+				data,
+				uuid: Bun.randomUUIDv7(),
+				response_to: message.uuid
+			};
+
+			worker.postMessage(response);
 		},
 
 		on: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => {
