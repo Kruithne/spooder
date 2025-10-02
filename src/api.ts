@@ -27,60 +27,110 @@ export * from './api_db';
 
 // region workers
 type WorkerMessageData = Record<string, any>;
-type WorkerEventPipeOptions = {
-	use_canary_reporting?: boolean;
+type WorkerMessage = {
+	id: string;
+	peer: string;
+	data?: WorkerMessageData;
 };
 
 export interface WorkerEventPipe {
-	send: (id: string, data?: object) => void;
-	on: (event: string, callback: (data: WorkerMessageData) => Promise<void> | void) => void;
-	once: (event: string, callback: (data: WorkerMessageData) => Promise<void> | void) => void;
+	id: string;
+	connect: (...worker: Worker[]) => Promise<void[]>;
+	send: (peer: string, id: string, data?: WorkerMessageData) => void;
+	broadcast: (id: string, data?: WorkerMessageData) => void;
+	on: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => void;
+	once: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => void;
 	off: (event: string) => void;
 }
 
-function worker_validate_message(message: any) {
-	if (typeof message !== 'object' || message === null)
-		throw new ErrorWithMetadata('invalid worker message type', { message });
-	
-	if (typeof message.id !== 'string')
-		throw new Error('missing worker message .id');
-}
-
 const log_worker = log_create_logger('worker', 'spooder');
-export function worker_event_pipe(worker: Worker, options?: WorkerEventPipeOptions): WorkerEventPipe {
-	const use_canary_reporting = options?.use_canary_reporting ?? false;
-	const callbacks = new Map<string, (data: Record<string, any>) => Promise<void> | void>();
-	
-	function handle_message(event: MessageEvent) {
-		try {
-			const message = JSON.parse(event.data);
-			worker_validate_message(message);
-			
-			const callback = callbacks.get(message.id);
-			if (callback !== undefined)
-				callback(message.data ?? {});
-		} catch (e) {
-			log_error(`exception in worker: ${(e as Error).message}`);
-			
-			if (use_canary_reporting)
-				caution('worker: exception handling payload', { exception: e });
+
+function worker_event_pipe_mt(peer_id?: string): WorkerEventPipe {
+	const pipe_workers = new BiMap<string, Worker>();
+	const worker_promises = new WeakMap<Worker, (value: void | PromiseLike<void>) => void>();
+
+	if (peer_id === undefined)
+		peer_id = 'main';
+
+	log_worker(`{worker_event_pipe} opened on {${peer_id}}`);
+
+	const callbacks = new Map<string, (data: WorkerMessage) => Promise<void> | void>();
+
+	function handle_worker_message(worker: Worker, event: MessageEvent) {
+		const message = event.data as WorkerMessage;
+
+		if (message.id === '__register__') {
+			const worker_id = message.data?.worker_id;
+			if (worker_id === undefined) {
+				log_error('{worker_event_pipe_mt} cannot register worker without ID');
+				return;
+			}
+
+			if (pipe_workers.hasKey(worker_id)) {
+				log_error(`{worker_event_pipe_mt} worker ID {${worker_id}} already in-use`);
+				return;
+			}
+
+			pipe_workers.set(message.data?.worker_id, worker);
+
+			worker_promises.get(worker)?.();
+			worker_promises.delete(worker);
+		} else if (message.peer === '__broadcast__') {
+			const worker_id = pipe_workers.getByValue(worker);
+			if (worker_id === undefined)
+				return;
+
+			message.peer = worker_id;
+
+			for (const target_worker of pipe_workers.values()) {
+				if (target_worker === worker)
+					continue;
+
+				target_worker.postMessage(message);
+			}
+		} else {
+			const target_worker = pipe_workers.getByKey(message.peer);
+			const worker_id = pipe_workers.getByValue(worker);
+
+			if (worker_id === undefined)
+				return;
+
+			message.peer = worker_id;
+			target_worker?.postMessage(message);
 		}
 	}
 	
-	if (Bun.isMainThread) {
-		log_worker(`event pipe connected {main thread} ⇄ {worker}`);
-		worker.addEventListener('message', handle_message);
-	} else {
-		log_worker(`event pipe connected {worker} ⇄ {main thread}`);
-		worker.onmessage = handle_message;
-	}
-	
 	return {
-		send: (id: string, data: object = {}) => {
-			worker.postMessage(JSON.stringify({ id, data }));
+		id: peer_id,
+
+		connect: async (...workers: Worker[]) => {
+			const promises = [];
+
+			for (const worker of workers) {
+				worker.addEventListener('message', (event) => {
+					handle_worker_message(worker, event);	
+				});
+
+				promises.push(new Promise<void>(resolve => {
+					worker_promises.set(worker, resolve);
+				}));
+			}
+
+			return Promise.all(promises);
+		},
+
+		send: (peer: string, id: string, data?: WorkerMessageData) => {
+			const target_worker = pipe_workers.getByKey(peer);
+			target_worker?.postMessage({ id, peer: peer_id, data });
+		},
+
+		broadcast: (id: string, data?: WorkerMessageData) => {
+			const message = { peer: peer_id, id, data };
+			for (const target_worker of pipe_workers.values())
+				target_worker.postMessage(message);
 		},
 		
-		on: (event: string, callback: (data: WorkerMessageData) => Promise<void> | void) => {
+		on: (event: string, callback: (data: WorkerMessage) => Promise<void> | void) => {
 			callbacks.set(event, callback);
 		},
 		
@@ -88,26 +138,166 @@ export function worker_event_pipe(worker: Worker, options?: WorkerEventPipeOptio
 			callbacks.delete(event);
 		},
 		
-		once: (event: string, callback: (data: WorkerMessageData) => Promise<void> | void) => {
-			callbacks.set(event, async (data: WorkerMessageData) => {
+		once: (event: string, callback: (data: WorkerMessage) => Promise<void> | void) => {
+			callbacks.set(event, async (data: WorkerMessage) => {
 				await callback(data);
 				callbacks.delete(event);
 			});
 		}
 	};
 }
+
+function worker_event_pipe_wt(peer_id?: string): WorkerEventPipe {
+	const listeners = new Map<string, (message: WorkerMessage) => Promise<void> | void>();
+
+	if (peer_id === undefined) {
+		// normally we would increment 'worker1', 'worker2' etc but we
+		// have no simple way of keeping track of global worker count.
+
+		// in normal circumstances, users should provide an ID via the
+		// parameter, this is just a sensible fallback.
+		peer_id = 'worker-' + Bun.randomUUIDv7();
+	}
+
+	log_worker(`{worker_event_pipe} opened on {${peer_id}}`);
+
+	const worker = globalThis as unknown as Worker;
+	worker.onmessage = event => {
+		const message = event.data as WorkerMessage;
+		listeners.get(message.id)?.(message);
+	};
+
+	worker.postMessage({
+		id: '__register__',
+		data: {
+			worker_id: peer_id
+		}
+	});
+	
+	return {
+		id: peer_id,
+
+		connect: async () => {
+			return [];
+		},
+
+		send: (peer: string, id: string, data?: WorkerMessageData) => {
+			worker.postMessage({ id, peer, data });
+		},
+
+		broadcast: (id: string, data?: WorkerMessageData) => {
+			worker.postMessage({ peer: '__broadcast__', id, data });
+		},
+		
+		on: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => {
+			listeners.set(event, callback);
+		},
+		
+		off: (event: string) => {
+			listeners.delete(event);
+		},
+		
+		once: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => {
+			listeners.set(event, async (message: WorkerMessage) => {
+				await callback(message);
+				listeners.delete(event);
+			});
+		}
+	};
+}
+
+export const worker_event_pipe = Bun.isMainThread ? worker_event_pipe_mt : worker_event_pipe_wt;
 // endregion
 
 // region utility
+export class BiMap<K, V> {
+	private ktv = new Map<K, V>();
+	private vtk = new Map<V, K>();
+
+	set(key: K, value: V): void {
+		const old_val = this.ktv.get(key);
+		if (old_val !== undefined)
+			this.vtk.delete(old_val);
+
+		const old_key = this.vtk.get(value);
+		if (old_key !== undefined)
+			this.ktv.delete(old_key);
+
+		this.ktv.set(key, value);
+		this.vtk.set(value, key);
+	}
+
+	getByKey(key: K): V | undefined {
+		return this.ktv.get(key);
+	}
+
+	getByValue(value: V): K | undefined {
+		return this.vtk.get(value);
+	}
+
+	hasKey(key: K): boolean {
+		return this.ktv.has(key);
+	}
+
+	hasValue(value: V): boolean {
+		return this.vtk.has(value);
+	}
+
+	deleteByKey(key: K): boolean {
+		const value = this.ktv.get(key);
+		if (value === undefined)
+			return false;
+
+		this.ktv.delete(key);
+		this.vtk.delete(value);
+		return true;
+	}
+
+	deleteByValue(value: V): boolean {
+		const key = this.vtk.get(value);
+		if (key === undefined)
+			return false;
+
+		this.vtk.delete(value);
+		this.ktv.delete(key);
+		return true;
+	}
+
+	clear(): void {
+		this.ktv.clear();
+		this.vtk.clear();
+	}
+
+	get size(): number {
+		return this.ktv.size;
+	}
+
+	entries(): IterableIterator<[K, V]> {
+		return this.ktv.entries();
+	}
+
+	keys(): IterableIterator<K> {
+		return this.ktv.keys();
+	}
+
+	values(): IterableIterator<V> {
+		return this.ktv.values();
+	}
+
+	[Symbol.iterator](): IterableIterator<[K, V]> {
+		return this.ktv.entries();
+	}
+}
+
 const FILESIZE_UNITS = ['bytes', 'kb', 'mb', 'gb', 'tb'];
 
 function filesize(bytes: number): string {
 	if (bytes === 0)
 		return '0 bytes';
-	
+
 	const i = Math.floor(Math.log(bytes) / Math.log(1024));
 	const size = bytes / Math.pow(1024, i);
-	
+
 	return `${size.toFixed(i === 0 ? 0 : 1)} ${FILESIZE_UNITS[i]}`;
 }
 // endregion

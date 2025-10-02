@@ -636,11 +636,14 @@ panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>;
 safe(fn: Callable): Promise<void>;
 
 // worker
-worker_event_pipe(worker: Worker, options?: WorkerEventPipeOptions): WorkerEventPipe;
-pipe.send(id: string, data?: object): void;
-pipe.on(event: string, callback: (data: object) => void | Promise<void>): void;
-pipe.once(event: string, callback: (data: object) => void | Promise<void>): void;
-pipe.off(event: string): void;
+worker_event_pipe(peer_id: string): WorkerEventPipe;
+pipe.id: string;
+pipe.connect: (...worker: Worker[]) => Promise<void[]>;
+pipe.send: (peer: string, id: string, data?: WorkerMessageData) => void;
+pipe.broadcast: (id: string, data?: WorkerMessageData) => void;
+pipe.on: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => void;
+pipe.once: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => void;
+pipe.off: (event: string) => void;
 
 // templates
 Replacements = Record<string, string | Array<string> | object | object[]> | ReplacerFn | AsyncReplaceFn;
@@ -1848,68 +1851,85 @@ await safe(() => {
 <a id="api-workers"></a>
 ## API > Workers
 
-### 🔧 `worker_event_pipe(worker: Worker, options?: WorkerEventPipeOptions): WorkerEventPipe`
+### 🔧 `worker_event_pipe(peer_id: string): WorkerEventPipe`
 
-Create an event-based communication pipe between host and worker processes. This function works both inside and outside of workers and provides a simple event system on top of the native `postMessage` API.
+Create an event-based communication pipe between host and one or more workers. This function workers both inside and outside of workers and provides a networked event system on top of the native `postMessage` API.
 
 ```ts
 // main thread
-const worker = new Worker('./some_file.ts');
-const pipe = worker_event_pipe(worker);
+const worker = new Worker('./worker.ts');
+const pipe = worker_event_pipe(); // defaults to 'main'
 
-pipe.on('bar', data => console.log('Received from worker:', data));
-pipe.send('foo', { x: 42 });
+// await this to ensure worker is ready to receive messages
+await pipe.connect(worker);
+
+pipe.send('my_worker', 'test', { foo: 42 });
 
 // worker thread
-import { worker_event_pipe } from 'spooder';
-
-const pipe = worker_event_pipe(globalThis as unknown as Worker);
-
-pipe.on('foo', data => {
-	console.log('Received from main:', data); // { x: 42 }
-	pipe.send('bar', { response: 'success' });
+const pipe = worker_event_pipe('my_worker'); // defaults to worker-UUID
+pipe.on('test', msg => {
+	console.log(`Received ${msg.data.foo} from ${msg.peer}`);
+	// > Received 42 from main
 });
 ```
 
-### WorkerEventPipeOptions
-
-The second parameter of `worker_event_pipe` accepts an object of options.
-
-Currently the only available option is `use_canary_reporting`. If enabled, the event pipe will call `caution()` when it encounters errors such as malformed payloads.
-
-### 🔧 `pipe.send(id: string, data?: object): void`
-
-Send a message to the other side of the worker pipe with the specified event ID and optional data payload.
+### Cross-Worker Communication
 
 ```ts
-pipe.send('user_update', { user_id: 123, name: 'John' });
-pipe.send('simple_event'); // data defaults to {}
+// main thread
+const worker_a = new Worker('./worker_a.ts');
+const worker_b = new Worker('./worker_b.ts');
+
+const pipe = worker_event_pipe();
+await pipe.connect(worker_a, worker_b);
+
+pipe.send('worker_a', 'test', { foo: 42 }); // send to just worker_a
+pipe.broadcast('test', { foo: 50 } ); // send to all workers
+
+// worker_a
+
+// send from worker_a to worker_b
+pipe.send('worker_b', 'test', { foo: 500 });
 ```
 
-### 🔧 `pipe.on(event: string, callback: (data: object) => void | Promise<void>): void`
+### 🔧 `pipe.send(peer: string, id: string, data?: Record<string, any>): void`
+
+Send a message to a specific peer on the pipe, which can be the main host or another worker.
+
+```ts
+pipe.send('main', 'user_update', { user_id: 123, name: 'John' });
+pipe.send('worker_b', 'simple_event'); // data defaults to {}
+```
+
+### 🔧 `pipe.broadcast(id: string, data?: Record<string, any>): void`
+
+Broadcast a message to all peers on the pipe.
+
+```ts
+pipe.broadcast('test_event', { foo: 42 });
+```
+
+### 🔧 `pipe.on(event: string, callback: (data: Record<string, any>) => void | Promise<void>): void`
 
 Register an event handler for messages with the specified event ID. The callback can be synchronous or asynchronous.
 
 ```ts
-pipe.on('process_data', async (data) => {
-	const result = await processData(data);
-	pipe.send('data_processed', { result });
-});
-
-pipe.on('log_message', (data) => {
-	console.log(data.message);
+pipe.on('process_data', async msg => {
+	// msg.peer
+	// msg.id
+	// msg.data
 });
 ```
 
 > [!NOTE]
 > There can only be one event handler for a specific event ID. Registering a new handler for an existing event ID will overwrite the previous handler.
 
-### 🔧 `pipe.once(event: string, callback: (data: object) => void | Promise<void>): void`
+### 🔧 `pipe.once(event: string, callback: (data: Record<string, any>) => void | Promise<void>): void`
 
 Register an event handler for messages with the specified event ID. This is the same as `pipe.on`, except the handler is automatically removed once it is fired.
 
 ```ts
-pipe.once('one_time_event', async (data) => {
+pipe.once('one_time_event', async msg => {
 	// this will only fire once
 });
 ```
