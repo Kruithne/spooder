@@ -33,9 +33,8 @@ type WorkerMessage = {
 	data?: WorkerMessageData;
 };
 
-export interface WorkerEventPipe {
+export interface WorkerPool {
 	id: string;
-	connect: (...worker: Worker[]) => Promise<void[]>;
 	send: (peer: string, id: string, data?: WorkerMessageData) => void;
 	broadcast: (id: string, data?: WorkerMessageData) => void;
 	on: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => void;
@@ -45,14 +44,39 @@ export interface WorkerEventPipe {
 
 const log_worker = log_create_logger('worker', 'spooder');
 
-function worker_event_pipe_mt(peer_id?: string): WorkerEventPipe {
+type WorkerPoolOptions = {
+	id?: string;
+	worker: string | Worker | (string | Worker)[];
+	size?: number;
+};
+
+export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPool> {
 	const pipe_workers = new BiMap<string, Worker>();
 	const worker_promises = new WeakMap<Worker, (value: void | PromiseLike<void>) => void>();
 
-	if (peer_id === undefined)
-		peer_id = 'main';
+	const peer_id = options.id ?? 'main';
+	let workers_to_add: Worker[] = [];
 
-	log_worker(`{worker_event_pipe} opened on {${peer_id}}`);
+	const worker_option = options.worker;
+	const worker_array = Array.isArray(worker_option) ? worker_option : [worker_option];
+
+	for (const w of worker_array) {
+		if (typeof w === 'string') {
+			workers_to_add.push(new Worker(w));
+		} else {
+			workers_to_add.push(w);
+		}
+	}
+
+	if (options.size !== undefined && !Array.isArray(options.worker)) {
+		const worker_path = options.worker as string;
+		workers_to_add = [];
+		for (let i = 0; i < options.size; i++) {
+			workers_to_add.push(new Worker(worker_path));
+		}
+	}
+
+	log_worker(`{worker_pool} opened on {${peer_id}}`);
 
 	const callbacks = new Map<string, (data: WorkerMessage) => Promise<void> | void>();
 
@@ -62,12 +86,12 @@ function worker_event_pipe_mt(peer_id?: string): WorkerEventPipe {
 		if (message.id === '__register__') {
 			const worker_id = message.data?.worker_id;
 			if (worker_id === undefined) {
-				log_error('{worker_event_pipe_mt} cannot register worker without ID');
+				log_error('{worker_pool_mt} cannot register worker without ID');
 				return;
 			}
 
 			if (pipe_workers.hasKey(worker_id)) {
-				log_error(`{worker_event_pipe_mt} worker ID {${worker_id}} already in-use`);
+				log_error(`{worker_pool_mt} worker ID {${worker_id}} already in-use`);
 				return;
 			}
 
@@ -99,25 +123,9 @@ function worker_event_pipe_mt(peer_id?: string): WorkerEventPipe {
 			target_worker?.postMessage(message);
 		}
 	}
-	
-	return {
+
+	const pool: WorkerPool = {
 		id: peer_id,
-
-		connect: async (...workers: Worker[]) => {
-			const promises = [];
-
-			for (const worker of workers) {
-				worker.addEventListener('message', (event) => {
-					handle_worker_message(worker, event);	
-				});
-
-				promises.push(new Promise<void>(resolve => {
-					worker_promises.set(worker, resolve);
-				}));
-			}
-
-			return Promise.all(promises);
-		},
 
 		send: (peer: string, id: string, data?: WorkerMessageData) => {
 			const target_worker = pipe_workers.getByKey(peer);
@@ -129,15 +137,15 @@ function worker_event_pipe_mt(peer_id?: string): WorkerEventPipe {
 			for (const target_worker of pipe_workers.values())
 				target_worker.postMessage(message);
 		},
-		
+
 		on: (event: string, callback: (data: WorkerMessage) => Promise<void> | void) => {
 			callbacks.set(event, callback);
 		},
-		
+
 		off: (event: string) => {
 			callbacks.delete(event);
 		},
-		
+
 		once: (event: string, callback: (data: WorkerMessage) => Promise<void> | void) => {
 			callbacks.set(event, async (data: WorkerMessage) => {
 				await callback(data);
@@ -145,9 +153,26 @@ function worker_event_pipe_mt(peer_id?: string): WorkerEventPipe {
 			});
 		}
 	};
+
+	// Connect workers
+	const promises = [];
+
+	for (const worker of workers_to_add) {
+		worker.addEventListener('message', (event) => {
+			handle_worker_message(worker, event);
+		});
+
+		promises.push(new Promise<void>(resolve => {
+			worker_promises.set(worker, resolve);
+		}));
+	}
+
+	await Promise.all(promises);
+
+	return pool;
 }
 
-function worker_event_pipe_wt(peer_id?: string): WorkerEventPipe {
+export function worker_connect(peer_id?: string): WorkerPool {
 	const listeners = new Map<string, (message: WorkerMessage) => Promise<void> | void>();
 
 	if (peer_id === undefined) {
@@ -159,7 +184,7 @@ function worker_event_pipe_wt(peer_id?: string): WorkerEventPipe {
 		peer_id = 'worker-' + Bun.randomUUIDv7();
 	}
 
-	log_worker(`{worker_event_pipe} opened on {${peer_id}}`);
+	log_worker(`{worker_connect} opened on {${peer_id}}`);
 
 	const worker = globalThis as unknown as Worker;
 	worker.onmessage = event => {
@@ -173,13 +198,9 @@ function worker_event_pipe_wt(peer_id?: string): WorkerEventPipe {
 			worker_id: peer_id
 		}
 	});
-	
+
 	return {
 		id: peer_id,
-
-		connect: async () => {
-			return [];
-		},
 
 		send: (peer: string, id: string, data?: WorkerMessageData) => {
 			worker.postMessage({ id, peer, data });
@@ -188,15 +209,15 @@ function worker_event_pipe_wt(peer_id?: string): WorkerEventPipe {
 		broadcast: (id: string, data?: WorkerMessageData) => {
 			worker.postMessage({ peer: '__broadcast__', id, data });
 		},
-		
+
 		on: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => {
 			listeners.set(event, callback);
 		},
-		
+
 		off: (event: string) => {
 			listeners.delete(event);
 		},
-		
+
 		once: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => {
 			listeners.set(event, async (message: WorkerMessage) => {
 				await callback(message);
@@ -206,7 +227,6 @@ function worker_event_pipe_wt(peer_id?: string): WorkerEventPipe {
 	};
 }
 
-export const worker_event_pipe = Bun.isMainThread ? worker_event_pipe_mt : worker_event_pipe_wt;
 // endregion
 
 // region utility

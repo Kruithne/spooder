@@ -635,15 +635,17 @@ caution(err_message_or_obj: string | object, ...err: object[]): Promise<void>;
 panic(err_message_or_obj: string | object, ...err: object[]): Promise<void>;
 safe(fn: Callable): Promise<void>;
 
-// worker
-worker_event_pipe(peer_id: string): WorkerEventPipe;
-pipe.id: string;
-pipe.connect: (...worker: Worker[]) => Promise<void[]>;
-pipe.send: (peer: string, id: string, data?: WorkerMessageData) => void;
-pipe.broadcast: (id: string, data?: WorkerMessageData) => void;
-pipe.on: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => void;
-pipe.once: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => void;
-pipe.off: (event: string) => void;
+// worker (main thread)
+worker_pool(options: WorkerPoolOptions): Promise<WorkerPool>;
+pool.id: string;
+pool.send: (peer: string, id: string, data?: WorkerMessageData) => void;
+pool.broadcast: (id: string, data?: WorkerMessageData) => void;
+pool.on: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => void;
+pool.once: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => void;
+pool.off: (event: string) => void;
+
+// worker (worker thread)
+worker_connect(peer_id?: string): WorkerPool;
 
 // templates
 Replacements = Record<string, string | Array<string> | object | object[]> | ReplacerFn | AsyncReplaceFn;
@@ -1852,23 +1854,55 @@ await safe(() => {
 <a id="api-workers"></a>
 ## API > Workers
 
-### 🔧 `worker_event_pipe(peer_id: string): WorkerEventPipe`
+### 🔧 `worker_pool(options: WorkerPoolOptions): Promise<WorkerPool>` (Main Thread)
 
-Create an event-based communication pipe between host and one or more workers. This function workers both inside and outside of workers and provides a networked event system on top of the native `postMessage` API.
+Create a worker pool with an event-based communication system between the main thread and one or more workers. This provides a networked event system on top of the native `postMessage` API.
+
+```ts
+// with a single worker (id defaults to 'main')
+const pool = await worker_pool({
+	worker: './worker.ts' // string or Worker instance
+});
+
+// with multiple workers and custom ID
+const pool = await worker_pool({
+	id: 'main',
+	worker: ['./worker_a.ts', './worker_b.ts']
+});
+
+// spawn multiple instances of the same worker
+const pool = await worker_pool({
+	worker: './worker.ts',
+	size: 5 // spawns 5 instances
+});
+```
+
+### 🔧 `worker_connect(peer_id?: string): WorkerPool` (Worker Thread)
+
+Connect a worker thread to the worker pool. This should be called from within a worker thread to establish communication with the main thread and other workers.
+
+```ts
+// worker thread
+const pool = worker_connect('my_worker'); // defaults to worker-UUID
+pool.on('test', msg => {
+	console.log(`Received ${msg.data.foo} from ${msg.peer}`);
+});
+```
+
+### Basic Usage
 
 ```ts
 // main thread
-const worker = new Worker('./worker.ts');
-const pipe = worker_event_pipe(); // defaults to 'main'
+const pool = await worker_pool({
+	id: 'main',
+	worker: './worker.ts'
+});
 
-// await this to ensure worker is ready to receive messages
-await pipe.connect(worker);
+pool.send('my_worker', 'test', { foo: 42 });
 
-pipe.send('my_worker', 'test', { foo: 42 });
-
-// worker thread
-const pipe = worker_event_pipe('my_worker'); // defaults to worker-UUID
-pipe.on('test', msg => {
+// worker thread (worker.ts)
+const pool = worker_connect('my_worker');
+pool.on('test', msg => {
 	console.log(`Received ${msg.data.foo} from ${msg.peer}`);
 	// > Received 42 from main
 });
@@ -1878,44 +1912,43 @@ pipe.on('test', msg => {
 
 ```ts
 // main thread
-const worker_a = new Worker('./worker_a.ts');
-const worker_b = new Worker('./worker_b.ts');
+const pool = await worker_pool({
+	id: 'main',
+	worker: ['./worker_a.ts', './worker_b.ts']
+});
 
-const pipe = worker_event_pipe();
-await pipe.connect(worker_a, worker_b);
+pool.send('worker_a', 'test', { foo: 42 }); // send to just worker_a
+pool.broadcast('test', { foo: 50 } ); // send to all workers
 
-pipe.send('worker_a', 'test', { foo: 42 }); // send to just worker_a
-pipe.broadcast('test', { foo: 50 } ); // send to all workers
-
-// worker_a
-
+// worker_a.ts
+const pool = worker_connect('worker_a');
 // send from worker_a to worker_b
-pipe.send('worker_b', 'test', { foo: 500 });
+pool.send('worker_b', 'test', { foo: 500 });
 ```
 
-### 🔧 `pipe.send(peer: string, id: string, data?: Record<string, any>): void`
+### 🔧 `pool.send(peer: string, id: string, data?: Record<string, any>): void`
 
-Send a message to a specific peer on the pipe, which can be the main host or another worker.
+Send a message to a specific peer in the pool, which can be the main host or another worker.
 
 ```ts
-pipe.send('main', 'user_update', { user_id: 123, name: 'John' });
-pipe.send('worker_b', 'simple_event'); // data defaults to {}
+pool.send('main', 'user_update', { user_id: 123, name: 'John' });
+pool.send('worker_b', 'simple_event'); // data defaults to {}
 ```
 
-### 🔧 `pipe.broadcast(id: string, data?: Record<string, any>): void`
+### 🔧 `pool.broadcast(id: string, data?: Record<string, any>): void`
 
-Broadcast a message to all peers on the pipe.
+Broadcast a message to all peers in the pool.
 
 ```ts
-pipe.broadcast('test_event', { foo: 42 });
+pool.broadcast('test_event', { foo: 42 });
 ```
 
-### 🔧 `pipe.on(event: string, callback: (data: Record<string, any>) => void | Promise<void>): void`
+### 🔧 `pool.on(event: string, callback: (data: Record<string, any>) => void | Promise<void>): void`
 
 Register an event handler for messages with the specified event ID. The callback can be synchronous or asynchronous.
 
 ```ts
-pipe.on('process_data', async msg => {
+pool.on('process_data', async msg => {
 	// msg.peer
 	// msg.id
 	// msg.data
@@ -1925,22 +1958,22 @@ pipe.on('process_data', async msg => {
 > [!NOTE]
 > There can only be one event handler for a specific event ID. Registering a new handler for an existing event ID will overwrite the previous handler.
 
-### 🔧 `pipe.once(event: string, callback: (data: Record<string, any>) => void | Promise<void>): void`
+### 🔧 `pool.once(event: string, callback: (data: Record<string, any>) => void | Promise<void>): void`
 
-Register an event handler for messages with the specified event ID. This is the same as `pipe.on`, except the handler is automatically removed once it is fired.
+Register an event handler for messages with the specified event ID. This is the same as `pool.on`, except the handler is automatically removed once it is fired.
 
 ```ts
-pipe.once('one_time_event', async msg => {
+pool.once('one_time_event', async msg => {
 	// this will only fire once
 });
 ```
 
-### 🔧 `pipe.off(event: string): void`
+### 🔧 `pool.off(event: string): void`
 
 Unregister an event handler for events with the specified event ID.
 
 ```ts
-pipe.off('event_name');
+pool.off('event_name');
 ```
 
 > [!IMPORTANT]
