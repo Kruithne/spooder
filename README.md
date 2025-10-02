@@ -644,6 +644,19 @@ pool.on: (event: string, callback: (message: WorkerMessage) => Promise<void> | v
 pool.once: (event: string, callback: (message: WorkerMessage) => Promise<void> | void) => void;
 pool.off: (event: string) => void;
 
+type WorkerPoolOptions = {
+	id?: string;
+	worker: string | string[];
+	size?: number;
+	auto_restart?: boolean | AutoRestartConfig;
+};
+
+type AutoRestartConfig = {
+	backoff_max?: number; // default: 5 * 60 * 1000 (5 min)
+	backoff_grace?: number; // default: 30000 (30 seconds)
+	max_attempts?: number; // default: 5, -1 for unlimited
+};
+
 // worker (worker thread)
 worker_connect(peer_id?: string): WorkerPool;
 
@@ -1861,7 +1874,7 @@ Create a worker pool with an event-based communication system between the main t
 ```ts
 // with a single worker (id defaults to 'main')
 const pool = await worker_pool({
-	worker: './worker.ts' // string or Worker instance
+	worker: './worker.ts'
 });
 
 // with multiple workers and custom ID
@@ -1874,6 +1887,22 @@ const pool = await worker_pool({
 const pool = await worker_pool({
 	worker: './worker.ts',
 	size: 5 // spawns 5 instances
+});
+
+// with auto-restart enabled (boolean)
+const pool = await worker_pool({
+	worker: './worker.ts',
+	auto_restart: true // uses default settings
+});
+
+// with custom auto-restart configuration
+const pool = await worker_pool({
+	worker: './worker.ts',
+	auto_restart: {
+		backoff_max: 5 * 60 * 1000, // 5 min (default)
+		backoff_grace: 30000, // 30 seconds (default)
+		max_attempts: 5 // -1 for unlimited (default: 5)
+	}
 });
 ```
 
@@ -1974,6 +2003,39 @@ Unregister an event handler for events with the specified event ID.
 
 ```ts
 pool.off('event_name');
+```
+
+### Auto-Restart
+
+The `worker_pool` function supports automatic worker restart when workers crash or close unexpectedly. This feature includes an exponential backoff protocol to prevent restart loops.
+
+**Configuration:**
+- `auto_restart`: `boolean | AutoRestartConfig` - Enable auto-restart (optional)
+  - If `true`, uses default settings
+  - If an object, allows customization of restart behavior
+
+**AutoRestartConfig Options:**
+- `backoff_max`: `number` - Maximum delay between restart attempts in milliseconds (default: `5 * 60 * 1000` = 5 minutes)
+- `backoff_grace`: `number` - Time in milliseconds a worker must run successfully before restart attempts are reset (default: `30000` = 30 seconds)
+- `max_attempts`: `number` - Maximum number of restart attempts before giving up (default: `5`, use `-1` for unlimited)
+
+**Backoff Protocol:**
+1. Initial restart delay starts at 100ms
+2. Each subsequent restart doubles the delay
+3. Delay is capped at `backoff_max`
+4. If a worker runs successfully for `backoff_grace` milliseconds, the delay and attempt counter reset
+5. After `max_attempts` failures, auto-restart stops for that worker
+
+**Example:**
+```ts
+const pool = await worker_pool({
+	worker: './worker.ts',
+	auto_restart: {
+		backoff_max: 5 * 60 * 1000, // cap at 5 minutes
+		backoff_grace: 30000, // reset after 30 seconds of successful operation
+		max_attempts: 5 // give up after 5 failed attempts
+	}
+});
 ```
 
 > [!IMPORTANT]

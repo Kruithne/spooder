@@ -42,12 +42,28 @@ export interface WorkerPool {
 	off: (event: string) => void;
 }
 
-const log_worker = log_create_logger('worker', 'spooder');
+const log_worker = log_create_logger('worker_pool', 'spooder');
+
+type AutoRestartConfig = {
+	backoff_max?: number;
+	backoff_grace?: number;
+	max_attempts?: number;
+};
 
 type WorkerPoolOptions = {
 	id?: string;
-	worker: string | Worker | (string | Worker)[];
+	worker: string | string[];
 	size?: number;
+	auto_restart?: boolean | AutoRestartConfig;
+};
+
+type WorkerState = {
+	worker: Worker;
+	worker_id?: string;
+	restart_delay: number;
+	restart_attempts: number;
+	restart_success_timer: Timer | null;
+	worker_path: string;
 };
 
 export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPool> {
@@ -55,30 +71,82 @@ export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPoo
 	const worker_promises = new WeakMap<Worker, (value: void | PromiseLike<void>) => void>();
 
 	const peer_id = options.id ?? 'main';
-	let workers_to_add: Worker[] = [];
 
-	const worker_option = options.worker;
-	const worker_array = Array.isArray(worker_option) ? worker_option : [worker_option];
+	const auto_restart_enabled = options.auto_restart !== undefined && options.auto_restart !== false;
+	const auto_restart_config = typeof options.auto_restart === 'object' ? options.auto_restart : {};
+	const backoff_max = auto_restart_config.backoff_max ?? 5 * 60 * 1000; // 5 min
+	const backoff_grace = auto_restart_config.backoff_grace ?? 30000; // 30 seconds
+	const max_attempts = auto_restart_config.max_attempts ?? 5;
 
-	for (const w of worker_array) {
-		if (typeof w === 'string') {
-			workers_to_add.push(new Worker(w));
-		} else {
-			workers_to_add.push(w);
-		}
-	}
+	const worker_states = new WeakMap<Worker, WorkerState>();
 
-	if (options.size !== undefined && !Array.isArray(options.worker)) {
-		const worker_path = options.worker as string;
-		workers_to_add = [];
-		for (let i = 0; i < options.size; i++) {
-			workers_to_add.push(new Worker(worker_path));
-		}
-	}
+	const worker_paths: string[] = options.size !== undefined
+		? Array(options.size).fill(options.worker)
+		: Array.isArray(options.worker) ? options.worker : [options.worker];
 
-	log_worker(`{worker_pool} opened on {${peer_id}}`);
+	log_worker(`created worker pool {${peer_id}}`);
 
 	const callbacks = new Map<string, (data: WorkerMessage) => Promise<void> | void>();
+
+	async function restart_worker(worker: Worker) {
+		if (!auto_restart_enabled)
+			return;
+
+		const state = worker_states.get(worker);
+		if (!state)
+			return;
+
+		if (state.restart_success_timer) {
+			clearTimeout(state.restart_success_timer);
+			state.restart_success_timer = null;
+		}
+
+		if (max_attempts !== -1 && state.restart_attempts >= max_attempts) {
+			log_worker(`worker {${state.worker_id ?? 'unknown'}} maximum restart attempts ({${max_attempts}}) reached, stopping auto-restart`);
+			return;
+		}
+
+		state.restart_attempts++;
+		const current_delay = Math.min(state.restart_delay, backoff_max);
+		const max_attempt_str = max_attempts === -1 ? '∞' : max_attempts;
+
+		log_worker(`restarting worker {${state.worker_id ?? 'unknown'}} in {${current_delay}ms} (attempt {${state.restart_attempts}}/{${max_attempt_str}}, delay capped at {${backoff_max}ms})`);
+
+		setTimeout(() => {
+			const new_worker = new Worker(state.worker_path);
+
+			state.worker = new_worker;
+			state.restart_delay = Math.min(state.restart_delay * 2, backoff_max);
+
+			state.restart_success_timer = setTimeout(() => {
+				state.restart_delay = 100;
+				state.restart_attempts = 0;
+				state.restart_success_timer = null;
+			}, backoff_grace);
+
+			worker_states.delete(worker);
+			worker_states.set(new_worker, state);
+
+			setup_worker_listeners(new_worker);
+		}, current_delay);
+	}
+
+	function setup_worker_listeners(worker: Worker) {
+		worker.addEventListener('message', (event) => {
+			handle_worker_message(worker, event);
+		});
+
+		worker.addEventListener('close', () => {
+			const worker_id = pipe_workers.getByValue(worker);
+			log_worker(`worker {${worker_id ?? 'unknown'}} closed`);
+
+			if (worker_id)
+				pipe_workers.deleteByKey(worker_id);
+
+			if (auto_restart_enabled)
+				restart_worker(worker);
+		});
+	}
 
 	function handle_worker_message(worker: Worker, event: MessageEvent) {
 		const message = event.data as WorkerMessage;
@@ -86,16 +154,20 @@ export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPoo
 		if (message.id === '__register__') {
 			const worker_id = message.data?.worker_id;
 			if (worker_id === undefined) {
-				log_error('{worker_pool_mt} cannot register worker without ID');
+				log_error('cannot register worker without ID');
 				return;
 			}
 
 			if (pipe_workers.hasKey(worker_id)) {
-				log_error(`{worker_pool_mt} worker ID {${worker_id}} already in-use`);
+				log_error(`worker ID {${worker_id}} already in-use`);
 				return;
 			}
 
 			pipe_workers.set(message.data?.worker_id, worker);
+
+			const state = worker_states.get(worker);
+			if (state)
+				state.worker_id = worker_id;
 
 			worker_promises.get(worker)?.();
 			worker_promises.delete(worker);
@@ -154,13 +226,21 @@ export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPoo
 		}
 	};
 
-	// Connect workers
 	const promises = [];
+	for (const path of worker_paths) {
+		const worker = new Worker(path);
 
-	for (const worker of workers_to_add) {
-		worker.addEventListener('message', (event) => {
-			handle_worker_message(worker, event);
-		});
+		if (auto_restart_enabled) {
+			worker_states.set(worker, {
+				worker,
+				restart_delay: 100,
+				restart_attempts: 0,
+				restart_success_timer: null,
+				worker_path: path
+			});
+		}
+
+		setup_worker_listeners(worker);
 
 		promises.push(new Promise<void>(resolve => {
 			worker_promises.set(worker, resolve);
@@ -184,7 +264,7 @@ export function worker_connect(peer_id?: string): WorkerPool {
 		peer_id = 'worker-' + Bun.randomUUIDv7();
 	}
 
-	log_worker(`{worker_connect} opened on {${peer_id}}`);
+	log_worker(`worker {${peer_id}} connected to pool`);
 
 	const worker = globalThis as unknown as Worker;
 	worker.onmessage = event => {
