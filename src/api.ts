@@ -291,7 +291,7 @@ export class BiMap<K, V> {
 
 const FILESIZE_UNITS = ['bytes', 'kb', 'mb', 'gb', 'tb'];
 
-function filesize(bytes: number): string {
+export function filesize(bytes: number): string {
 	if (bytes === 0)
 		return '0 bytes';
 
