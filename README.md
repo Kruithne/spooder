@@ -2896,30 +2896,30 @@ filesize(1099511627776); // > "1 tb"
 A bidirectional map that maintains a two-way relationship between keys and values, allowing efficient lookups in both directions.
 
 ```ts
-const userIdToName = new BiMap<number, string>();
+const users = new BiMap<number, string>();
 
 // Set key-value pairs
-userIdToName.set(1, "Alice");
-userIdToName.set(2, "Bob");
-userIdToName.set(3, "Charlie");
+users.set(1, "Alice");
+users.set(2, "Bob");
+users.set(3, "Charlie");
 
 // Lookup by key
-userIdToName.getByKey(1); // > "Alice"
+users.getByKey(1); // > "Alice"
 
 // Lookup by value
-userIdToName.getByValue("Bob"); // > 2
+users.getByValue("Bob"); // > 2
 
 // Check existence
-userIdToName.hasKey(1); // > true
-userIdToName.hasValue("Charlie"); // > true
+users.hasKey(1); // > true
+users.hasValue("Charlie"); // > true
 
 // Delete by key or value
-userIdToName.deleteByKey(1); // > true
-userIdToName.deleteByValue("Bob"); // > true
+users.deleteByKey(1); // > true
+users.deleteByValue("Bob"); // > true
 
 // Other operations
-userIdToName.size; // > 1
-userIdToName.clear();
+users.size; // > 1
+users.clear();
 ```
 
 ## Legal
