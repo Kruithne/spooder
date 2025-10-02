@@ -705,6 +705,7 @@ cache.request(req: Request, cache_key: string, content_generator: () => string |
 
 // utilities
 filesize(bytes: number): string;
+BiMap: class BiMap<K, V>;
 
 // ipc
 ipc_register(op: number, callback: IPC_Callback);
@@ -2888,6 +2889,37 @@ filesize(1024); // > "1 kb"
 filesize(1048576); // > "1 mb"
 filesize(1073741824); // > "1 gb"
 filesize(1099511627776); // > "1 tb"
+```
+
+### 🔧 ``BiMap<K, V>``
+
+A bidirectional map that maintains a two-way relationship between keys and values, allowing efficient lookups in both directions.
+
+```ts
+const userIdToName = new BiMap<number, string>();
+
+// Set key-value pairs
+userIdToName.set(1, "Alice");
+userIdToName.set(2, "Bob");
+userIdToName.set(3, "Charlie");
+
+// Lookup by key
+userIdToName.getByKey(1); // > "Alice"
+
+// Lookup by value
+userIdToName.getByValue("Bob"); // > 2
+
+// Check existence
+userIdToName.hasKey(1); // > true
+userIdToName.hasValue("Charlie"); // > true
+
+// Delete by key or value
+userIdToName.deleteByKey(1); // > true
+userIdToName.deleteByValue("Bob"); // > true
+
+// Other operations
+userIdToName.size; // > 1
+userIdToName.clear();
 ```
 
 ## Legal
