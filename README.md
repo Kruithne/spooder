@@ -10,6 +10,9 @@
 
 The design goal behind `spooder` is not to provide a full-featured web server, but to expand the Bun runtime with a set of APIs and utilities that make it easy to develop servers with minimal overhead.
 
+### spooderverse
+In addition to the core API provided here, you can also find [spooderverse](https://github.com/Kruithne/spooderverse) which is a collection of drop-in modules designed for spooder with minimal overhead and zero dependencies.
+
 > [!NOTE]
 > If you think a is missing a feature, consider opening an issue with your use-case. The goal behind `spooder` is to provide APIs that are useful for a wide range of use-cases, not to provide bespoke features better suited for userland.
 
