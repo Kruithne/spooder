@@ -749,6 +749,13 @@ log('Hello, {world}!');
 // > [info] Hello, world!
 ```
 
+Tagged template literals are also supported and automatically highlights values without the brace syntax.
+
+```ts
+const user = 'Fred';
+log`Hello ${user}!`;
+```
+
 Formatting parameters are supported using standard console logging formatters.
 
 ```ts

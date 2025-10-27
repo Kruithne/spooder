@@ -519,8 +519,20 @@ export function log_create_logger(label: string, color: ColorInput = 'blue') {
 	const ansi = Bun.color(color, 'ansi-256') ?? '\x1b[38;5;6m';
 	const prefix = `[${ansi}${label}\x1b[0m] `;
 	
-	return (message: string, ...params: any[]) => {
-		console.log(prefix + message.replace(/\{([^}]+)\}/g, `${ansi}$1\x1b[0m`), ...params);
+	return (strings: TemplateStringsArray | string, ...values: any[]) => {
+		if (typeof strings === 'string') {
+			// regular string with { } syntax
+			console.log(prefix + strings.replace(/\{([^}]+)\}/g, `${ansi}$1\x1b[0m`), ...values);
+		} else {
+			// tagged template literal
+			let message = '';
+			for (let i = 0; i < strings.length; i++) {
+				message += strings[i];
+				if (i < values.length)
+					message += `${ansi}${values[i]}\x1b[0m`;
+			}
+			console.log(prefix + message);
+		}
 	};
 }
 
