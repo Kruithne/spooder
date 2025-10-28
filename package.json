@@ -2,7 +2,7 @@
 	"name": "spooder",
 	"author": "Kruithne <kruithne@gmail.com>",
 	"type": "module",
-	"version": "6.0.0",
+	"version": "6.1.0",
 	"module": "./src/api.ts",
 	"bin": {
 		"spooder": "./src/cli.ts"
