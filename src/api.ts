@@ -2114,9 +2114,9 @@ export function http_serve(port: number, hostname?: string) {
 
 // region db
 type SchemaOptions = {
-	schema_table: string;
-	recursive: boolean;
-	throw_on_skip: boolean;
+	schema_table?: string;
+	recursive?: boolean;
+	throw_on_skip?: boolean;
 };
 
 type TableRevision = {

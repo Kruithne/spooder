@@ -681,8 +681,8 @@ db_set_serialize<T extends string>(set: Iterable<T> | null): string;
 
 // database schema
 type SchemaOptions = {
-	schema_table: string;
-	recursive: boolean;
+	schema_table?: string;
+	recursive?: boolean;
 };
 
 db_get_schema_revision(db: SQL): Promise<number|null>;
