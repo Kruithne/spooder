@@ -111,10 +111,8 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 - [API > Cache Busting](#api-cache-busting)
 - [API > Git](#api-git)
 - [API > Database](#api-database)
+	- [API > Database > Utilities](#api-database-utilities)
 	- [API > Database > Schema](#api-database-schema)
-	- [API > Database > Interface](#api-database-interface)
-		- [API > Database > Interface > SQLite](#api-database-interface-sqlite)
-		- [API > Database > Interface > MySQL](#api-database-interface-mysql)
 - [API > Utilities](#api-utilities)
 
 # CLI
@@ -675,46 +673,20 @@ cache_bust_get_hash_table(): Record<string, string>;
 
 // git
 git_get_hashes(length: number): Promise<Record<string, string>>;
-git_get_hashes_sync(length: number): Record<string, string>
+git_get_hashes_sync(length: number): Record<string, string>;
 
-// database interface
-db_sqlite(filename: string, options: number|object): db_sqlite;
-db_mysql(options: ConnectionOptions, pool: boolean): Promise<MySQLDatabaseInterface>;
-db_cast_set<T extends string>(set: string | null): Set<T>;
-db_serialize_set<T extends string>(set: Set<T> | null): string;
-
-// db_sqlite
-update_schema(db_dir: string, schema_table?: string): Promise<void>
-insert(sql: string, ...values: any): number;
-insert_object(table: string, obj: Record<string, any>): number;
-execute(sql: string, ...values: any): number;
-get_all<T>(sql: string, ...values: any): T[];
-get_single<T>(sql: string, ...values: any): T | null;
-get_column<T>(sql: string, column: string, ...values: any): T[];
-get_paged<T>(sql: string, values?: any[], page_size?: number): AsyncGenerator<T[]>;
-count(sql: string, ...values: any): number;
-count_table(table_name: string): number;
-exists(sql: string, ...values: any): boolean;
-transaction(scope: (transaction: SQLiteDatabaseInterface) => void | Promise<void>): boolean;
-
-// db_mysql
-update_schema(db_dir: string, schema_table?: string): Promise<void>
-insert(sql: string, ...values: any): Promise<number>;
-insert_object(table: string, obj: Record<string, any>): Promise<number>;
-execute(sql: string, ...values: any): Promise<number>;
-get_all<T>(sql: string, ...values: any): Promise<T[]>;
-get_single<T>(sql: string, ...values: any): Promise<T | null>;
-get_column<T>(sql: string, column: string, ...values: any): Promise<T[]>;
-call<T>(func_name: string, ...args: any): Promise<T[]>;
-get_paged<T>(sql: string, values?: any[], page_size?: number): AsyncGenerator<T[]>;
-count(sql: string, ...values: any): Promise<number>;
-count_table(table_name: string): Promise<number>;
-exists(sql: string, ...values: any): Promise<boolean>;
-transaction(scope: (transaction: MySQLDatabaseInterface) => void | Promise<void>): Promise<boolean>;
+// database utilities
+db_set_cast<T extends string>(set: string | null): Set<T>;
+db_set_serialize<T extends string>(set: Iterable<T> | null): string;
 
 // database schema
-db_update_schema_sqlite(db: Database, schema_dir: string, schema_table?: string): Promise<void>;
-db_update_schema_mysql(db: Connection, schema_dir: string, schema_table?: string): Promise<void>;
+type SchemaOptions = {
+	schema_table: string;
+	recursive: boolean;
+};
+
+db_get_schema_revision(db: SQL): Promise<number|null>;
+db_schema(db: SQL, schema_path: string, options?: SchemaOptions): Promise<boolean>;
 
 // caching
 cache_http(options?: CacheOptions);
@@ -2538,524 +2510,115 @@ const full_hashes = await git_get_hashes(40);
 
 
 <a id="api-database"></a>
-<a id="api-database-interface"></a>
 ## API > Database
 
-### 🔧 ``db_cast_set<T extends string>(set: string | null): Set<T>``
+Before `v6.0.0`, spooder provided a database API for `sqlite` and `mysql` while they were not available natively in `bun`.
+
+Now that `bun` provides a native API for these, we've dropped our API in favor of those as it aligns with the mission of minimalism.
+
+You can see the documentation for the [Bun SQL API here.](https://bun.com/docs/runtime/sql)
+
+<a id="api-database-utilities"></a>
+## API > Database > Utilities
+
+### 🔧 ``db_set_cast<T extends string>(set: string | null): Set<T>``
 
 Takes a database SET string and returns a `Set<T>` where `T` is a provided enum.
 
 ```ts
-enum ExampleRow {
-	OPT_A = 'OPT_A',
-	OPT_B = 'OPT_B',
-	OPT_C = 'OPT_C'
+enum Fruits {
+	Apple = 'Apple',
+	Banana = 'Banana',
+	Lemon = 'Lemon'
 };
 
-const set = db_cast_set<ExampleRow>('OPT_A,OPT_B');
-if (set.has(ExampleRow.OPT_B)) {
-	// ...
+const [row] = await sql`SELECT * FROM some_table`;
+const set = db_set_cast<Fruits>(row.fruits);
+
+if (set.has(Fruits.Apple)) {
+	// we have an apple in the set
 }
 ```
 
-### 🔧 ``db_serialize_set<T extends string>(set: Set<T> | null): string``
+### 🔧 ``db_set_serialize<T extends string>(set: Iterable<T> | null): string``
 
-Takes a `Set<T>` and returns a database SET string. If the set is empty or `null`, it returns an empty string.
+Takes an `Iterable<T>` and returns a database SET string. If the set is empty or `null`, it returns an empty string.
 
 ```ts
-enum ExampleRow {
-	OPT_A = 'OPT_A',
-	OPT_B = 'OPT_B',
-	OPT_C = 'OPT_C'
+enum Fruits {
+	Apple = 'Apple',
+	Banana = 'Banana',
+	Lemon = 'Lemon'
 };
 
-const set = new Set<ExampleRow>([ExampleRow.OPT_A, ExampleRow.OPT_B]);
+// edit existing set
+const [row] = await sql`SELECT * FROM some_table`;
+const fruits = db_set_cast<Fruits>(row.fruits);
 
-const serialized = db_serialize_set(set);
-// > 'OPT_A,OPT_B'
-```
+if (!fruits.has(Fruits.Lemon))
+	fruits.add(Fruits.Lemon);
 
-<a id="api-database-interface-sqlite"></a>
-## API > Database > Interface > SQLite
+await sql`UPDATE some_table SET fruits = ${sql(db_set_serialize(fruits))} WHERE id = ${row.id}`;
 
-`spooder` provides a simple **SQLite** interface that acts as a wrapper around the Bun SQLite API. The construction parameters match the underlying API.
-
-```ts
-// see: https://bun.sh/docs/api/sqlite
-const db = db_sqlite(':memory:', { create: true });
-db.instance; // raw access to underlying sqlite instance.
-```
-
-### Error Reporting
-
-In the event of an error from SQLite, an applicable value will be returned from interface functions, rather than the error being thrown.
-
-```ts
-const result = await db.get_single('BROKEN QUERY');
-if (result !== null) {
-	// do more stuff with result
-}
-```
-
-If you have configured the canary reporting feature in spooder, you can instruct the database interface to report errors using this feature with the `use_canary_reporting` parameter.
-
-```ts
-const db = db_sqlite(':memory', { ... }, true);
-```
-
-### 🔧 ``db_sqlite.update_schema(schema_dir: string, schema_table: string): Promise<void>``
-
-`spooder` offers a database schema management system. The `update_schema()` function is a shortcut to call this on the underlying database.
-
-See [API > Database > Schema](#api-database-schema) for information on how schema updating works.
-
-```ts
-// without interface
-import { db_sqlite, db_update_schema_sqlite } from 'spooder';
-const db = db_sqlite('./my_database.sqlite');
-await db_update_schema_sqlite(db.instance, './schema');
-
-// with interface
-import { db_sqlite } from 'spooder';
-const db = db_sqlite('./my_database.sqlite');
-await db.update_schema('./schema');
-```
-
-### 🔧 ``db_sqlite.insert(sql: string, ...values: any): number``
-
-Executes a query and returns the `lastInsertRowid`. Returns `-1` in the event of an error or if `lastInsertRowid` is not provided.
-
-```ts
-const id = db.insert('INSERT INTO users (name) VALUES(?)', 'test');
-```
-
-### 🔧 ``db_sqlite.insert_object(table: string, obj: Record<string, any>): number``
-
-Executes an insert query using object key/value mapping and returns the `lastInsertRowid`. Returns `-1` in the event of an error.
-
-```ts
-const id = db.insert_object('users', { name: 'John', email: 'john@example.com' });
-```
-
-### 🔧 ``db_sqlite.execute(sql: string, ...values: any): number``
-
-Executes a query and returns the number of affected rows. Returns `-1` in the event of an error.
-
-```ts
-const affected = db.execute('UPDATE users SET name = ? WHERE id = ?', 'Jane', 1);
-```
-
-### 🔧 ``db_sqlite.get_all<T>(sql: string, ...values: any): T[]``
-
-Returns the complete query result set as an array. Returns empty array if no rows found or if query fails.
-
-```ts
-const users = db.get_all<User>('SELECT * FROM users WHERE active = ?', true);
-```
-
-### 🔧 ``db_sqlite.get_single<T>(sql: string, ...values: any): T | null``
-
-Returns the first row from a query result set. Returns `null` if no rows found or if query fails.
-
-```ts
-const user = db.get_single<User>('SELECT * FROM users WHERE id = ?', 1);
-```
-
-### 🔧 ``db_sqlite.get_column<T>(sql: string, column: string, ...values: any): T[]``
-
-Returns the query result as a single column array. Returns empty array if no rows found or if query fails.
-
-```ts
-const names = db.get_column<string>('SELECT name FROM users', 'name');
-```
-
-### 🔧 ``db_sqlite.get_paged<T>(sql: string, values?: any[], page_size?: number): AsyncGenerator<T[]>``
-
-Returns an async iterator that yields pages of database rows. Each page contains at most `page_size` rows (default 1000).
-
-```ts
-for await (const page of db.get_paged<User>('SELECT * FROM users', [], 100)) {
-	console.log(`Processing ${page.length} users`);
-}
-```
-
-### 🔧 ``db_sqlite.count(sql: string, ...values: any): number``
-
-Returns the value of `count` from a query. Returns `0` if query fails.
-
-```ts
-const user_count = db.count('SELECT COUNT(*) AS count FROM users WHERE active = ?', true);
-```
-
-### 🔧 ``db_sqlite.count_table(table_name: string): number``
-
-Returns the total count of rows from a table. Returns `0` if query fails.
-
-```ts
-const total_users = db.count_table('users');
-```
-
-### 🔧 ``db_sqlite.exists(sql: string, ...values: any): boolean``
-
-Returns `true` if the query returns any results. Returns `false` if no results found or if query fails.
-
-```ts
-const has_active_users = db.exists('SELECT 1 FROM users WHERE active = ? LIMIT 1', true);
-```
-
-### 🔧 ``db_sqlite.transaction(scope: (transaction: SQLiteDatabaseInterface) => void | Promise<void>): boolean``
-
-Executes a callback function within a database transaction. The callback receives a transaction object with all the same database methods available. Returns `true` if the transaction was committed successfully, `false` if it was rolled back due to an error.
-
-```ts
-const success = db.transaction(async (tx) => {
-	const user_id = tx.insert('INSERT INTO users (name) VALUES (?)', 'John');
-	tx.insert('INSERT INTO user_profiles (user_id, bio) VALUES (?, ?)', user_id, 'Hello world');
-});
-
-if (success) {
-	console.log('Transaction completed successfully');
-} else {
-	console.log('Transaction was rolled back');
-}
-```
-
-<a id="api-database-interface-mysql"></a>
-## API > Database > Interface > MySQL
-
-`spooder` provides a simple **MySQL** interface that acts as a wrapper around the `mysql2` API. The connection options match the underlying API.
-
-> [!IMPORTANT]
-> MySQL requires the optional dependency `mysql2` to be installed - this is not automatically installed with spooder. This will be replaced when bun:sql supports MySQL natively.
-
-```ts
-// see: https://github.com/mysqljs/mysql#connection-options
-const db = await db_mysql({
-	// ...
-});
-db.instance; // raw access to underlying mysql2 instance.
-```
-
-### Error Reporting
-
-In the event of an error from MySQL, an applicable value will be returned from interface functions, rather than the error being thrown.
-
-```ts
-const result = await db.get_single('BROKEN QUERY');
-if (result !== null) {
-	// do more stuff with result
-}
-```
-
-If you have configured the canary reporting feature in spooder, you can instruct the database interface to report errors using this feature with the `use_canary_reporting` parameter.
-
-```ts
-const db = await db_mysql({ ... }, false, true);
-```
-
-### Pooling
-
-MySQL supports connection pooling. This can be configured by providing `true` to the `pool` parameter.
-
-```ts
-const pool = await db_mysql({ ... }, true);
-```
-
-### 🔧 ``db_mysql.update_schema(schema_dir: string, schema_table: string): Promise<void>``
-
-`spooder` offers a database schema management system. The `update_schema()` function is a shortcut to call this on the underlying database.
-
-See [API > Database > Schema](#api-database-schema) for information on how schema updating works.
-
-```ts
-// without interface
-import { db_mysql, db_update_schema_mysql } from 'spooder';
-const db = await db_mysql({ ... });
-await db_update_schema_mysql(db.instance, './schema');
-
-// with interface
-import { db_mysql } from 'spooder';
-const db = await db_mysql({ ... });
-await db.update_schema('./schema');
-```
-
-### 🔧 ``db_mysql.insert(sql: string, ...values: any): Promise<number>``
-
-Executes a query and returns the `LAST_INSERT_ID`. Returns `-1` in the event of an error or if `LAST_INSERT_ID` is not provided.
-
-```ts
-const id = await db.insert('INSERT INTO tbl (name) VALUES(?)', 'test');
-```
-
-### 🔧 ``db_mysql.insert_object(table: string, obj: Record<string, any>): Promise<number>``
-
-Executes an insert query using object key/value mapping and returns the `LAST_INSERT_ID`. Returns `-1` in the event of an error.
-
-```ts
-const id = await db.insert_object('users', { name: 'John', email: 'john@example.com' });
-```
-
-### 🔧 ``db_mysql.execute(sql: string, ...values: any): Promise<number>``
-
-Executes a query and returns the number of affected rows. Returns `-1` in the event of an error.
-
-```ts
-const affected = await db.execute('UPDATE users SET name = ? WHERE id = ?', 'Jane', 1);
-```
-
-### 🔧 ``db_mysql.get_all<T>(sql: string, ...values: any): Promise<T[]>``
-
-Returns the complete query result set as an array. Returns empty array if no rows found or if query fails.
-
-```ts
-const users = await db.get_all<User>('SELECT * FROM users WHERE active = ?', true);
-```
-
-### 🔧 ``db_mysql.get_single<T>(sql: string, ...values: any): Promise<T | null>``
-
-Returns the first row from a query result set. Returns `null` if no rows found or if query fails.
-
-```ts
-const user = await db.get_single<User>('SELECT * FROM users WHERE id = ?', 1);
-```
-
-### 🔧 ``db_mysql.get_column<T>(sql: string, column: string, ...values: any): Promise<T[]>``
-
-Returns the query result as a single column array. Returns empty array if no rows found or if query fails.
-
-```ts
-const names = await db.get_column<string>('SELECT name FROM users', 'name');
-```
-
-### 🔧 ``db_mysql.call<T>(func_name: string, ...args: any): Promise<T[]>``
-
-Calls a stored procedure and returns the result set as an array. Returns empty array if no rows found or if query fails.
-
-```ts
-const results = await db.call<User>('get_active_users', true, 10);
-```
-
-### 🔧 ``db_mysql.get_paged<T>(sql: string, values?: any[], page_size?: number): AsyncGenerator<T[]>``
-
-Returns an async iterator that yields pages of database rows. Each page contains at most `page_size` rows (default 1000).
-
-```ts
-for await (const page of db.get_paged<User>('SELECT * FROM users', [], 100)) {
-	console.log(`Processing ${page.length} users`);
-}
-```
-
-### 🔧 ``db_mysql.count(sql: string, ...values: any): Promise<number>``
-
-Returns the value of `count` from a query. Returns `0` if query fails.
-
-```ts
-const user_count = await db.count('SELECT COUNT(*) AS count FROM users WHERE active = ?', true);
-```
-
-### 🔧 ``db_mysql.count_table(table_name: string): Promise<number>``
-
-Returns the total count of rows from a table. Returns `0` if query fails.
-
-```ts
-const total_users = await db.count_table('users');
-```
-
-### 🔧 ``db_mysql.exists(sql: string, ...values: any): Promise<boolean>``
-
-Returns `true` if the query returns any results. Returns `false` if no results found or if query fails.
-
-```ts
-const has_active_users = await db.exists('SELECT 1 FROM users WHERE active = ? LIMIT 1', true);
-```
-
-### 🔧 ``db_mysql.transaction(scope: (transaction: MySQLDatabaseInterface) => void | Promise<void>): Promise<boolean>``
-
-Executes a callback function within a database transaction. The callback receives a transaction object with all the same database methods available. Returns `true` if the transaction was committed successfully, `false` if it was rolled back due to an error.
-
-```ts
-const success = await db.transaction(async (tx) => {
-	const user_id = await tx.insert('INSERT INTO users (name) VALUES (?)', 'John');
-	await tx.insert('INSERT INTO user_profiles (user_id, bio) VALUES (?, ?)', user_id, 'Hello world');
-});
-
-if (success) {
-	console.log('Transaction completed successfully');
-} else {
-	console.log('Transaction was rolled back');
-}
+// new set from iterable
+await sql`UPDATE some_table SET fruits = ${sql(db_set_serialize([Fruits.Apple, Fruits.Lemon]))}`;
 ```
 
 <a id="api-database-schema"></a>
 ## API > Database > Schema
 
-`spooder` provides a straightforward API to manage database schema in revisions through source control.
+### 🔧 ``db_schema(db: SQL, schema_path: string, options?: SchemaOptions): Promise<boolean>``
+
+`db_schema` executes all revisioned `.sql` files in a given directory, applying them to the database incrementally.
 
 ```ts
-// sqlite
-db_update_schema_sqlite(db: Database, schema_dir: string, schema_table?: string): Promise<void>;
-
-// mysql
-db_update_schema_mysql(db: Connection, schema_dir: string, schema_table?: string): Promise<void>;
+const db = new SQL('db:pw@localhost:3306/test');
+await db_schema(db, './db/revisions');
 ```
+
+The above example will **recursively** search the `./db/revisions` directory for all `.sql` files that begin with a positive numeric identifier.
 
 ```ts
-// sqlite example
-import { db_update_schema_sqlite } from 'spooder';
-import { Database } from 'bun:sqlite';
-
-const db = new Database('./database.sqlite');
-await db_update_schema_sqlite(db, './schema');
+db/revisions/000_invalid.sql // no: 0 is not valid
+db/revisions/001_valid.sql // yes: revision 1
+db/revisions/25-valid.sql // yes: revision 25
+db/revisions/005_not.txt // no: .sql extension missing
+db/revisions/invalid_500.sql // no: must begin with rev
 ```
+
+Revisions are applied in **numerical order**, rather than the file sorting order from the operating system. Invalid files are **skipped** without throwing an error.
+
+By default, schema revision is tracked in a table called `db_schema`. The name of this table can be customized by providing a different `.schema_table` option.
 
 ```ts
-// mysql example
-import { db_update_schema_mysql } from 'spooder';
-import mysql from 'mysql2';
-
-const db = await mysql.createConnection({
-	// connection options
-	// see https://github.com/mysqljs/mysql#connection-options
-});
-await db_update_schema_mysql(db, './schema');
+await db_schema(db, './db/revisions', { schema_table: 'alt_table_name' });
 ```
 
-> [!IMPORTANT]
-> MySQL requires the optional dependency `mysql2` to be installed - this is not automatically installed with spooder. This will be replaced when bun:sql supports MySQL natively.
-
-### Interface API
-
-If you are already using the [database interface API](#api-database-interface) provided by `spooder`, you can call `update_schema()` directly on the interface.
+The revision folder is enumerated recursively by default. This can be disabled by passing `false` to `.recursive`, which will only scan the top level of the specified directory.
 
 ```ts
-const db = await db_mysql({ ... });
-await db.update_schema('./schema');
+await db_schema(db, './db/revisions', { recursive: false });
 ```
 
-### Schema Files
+Each revision file is executed within a transaction. In the event of an error, the transaction will be rolled back. Successful revision files executed **before** the error will not be rolled back. Subsequent revision files will **not** be executed after an error.
 
-The schema directory is expected to contain an SQL file for each table in the database with the file name matching the name of the table.
+> [!CAUTION]
+> Implicit commits, such as those that modify DDL, cannot be rolled back inside a transaction.
+>
+> It is recommended to only feature one implicit commit query per revision file. In the event of multiple, an error will not rollback previous implicitly committed queries within the revision, leaving your database in a partial state.
+>
+> See [MySQL 8.4 Reference Manual // 15.3.3 Statements That Cause an Implicit Commit](https://dev.mysql.com/doc/refman/8.4/en/implicit-commit.html) for more information.
 
-> [!NOTE]
-> The schema directory is searched recursively and files without the `.sql` extension (case-insensitive) will be ignored.
-
-```
-- database.sqlite
-- schema/
-	- users.sql
-	- posts.sql
-	- comments.sql
-```
 
 ```ts
-import { db_update_schema_sqlite } from 'spooder';
-import { Database } from 'bun:sqlite';
+type SchemaOptions = {
+	schema_table: string;
+	recursive: boolean;
+};
 
-const db = new Database('./database.sqlite');
-await db_update_schema_sqlite(db, './schema');
+db_get_schema_revision(db: SQL): Promise<number|null>;
+db_schema(db: SQL, schema_path: string, options?: SchemaOptions): Promise<boolean>;
 ```
-
-Each of the SQL files should contain all of the revisions for the table, with the first revision being table creation and subsequent revisions being table modifications.
-
-```sql
--- [1] Table creation.
-CREATE TABLE users (
-	id INTEGER PRIMARY KEY,
-	username TEXT NOT NULL,
-	password TEXT NOT NULL
-);
-
--- [2] Add email column.
-ALTER TABLE users ADD COLUMN email TEXT;
-
--- [3] Cleanup invalid usernames.
-DELETE FROM users WHERE username = 'admin';
-DELETE FROM users WHERE username = 'root';
-```
-
-Each revision should be clearly marked with a comment containing the revision number in square brackets. Anything proceeding the revision number is treated as a comment and ignored.
-
->[!NOTE]
-> The exact revision header syntax is `^--\s*\[(\d+)\]`.
-
-Everything following a revision header is considered part of that revision until the next revision header or the end of the file, allowing for multiple SQL statements to be included in a single revision.
-
-When calling `db_update_schema_*`, unapplied revisions will be applied in ascending order (regardless of order within the file) until the schema is up-to-date.
-
-It is acceptable to omit keys. This can be useful to prevent repitition when managing stored procedures, views or functions.
-
-```sql
--- example of repetitive declaration
-
--- [1] create view
-CREATE VIEW `view_test` AS SELECT * FROM `table_a` WHERE col = 'foo';
-
--- [2] change view
-DROP VIEW IF EXISTS `view_test`;
-CREATE VIEW `view_test` AS SELECT * FROM `table_b` WHERE col = 'foo';
-```
-Instead of unnecessarily including each full revision of a procedure, view or function in the schema file, simply store the most up-to-date one and increment the version.
-```sql
--- [2] create view
-CREATE OR REPLACE VIEW `view_test` AS SELECT * FROM `table_b` WHERE col = 'foo';
-```
-
-
-Schema revisions are tracked in a table called `db_schema` which is created automatically if it does not exist with the following schema.
-
-```sql
-CREATE TABLE db_schema (
-	db_schema_table_name TEXT PRIMARY KEY,
-	db_schema_version INTEGER
-);
-```
-
-The table used for schema tracking can be changed if necessary by providing an alternative table name as the third paramater.
-
-```ts
-await db_update_schema_sqlite(db, './schema', 'my_schema_table');
-```
-
->[!IMPORTANT]
-> The entire process is transactional. If an error occurs during the application of **any** revision for **any** table, the entire process will be rolled back and the database will be left in the state it was before the update was attempted.
-
->[!IMPORTANT]
-> `db_update_schema_*` will throw an error if the revisions cannot be parsed or applied for any reason. It is important you catch and handle appropriately.
-
-```ts
-try {
-	const db = new Database('./database.sqlite');
-	await db_update_schema_sqlite(db, './schema');
-} catch (e) {
-	// panic (crash) or gracefully continue, etc.
-	await panic(e);
-}
-```
-
-### Schema Dependencies
-By default, schema files are executed in the order they are provided by the operating system (generally alphabetically). Individual revisions within files are always executed in ascending order.
-
-If a specific revision depends on one or more other schema files to be executed before it (for example, when adding foreign keys), you can specify dependencies at the revision level.
-
-```sql
--- [1] create table_a (no dependencies)
-CREATE TABLE table_a (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL
-);
-
--- [2] add foreign key to table_b
--- [deps] table_b_schema.sql
-ALTER TABLE table_a ADD COLUMN table_b_id INTEGER REFERENCES table_b(id);
-```
-
-When a revision specifies dependencies, all revisions of the dependent schema files will be executed before that specific revision runs. This allows you to create tables independently and then add dependencies in later revisions.
-
->[!IMPORTANT]
-> Dependencies are specified per-revision, not per-file. A `-- [deps]` line applies only to the revision it appears in.
-
->[!IMPORTANT]
-> Cyclic or missing dependencies will throw an error.
 
 <a id="api-utilities"></a>
 ## API > Utilities

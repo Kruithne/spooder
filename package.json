@@ -17,8 +17,5 @@
 	},
 	"devDependencies": {
 		"@types/bun": "^1.2.20"
-	},
-	"optionalDependencies": {
-		"mysql2": "^3.11.0"
 	}
 }

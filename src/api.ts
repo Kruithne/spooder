@@ -4,7 +4,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import crypto from 'crypto';
 import { Blob } from 'node:buffer';
-import { ColorInput } from 'bun';
+import { ColorInput, SQL } from 'bun';
 import packageJson from '../package.json' with { type: 'json' };
 
 // region exit codes
@@ -19,10 +19,6 @@ export const EXIT_CODE = {
 export const EXIT_CODE_NAMES = Object.fromEntries(
 	Object.entries(EXIT_CODE).map(([key, value]) => [value, key])
 );
-// endregion
-
-// region api forwarding
-export * from './api_db';
 // endregion
 
 // region workers
@@ -2113,5 +2109,119 @@ export function http_serve(port: number, hostname?: string) {
 			}
 		}
 	};
+}
+// endregion
+
+// region db
+type SchemaOptions = {
+	schema_table: string;
+	recursive: boolean;
+	throw_on_skip: boolean;
+};
+
+type TableRevision = {
+	revision_number: number;
+	file_path: string;
+	filename: string;
+};
+
+const db_log = log_create_logger('db', 'spooder');
+
+export function db_set_cast<T extends string>(set: string | null): Set<T> {
+	return new Set(set?.split(',') as T[] ?? []);
+}
+
+export function db_set_serialize<T extends string>(set: Iterable<T> | null): string {
+	return set ? Array.from(set).join(',') : '';
+}
+
+export async function db_get_schema_revision(db: SQL): Promise<number|null> {
+	try {
+		const [result] = await db`SELECT MAX(revision_number) as latest_revision FROM db_schema`;
+		return result.latest_revision ?? 0;
+	} catch (e) {
+		return null;
+	}
+}
+
+export async function db_schema(db: SQL, schema_path: string, options?: SchemaOptions): Promise<boolean> {
+	const schema_table = options?.schema_table ?? 'db_schema';
+	const recursive = options?.recursive ?? true;
+
+	db_log`applying schema revisions from ${schema_path}`;
+	let current_revision = await db_get_schema_revision(db);
+
+	if (current_revision === null) {
+		db_log`initiating schema database table ${schema_table}`;
+		await db`CREATE TABLE ${db(schema_table)} (
+			revision_number INTEGER PRIMARY KEY,
+			filename VARCHAR(255) NOT NULL,
+			applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);`;
+	}
+
+	current_revision ??= 0;
+
+	const revisions = Array<TableRevision>();
+	const files = await fs.readdir(schema_path, { recursive, encoding: 'utf8' });
+	for (const file of files) {
+		const filename = path.basename(file);
+		if (!filename.toLowerCase().endsWith('.sql'))
+			continue;
+		
+		const match = filename.match(/^(\d+)/);
+		const revision_number = match ? Number(match[1]) : null;
+		if (revision_number === null || revision_number < 1) {
+			log_error`skipping sql file ${file}, invalid revision number`;
+			continue;
+		}
+
+		const file_path = path.join(schema_path, file);
+		if (revision_number > current_revision) {
+			revisions.push({
+				revision_number,
+				file_path,
+				filename
+			});
+		}
+	}
+
+	// sort revisions in ascending order before applying
+	// for recursive trees or unreliable OS sort ordering
+	revisions.sort((a, b) => a.revision_number - b.revision_number);
+
+	const revisions_applied = Array<string>();
+	for (const rev of revisions) {
+		db_log`applying revision ${rev.revision_number} from ${rev.filename}`;
+		
+		try {
+			await db.begin(async tx => {
+				await tx.file(rev.file_path);
+				await tx`INSERT INTO ${db(schema_table)} ${db(rev, 'revision_number', 'filename')}`;
+				revisions_applied.push(rev.filename);
+			});
+		} catch (err) {
+			
+			log_error`failed to apply revisions from ${rev.filename}: ${err}`;
+			log_error`${'warning'}: if ${rev.filename} contained DDL statements, they will ${'not'} be rolled back automatically`;
+			log_error`verify the current database state ${'before'} running ammended revisions`;
+			
+			const last_revision = await db_get_schema_revision(db);
+			db_log`database schema revision is now ${last_revision ?? 0}`;
+
+			caution('db_schema failed', { rev, err, last_revision, revisions_applied });
+
+			return false;
+		}
+	}
+
+	if (revisions_applied.length > 0) {
+		const new_revision = await db_get_schema_revision(db);
+		db_log`applied ${revisions_applied.length} database schema revisions (${current_revision} >> ${new_revision})`;
+	} else {
+		db_log`no database schema revisions to apply (current: ${current_revision})`;
+	}
+
+	return true;
 }
 // endregion
