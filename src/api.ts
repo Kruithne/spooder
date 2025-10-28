@@ -2116,7 +2116,6 @@ export function http_serve(port: number, hostname?: string) {
 type SchemaOptions = {
 	schema_table?: string;
 	recursive?: boolean;
-	throw_on_skip?: boolean;
 };
 
 type TableRevision = {
