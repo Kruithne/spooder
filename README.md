@@ -601,6 +601,9 @@ log_list(input: any[], delimiter = ', ');
 http_serve(port: number, hostname?: string): Server;
 server.stop(immediate: boolean): Promise<void>;
 
+// cookies
+cookies_get(req: Request): Bun.CookieMap
+
 // routing
 server.route(path: string, handler: RequestHandler, method?: HTTP_METHODS);
 server.json(path: string, handler: JSONRequestHandler, method?: HTTP_METHODS);
