@@ -683,6 +683,7 @@ git_get_hashes_sync(length: number): Record<string, string>;
 // database utilities
 db_set_cast<T extends string>(set: string | null): Set<T>;
 db_set_serialize<T extends string>(set: Iterable<T> | null): string;
+db_exists(db: SQL, table_name: string, value: string|number, column_name = 'id'): Promise<boolean>;
 
 // database schema
 type SchemaOptions = {
@@ -2592,7 +2593,7 @@ if (set.has(Fruits.Apple)) {
 }
 ```
 
-### 🔧 ``db_set_serialize<T extends string>(set: Iterable<T> | null): string``
+### ``db_set_serialize<T extends string>(set: Iterable<T> | null): string``
 
 Takes an `Iterable<T>` and returns a database SET string. If the set is empty or `null`, it returns an empty string.
 
@@ -2614,6 +2615,18 @@ await sql`UPDATE some_table SET fruits = ${sql(db_set_serialize(fruits))} WHERE 
 
 // new set from iterable
 await sql`UPDATE some_table SET fruits = ${sql(db_set_serialize([Fruits.Apple, Fruits.Lemon]))}`;
+```
+
+### 🔧 ``db_exists(db: SQL, table_name: string, value: string|number, column_name = 'id'): Promise<boolean>``
+
+Returns true if a database row exists in the table.
+
+```ts
+// checks if row exists with id 1 in 'table'
+const exists = await db_exists(db, 'table', 1);
+
+// checks if row exists with column 'foo' = 'bar' in 'table'
+const exists = await db_exists(db, 'table', 'bar', 'foo');
 ```
 
 <a id="api-database-schema"></a>

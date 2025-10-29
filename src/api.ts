@@ -2182,6 +2182,11 @@ export function db_set_serialize<T extends string>(set: Iterable<T> | null): str
 	return set ? Array.from(set).join(',') : '';
 }
 
+export async function db_exists(db: SQL, table_name: string, value: string|number, column_name = 'id'): Promise<boolean> {
+	const rows = await db`SELECT 1 FROM ${db(table_name)} WHERE ${db(column_name)} = ${value} LIMIT 1`;
+	return rows.length > 0;
+}
+
 export async function db_get_schema_revision(db: SQL): Promise<number|null> {
 	try {
 		const [result] = await db`SELECT MAX(revision_number) as latest_revision FROM db_schema`;
