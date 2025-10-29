@@ -1782,6 +1782,11 @@ export function http_serve(port: number, hostname?: string) {
 	
 	log_spooder(`server started on port {${port}} (host: {${hostname ?? 'unspecified'}})`);
 	
+	type ThrottleHandler = {
+		(delta: number, handler: JSONRequestHandler): JSONRequestHandler;
+		(delta: number, handler: RequestHandler): RequestHandler;
+	};
+
 	return {
 		/** Register a handler for a specific route. */
 		route: (path: string, handler: RequestHandler, method: HTTP_METHODS = 'GET'): void => {
@@ -1789,6 +1794,23 @@ export function http_serve(port: number, hostname?: string) {
 				path = path.slice(0, -1);
 			routes.push([path.split('/'), handler, method]);
 		},
+
+		/** Throttles an endpoint to take at least the specified delta time (in ms) */
+		throttle: ((delta: number, handler: JSONRequestHandler | RequestHandler): any => {
+			return async (req: Request, ...args: any[]) => {
+				const t_start = Date.now();
+				const result = await (handler as any)(req, ...args);
+
+				const t_elapsed = Date.now() - t_start;
+				const t_remaining = Math.max(0, delta - t_elapsed);
+
+				if (t_remaining > 0)
+					await Bun.sleep(t_remaining);
+
+				slow_requests.add(req);
+				return result;
+			};
+		}) as ThrottleHandler,
 		
 		/** Register a JSON endpoint with automatic content validation. */
 		json: (path: string, handler: JSONRequestHandler, method: HTTP_METHODS = 'POST'): void => {

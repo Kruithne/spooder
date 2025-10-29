@@ -603,6 +603,7 @@ server.stop(immediate: boolean): Promise<void>;
 // routing
 server.route(path: string, handler: RequestHandler, method?: HTTP_METHODS);
 server.json(path: string, handler: JSONRequestHandler, method?: HTTP_METHODS);
+server.throttle(delta: number, handler: JSONRequestHandler|RequestHandler);
 server.unroute(path: string);
 
 // fallback handlers
@@ -890,6 +891,24 @@ Unregister a specific route.
 ```ts
 server.route('/test/route', () => {});
 server.unroute('/test/route');
+```
+
+### 🔧 `server.throttle(delta: number, handler: JSONRequestHandler|RequestHandler)`
+
+Throttles requests going through the provided handler so that they take a **minimum** of `delta` milliseconds. Useful for preventing brute-force of sensitive endpoints.
+
+> [!IMPORTANT]
+> This is a rudimentary countermeasure for brute-force attacks, **not** a defence against timing-attacks. Always use constant-time/timing-safe comparison functions in sensitive endpoints.
+
+```ts
+server.json('/api/login', server.throttle(1000, (req, url, json) => {
+	// this endpoint will always take at least 1000ms to execute
+}));
+
+// works with regular routes
+server.route('/reset-password', server.throttle(1000, (req, url) => {
+	// this route will also take at least 1000ms to execute
+}));
 ```
 
 ### 🔧 `server.json(path: string, handler: JSONRequestHandler, method?: HTTP_METHODS)`
