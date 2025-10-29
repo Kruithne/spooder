@@ -1143,6 +1143,26 @@ export function git_get_hashes_sync(length = 7): Record<string, string> {
 }
 // endregion
 
+// region cookies
+const cookie_map = new WeakMap<Request, Bun.CookieMap>();
+
+export function cookies_get(req: Request): Bun.CookieMap {
+	const jar = new Bun.CookieMap(req.headers.get('Cookie') ?? undefined);
+	cookie_map.set(req, jar);
+	return jar;
+}
+
+function apply_cookies(req: Request, res: Response) {
+	const jar = cookie_map.get(req);
+	if (jar === undefined)
+		return;
+
+	const cookies = jar.toSetCookieHeaders();
+	for (const cookie of cookies)
+		res.headers.append('Set-Cookie', cookie);
+}
+// endregion
+
 // region serving
 export const HTTP_STATUS_TEXT: Record<number, string> = {
 	// 1xx Informational Response
@@ -1736,6 +1756,8 @@ export function http_serve(port: number, hostname?: string) {
 			
 			const response = await generate_response(req, url);
 			const request_time = Date.now() - request_start;
+
+			apply_cookies(req, response);
 			
 			const is_known_slow = slow_requests.has(req);
 			if (slow_request_callback !== null && request_time > slow_request_threshold && !is_known_slow)
