@@ -1147,7 +1147,11 @@ export function git_get_hashes_sync(length = 7): Record<string, string> {
 const cookie_map = new WeakMap<Request, Bun.CookieMap>();
 
 export function cookies_get(req: Request): Bun.CookieMap {
-	const jar = new Bun.CookieMap(req.headers.get('Cookie') ?? undefined);
+	let jar = cookie_map.get(req);
+	if (jar !== undefined)
+		return jar;
+
+	jar = new Bun.CookieMap(req.headers.get('Cookie') ?? undefined);
 	cookie_map.set(req, jar);
 	return jar;
 }
