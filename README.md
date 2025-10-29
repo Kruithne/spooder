@@ -1421,35 +1421,6 @@ server.websocket('/path/to/websocket', {
 > [!IMPORTANT]
 > While it is possible to register multiple routes for websockets, the only handler which is unique per route is `accept()`. The last handlers provided to any route (with the exception of `accept()`) will apply to ALL websocket routes. This is a limitation in Bun.
 
-<a id="api-http-cookies"></a>
-## API > HTTP > Cookies
-
-### 🔧 `cookies_get(req: Request): Bun.CookieMap`
-
-When called on a request, the `cookies_get` function will return a `Bun.CookieMap` contains all of the cookies parsed from the `Cookie` header on the request.
-
-```ts
-server.route('/', (req, url) => {
-	const cookies = cookies_get(req);
-	return `Hello ${cookies.get('person') ?? 'unknown'}`;
-});
-```
-
-The return `Bun.CookieMap` is an iterable map with a custom API for reading/setting cookies. The full API [can be seen here](https://bun.com/docs/runtime/cookies).
-
-Any changes made to the cookie map (adding, deletion, editing, etc) will be sent as `Set-Cookie` headers on the response automatically. Unchanged cookies are not sent.
-
-```ts
-server.route('/', (req, url) => {
-	const cookies = cookies_get(req);
-	cookies.set('test', 'foobar');
-	return 'Hello, world!';
-
-	// the response automatically gets:
-	// Set-Cookie test=foobar; Path=/; SameSite=Lax
-});
-```
-
 <a id="api-http-bootstrap"></a>
 ## API > HTTP > Bootstrap
 
@@ -1781,6 +1752,35 @@ Functions in `global_subs` and route-specific `subs` are called during template 
 2. If `base` is defined, content is wrapped using `{{content}}` substitution
 3. Route-specific `subs` and `global_subs` are applied
 4. Hash substitutions (if enabled) are applied
+
+<a id="api-http-cookies"></a>
+## API > HTTP > Cookies
+
+### 🔧 `cookies_get(req: Request): Bun.CookieMap`
+
+When called on a request, the `cookies_get` function will return a `Bun.CookieMap` contains all of the cookies parsed from the `Cookie` header on the request.
+
+```ts
+server.route('/', (req, url) => {
+	const cookies = cookies_get(req);
+	return `Hello ${cookies.get('person') ?? 'unknown'}`;
+});
+```
+
+The return `Bun.CookieMap` is an iterable map with a custom API for reading/setting cookies. The full API [can be seen here](https://bun.com/docs/runtime/cookies).
+
+Any changes made to the cookie map (adding, deletion, editing, etc) will be sent as `Set-Cookie` headers on the response automatically. Unchanged cookies are not sent.
+
+```ts
+server.route('/', (req, url) => {
+	const cookies = cookies_get(req);
+	cookies.set('test', 'foobar');
+	return 'Hello, world!';
+
+	// the response automatically gets:
+	// Set-Cookie test=foobar; Path=/; SameSite=Lax
+});
+```
 
 <a id="api-error-handling"></a>
 ## API > Error Handling
