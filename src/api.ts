@@ -1841,24 +1841,37 @@ export function http_serve(port: number, hostname?: string) {
 		/** Register a JSON endpoint with automatic content validation. */
 		json: (path: string, handler: JSONRequestHandler, method: HTTP_METHODS = 'POST'): void => {
 			const json_wrapper: RequestHandler = async (req: Request, url: URL) => {
+				// handle CORS preflight
+				if (req.method === 'OPTIONS') {
+					return new Response(null, {
+						status: 204,
+						headers: {
+							'Access-Control-Allow-Origin': '*',
+							'Access-Control-Allow-Methods': `${Array.isArray(method) ? method.join(', ') : method}, OPTIONS`,
+							'Access-Control-Allow-Headers': 'Content-Type, User-Agent'
+						}
+					});
+				}
+
 				try {
 					if (req.headers.get('Content-Type') !== 'application/json')
 						return 400; // Bad Request
-					
+
 					const json = await req.json();
 					if (json === null || typeof json !== 'object' || Array.isArray(json))
 						return 400; // Bad Request
-					
+
 					return handler(req, url, json as JsonObject);
 				} catch (e) {
 					return 400; // Bad Request
 				}
 			};
-			
+
 			if (path.length > 1 && path.endsWith('/'))
 				path = path.slice(0, -1);
-			
-			routes.push([path.split('/'), json_wrapper, method]);
+
+			const methods: HTTP_METHODS = Array.isArray(method) ? [...method, 'OPTIONS'] : [method, 'OPTIONS'];
+			routes.push([path.split('/'), json_wrapper, methods]);
 		},
 		
 		/** Unregister a specific route */
