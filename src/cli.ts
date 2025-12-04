@@ -296,6 +296,8 @@ async function start_server() {
 
 	const config = await get_config();
 
+	await apply_updates(config);
+
 	const instances = config.instances;
 	const n_instances = instances.length;
 
