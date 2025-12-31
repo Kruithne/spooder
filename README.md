@@ -655,6 +655,8 @@ type WorkerPoolOptions = {
 	worker: string | string[];
 	size?: number;
 	auto_restart?: boolean | AutoRestartConfig;
+	onWorkerStart?: (pool: WorkerPool, worker_id: string) => void;
+	onWorkerStop?: (pool: WorkerPool, worker_id: string, exit_code: number) => void;
 };
 
 type AutoRestartConfig = {
@@ -2105,6 +2107,32 @@ pool.on('MSG_REQUEST', msg => {
 	pool.respond(msg, { value: msg.data.value * 2 });
 });
 ```
+
+### Lifecycle Callbacks
+
+Worker pools support lifecycle callbacks to monitor when workers start and stop. Callbacks receive the pool instance, allowing you to communicate with workers immediately.
+
+```ts
+const pool = await worker_pool({
+	worker: './worker.ts',
+	auto_restart: true,
+	onWorkerStart: async (pool, worker_id) => {
+		console.log(`Worker ${worker_id} started`);
+		await pool.send(worker_id, 'init', { config: 'value' }, true);
+	},
+	onWorkerStop: (pool, worker_id, exit_code) => {
+		console.log(`Worker ${worker_id} stopped with exit code ${exit_code}`);
+		if (exit_code !== 0 && exit_code !== 42) {
+			console.log(`Worker ${worker_id} crashed`);
+		}
+	}
+});
+```
+
+#### Callback Signatures
+
+- `onWorkerStart: (pool: WorkerPool, worker_id: string) => void` - Fires when a worker registers with the pool
+- `onWorkerStop: (pool: WorkerPool, worker_id: string, exit_code: number) => void` - Fires when a worker stops
 
 ### Auto-Restart
 

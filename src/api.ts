@@ -33,6 +33,9 @@ type WorkerMessage = {
 
 const RESPONSE_TIMEOUT_MS = 5000;
 
+type WorkerStartCallback = (pool: WorkerPool, worker_id: string) => void;
+type WorkerStopCallback = (pool: WorkerPool, worker_id: string, exit_code: number) => void;
+
 export interface WorkerPool {
 	id: string;
 	send(peer: string, id: string, data?: WorkerMessageData, expect_response?: false): void;
@@ -59,6 +62,8 @@ type WorkerPoolOptions = {
 	size?: number;
 	auto_restart?: boolean | AutoRestartConfig;
 	response_timeout?: number;
+	onWorkerStart?: WorkerStartCallback;
+	onWorkerStop?: WorkerStopCallback;
 };
 
 type WorkerState = {
@@ -93,6 +98,9 @@ export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPoo
 
 	const callbacks = new Map<string, (data: WorkerMessage) => Promise<void> | void>();
 	const pending_responses = new Map<string, { resolve: (message: WorkerMessage) => void, reject: (error: Error) => void, timeout: Timer | undefined }>();
+
+	const on_worker_start = options.onWorkerStart;
+	const on_worker_stop = options.onWorkerStop;
 
 	async function restart_worker(worker: Worker) {
 		if (!auto_restart_enabled)
@@ -150,6 +158,9 @@ export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPoo
 			if (worker_id)
 				pipe_workers.deleteByKey(worker_id);
 
+			if (worker_id)
+				on_worker_stop?.(pool, worker_id, exit_code);
+
 			if (auto_restart_enabled && exit_code !== WORKER_EXIT_NO_RESTART)
 				restart_worker(worker);
 			else if (exit_code === WORKER_EXIT_NO_RESTART)
@@ -180,6 +191,8 @@ export async function worker_pool(options: WorkerPoolOptions): Promise<WorkerPoo
 
 			worker_promises.get(worker)?.();
 			worker_promises.delete(worker);
+
+			on_worker_start?.(pool, worker_id);
 		} else if (message.peer === '__broadcast__') {
 			const worker_id = pipe_workers.getByValue(worker);
 			if (worker_id === undefined)
