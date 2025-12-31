@@ -4,6 +4,9 @@
 	"type": "module",
 	"version": "6.1.91",
 	"module": "./src/api.ts",
+	"repository": {
+		"url": "https://github.com/Kruithne/spooder"
+	},
 	"bin": {
 		"spooder": "./src/cli.ts"
 	},
