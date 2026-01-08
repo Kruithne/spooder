@@ -1119,7 +1119,7 @@ export async function git_get_hashes(length = 7): Promise<Record<string, string>
 	await process.exited;
 	
 	if (process.exitCode as number > 0)
-		throw new Error('git_get_hashes() failed, `' + cmd.join(' ') + '` exited with non-zero exit code.');
+		return {};
 	
 	const stdout = await Bun.readableStreamToText(process.stdout as ReadableStream);
 	const hash_map: Record<string, string> = {};
@@ -1141,7 +1141,7 @@ export function git_get_hashes_sync(length = 7): Record<string, string> {
 	});
 	
 	if (process.exitCode > 0)
-		throw new Error('git_get_hashes_sync() failed, `' + cmd.join(' ') + '` exited with non-zero exit code.');
+		return {};
 	
 	const stdout = process.stdout.toString();
 	const hash_map: Record<string, string> = {};
