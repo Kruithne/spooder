@@ -599,6 +599,7 @@ log_list(input: any[], delimiter = ', ');
 
 // http
 http_serve(port: number, hostname?: string): Server;
+server.port: number;
 server.stop(immediate: boolean): Promise<void>;
 
 // cookies
@@ -840,13 +841,14 @@ IPC_TARGET.BROADCAST; // broadcast to all other instances
 ## API > HTTP
 
 ### `http_serve(port: number, hostname?: string): Server`
-Bootstrap a server on the specified port (and optional hostname).
+Bootstrap a server on the specified port (and optional hostname). Pass `0` for the port to assign a random available port, which can then be retrieved via `server.port`.
 
 ```ts
 import { serve } from 'spooder';
 
 const server = http_serve(8080); // port only
 const server = http_serve(3000, '0.0.0.0'); // optional hostname
+const server = http_serve(0); // random port, retrieve via server.port
 ```
 
 By default, the server responds with:
@@ -877,6 +879,15 @@ server.stop(false);
 ```ts
 await server.stop(false);
 // do something now all connections are done
+```
+
+### 📖 `server.port`
+
+Returns the port the server is listening on. Useful when `0` is passed to `http_serve()` for a random port assignment.
+
+```ts
+const server = http_serve(0);
+console.log(`Server listening on port ${server.port}`);
 ```
 
 ### Routing

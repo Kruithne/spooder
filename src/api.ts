@@ -2179,6 +2179,11 @@ export function http_serve(port: number, hostname?: string) {
 					return http_apply_range(file, request);
 				});
 			}
+		},
+
+		/** The port the server is listening on. Useful when port 0 is passed to assign a random port. */
+		get port(): number {
+			return server.port!;
 		}
 	};
 }
