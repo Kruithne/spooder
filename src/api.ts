@@ -970,12 +970,10 @@ export async function parse_template(template: string, replacements: Replacement
 				}
 			}
 
-			if (!drop_missing)
-				return match;
-
+			// missing/undefined items treated as empty array (no output)
 			return '';
 		});
-		
+
 		// Parse t-if tags
 		const if_regex = /<t-if\s+test="([^"]+)"\s*>(.*?)<\/t-if>/gs;
 		result = await replace_async(result, if_regex, async (match, condition_key, if_content) => {
