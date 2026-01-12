@@ -978,13 +978,16 @@ export async function parse_template(template: string, replacements: Replacement
 		const if_regex = /<t-if\s+test="([^"]+)"\s*>(.*?)<\/t-if>/gs;
 		result = await replace_async(result, if_regex, async (match, condition_key, if_content) => {
 			const condition_value = is_replacer_fn ? await replacements(condition_key) : replacements[condition_key];
-			
-			if (!drop_missing && !condition_value)
+			const key_exists = is_replacer_fn || (condition_key in replacements);
+
+			// preserve block for later pass if key doesn't exist and drop_missing is false
+			if (!key_exists && !drop_missing)
 				return match;
-			
+
+			// render content if condition is truthy, otherwise remove block
 			if (condition_value)
 				return await parse_template(if_content, replacements, drop_missing);
-			
+
 			return '';
 		});
 		
