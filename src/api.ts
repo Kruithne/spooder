@@ -1817,7 +1817,7 @@ export function http_serve(port: number, hostname?: string) {
 		}
 	});
 	
-	log_spooder(`server started on port {${port}} (host: {${hostname ?? 'unspecified'}})`);
+	log_spooder(`server started on port {${server.port}} (host: {${hostname ?? 'unspecified'}})`);
 	
 	type ThrottleHandler = {
 		(delta: number, handler: JSONRequestHandler): JSONRequestHandler;
