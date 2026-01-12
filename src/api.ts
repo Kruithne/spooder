@@ -821,7 +821,7 @@ export class ErrorWithMetadata extends Error {
 			else if (typeof value === 'function')
 				resolved_value = await value();
 			else if (value instanceof ReadableStream)
-				resolved_value = await Bun.readableStreamToText(value);
+				resolved_value = await new Response(value).text();
 			
 			if (typeof resolved_value === 'string' && resolved_value.includes('\n'))
 				resolved_value = resolved_value.split(/\r?\n/);
@@ -1121,7 +1121,7 @@ export async function git_get_hashes(length = 7): Promise<Record<string, string>
 	if (process.exitCode as number > 0)
 		return {};
 	
-	const stdout = await Bun.readableStreamToText(process.stdout as ReadableStream);
+	const stdout = await new Response(process.stdout).text();
 	const hash_map: Record<string, string> = {};
 	
 	const regex = /([^\s]+)\s([^\s]+)\s([^\s]+)\t(.+)/g;

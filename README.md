@@ -1734,7 +1734,7 @@ global_subs: {
 	build_time: async () => {
 		// Example: fetch build timestamp from git
 		const process = Bun.spawn(['git', 'log', '-1', '--format=%ct']);
-		const output = await Bun.readableStreamToText(process.stdout);
+		const output = await new Response(process.stdout).text();
 		return new Date(parseInt(output.trim()) * 1000).toISOString();
 	},
 	
