@@ -1384,7 +1384,7 @@ type ErrorHandler = (err: Error, req: Request, url: URL) => Resolvable<Response>
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
 type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
-type JSONRequestHandler = (req: Request, url: URL, json: JsonObject) => HandlerReturnType;
+type JSONRequestHandler = (req: Request, url: URL, json: JsonObject | null) => HandlerReturnType;
 
 export type ServerSentEventClient = {
 	message: (message: string) => void;
@@ -1868,6 +1868,10 @@ export function http_serve(port: number, hostname?: string) {
 				}
 
 				try {
+					// GET/HEAD requests don't have bodies, skip validation
+					if (req.method === 'GET' || req.method === 'HEAD')
+						return handler(req, url, null);
+
 					if (req.headers.get('Content-Type') !== 'application/json')
 						return 400; // Bad Request
 
