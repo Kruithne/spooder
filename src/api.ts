@@ -1332,6 +1332,8 @@ export const HTTP_STATUS_CODE = {
 type HTTP_METHOD = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS' | 'CONNECT' | 'TRACE';
 type HTTP_METHODS = HTTP_METHOD|HTTP_METHOD[];
 
+type BodylessMethod = 'GET' | 'HEAD';
+
 export function http_apply_range(file: BunFile, request: Request): BunFile {
 	const range_header = request.headers.get('range');
 	if (range_header !== null) {
@@ -1384,7 +1386,7 @@ type ErrorHandler = (err: Error, req: Request, url: URL) => Resolvable<Response>
 type DefaultHandler = (req: Request, status_code: number) => HandlerReturnType;
 type StatusCodeHandler = (req: Request) => HandlerReturnType;
 
-type JSONRequestHandler = (req: Request, url: URL, json: JsonObject | null) => HandlerReturnType;
+type JSONRequestHandler<T extends JsonObject | null = JsonObject> = (req: Request, url: URL, json: T) => HandlerReturnType;
 
 export type ServerSentEventClient = {
 	message: (message: string) => void;
@@ -1823,8 +1825,18 @@ export function http_serve(port: number, hostname?: string) {
 	log_spooder(`server started on port {${server.port}} (host: {${hostname ?? 'unspecified'}})`);
 	
 	type ThrottleHandler = {
-		(delta: number, handler: JSONRequestHandler): JSONRequestHandler;
+		(delta: number, handler: JSONRequestHandler<JsonObject>): JSONRequestHandler<JsonObject>;
+		(delta: number, handler: JSONRequestHandler<null>): JSONRequestHandler<null>;
 		(delta: number, handler: RequestHandler): RequestHandler;
+	};
+
+	type JsonEndpointHandler = {
+		<M extends BodylessMethod>(path: string, handler: JSONRequestHandler<null>, method: M): void;
+		<M extends BodylessMethod[]>(path: string, handler: JSONRequestHandler<null>, method: M): void;
+		<M extends Exclude<HTTP_METHOD, BodylessMethod>>(path: string, handler: JSONRequestHandler<JsonObject>, method: M): void;
+		<M extends Exclude<HTTP_METHOD, BodylessMethod>[]>(path: string, handler: JSONRequestHandler<JsonObject>, method: M): void;
+		<M extends HTTP_METHOD[]>(path: string, handler: JSONRequestHandler<JsonObject | null>, method: M): void;
+		(path: string, handler: JSONRequestHandler<JsonObject>): void;
 	};
 
 	return {
@@ -1853,7 +1865,7 @@ export function http_serve(port: number, hostname?: string) {
 		}) as ThrottleHandler,
 		
 		/** Register a JSON endpoint with automatic content validation. */
-		json: (path: string, handler: JSONRequestHandler, method: HTTP_METHODS = 'POST'): void => {
+		json: ((path: string, handler: JSONRequestHandler<JsonObject | null>, method: HTTP_METHODS = 'POST'): void => {
 			const json_wrapper: RequestHandler = async (req: Request, url: URL) => {
 				// handle CORS preflight
 				if (req.method === 'OPTIONS') {
@@ -1890,7 +1902,7 @@ export function http_serve(port: number, hostname?: string) {
 
 			const methods: HTTP_METHODS = Array.isArray(method) ? [...method, 'OPTIONS'] : [method, 'OPTIONS'];
 			routes.push([path.split('/'), json_wrapper, methods]);
-		},
+		}) as JsonEndpointHandler,
 		
 		/** Unregister a specific route */
 		unroute: (path: string): void => {
