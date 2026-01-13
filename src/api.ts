@@ -977,8 +977,29 @@ export async function parse_template(template: string, replacements: Replacement
 		// Parse t-if tags
 		const if_regex = /<t-if\s+test="([^"]+)"\s*>(.*?)<\/t-if>/gs;
 		result = await replace_async(result, if_regex, async (match, condition_key, if_content) => {
-			const condition_value = is_replacer_fn ? await replacements(condition_key) : replacements[condition_key];
-			const key_exists = is_replacer_fn || (condition_key in replacements);
+			let condition_value;
+			let key_exists = false;
+
+			if (is_replacer_fn) {
+				condition_value = await replacements(condition_key);
+				key_exists = true;
+			} else {
+				condition_value = replacements[condition_key];
+				key_exists = condition_key in replacements;
+
+				// try nested property access if direct lookup fails
+				if (condition_value === undefined && condition_key.includes('.')) {
+					const dot_index = condition_key.indexOf('.');
+					const base_key = condition_key.substring(0, dot_index);
+					const prop_path = condition_key.substring(dot_index + 1);
+					const base_obj = replacements[base_key];
+
+					if (base_obj !== undefined && typeof base_obj === 'object' && base_obj !== null) {
+						condition_value = get_nested_property(base_obj, prop_path);
+						key_exists = base_key in replacements;
+					}
+				}
+			}
 
 			// preserve block for later pass if key doesn't exist and drop_missing is false
 			if (!key_exists && !drop_missing)
