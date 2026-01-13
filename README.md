@@ -2520,6 +2520,34 @@ await parse_template(..., {
 </t-for>
 ```
 
+#### Object Serialization
+
+When a replacement value is an object or array, it is automatically serialized to JSON. This allows server-side data to be embedded directly into client-side scripts.
+
+```ts
+const config = {
+	debug: true,
+	api_url: '/api/v1',
+	features: ['auth', 'logging']
+};
+
+await parse_template('<script>const CONFIG = {{config}};</script>', { config });
+// Result: "<script>const CONFIG = {"debug":true,"api_url":"/api/v1","features":["auth","logging"]};</script>"
+```
+
+This also works with nested objects accessed via dot notation:
+
+```ts
+const data = {
+	app: {
+		settings: { theme: 'dark', lang: 'en' }
+	}
+};
+
+await parse_template('<script>const SETTINGS = {{app.settings}};</script>', data);
+// Result: "<script>const SETTINGS = {"theme":"dark","lang":"en"};</script>"
+```
+
 <a id="api-cache-busting"></a>
 ## API > Cache Busting
 

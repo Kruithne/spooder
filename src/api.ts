@@ -1040,8 +1040,12 @@ export async function parse_template(template: string, replacements: Replacement
 					replacement = await replacement();
 			}
 			
-			if (replacement !== undefined)
+			if (replacement !== undefined) {
+				if (typeof replacement === 'object' && replacement !== null)
+					return JSON.stringify(replacement);
+
 				return replacement;
+			}
 			
 			if (!drop_missing)
 				return match;
