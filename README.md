@@ -302,6 +302,32 @@ This can be configured in `spooder` using the `instances` array, with each entry
 
 Instances will be managed individually in the same manner that a single process would be, including auto-restarting and other functionality.
 
+### Instance Environment
+
+Each instance can define custom environment variables using the `env` property. These variables are merged with the parent process environment and passed to the spawned instance.
+
+```json
+"spooder": {
+	"instances": [
+		{
+			"id": "foo",
+			"run": "bun run server.ts",
+			"env": { "ENVTEST": "foo" }
+		},
+		{
+			"id": "bar",
+			"run": "bun run server.ts",
+			"env": { "ENVTEST": "bar" }
+		}
+	]
+}
+```
+
+Environment variable precedence (highest to lowest):
+1. `SPOODER_ENV` - always set by spooder (`dev` or `prod`)
+2. Instance `env` - overrides parent environment
+3. Parent process environment - inherited from spooder
+
 ### Instance Stagger
 
 By default, instances are all launched instantly. This behavior can be configured with the `instance_stagger_interval` configuration property, which defines an interval between instance launches in milliseconds.
