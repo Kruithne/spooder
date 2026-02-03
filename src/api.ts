@@ -1404,7 +1404,7 @@ interface ToJson {
 
 type JsonSerializable = JsonPrimitive | JsonObject | JsonArray | ToJson;
 
-type HandlerReturnType = Resolvable<string | number | BunFile | Response | JsonSerializable | Blob>;
+type HandlerReturnType = Resolvable<string | number | BunFile | Response | JsonSerializable | Blob | object>;
 type RequestHandler = (req: Request, url: URL) => HandlerReturnType;
 type WebhookHandler = (payload: JsonSerializable) => HandlerReturnType;
 type ErrorHandler = (err: Error, req: Request, url: URL) => Resolvable<Response>;
