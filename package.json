@@ -2,7 +2,7 @@
 	"name": "spooder",
 	"author": "Kruithne <kruithne@gmail.com>",
 	"type": "module",
-	"version": "6.2.6",
+	"version": "6.2.7",
 	"module": "./src/api.ts",
 	"repository": {
 		"url": "https://github.com/Kruithne/spooder"
