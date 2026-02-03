@@ -549,7 +549,7 @@ export function log_list(input: any[], delimiter = ',') {
 	return input.map(e => `{${e}}`).join(delimiter);
 }
 
-const log_spooder = log_create_logger('spooder', 'spooder');
+const log_spooder = log_create_logger(process.env.SPOODER_INSTANCE_ID ?? 'spooder', 'spooder');
 export const log = log_create_logger('info', 'blue');
 export const log_error = log_create_logger('error', 'red');
 

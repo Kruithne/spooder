@@ -169,7 +169,7 @@ async function start_instance(instance: InstanceConfig, config: Config, update =
 	const run_command = is_dev_mode && instance.run_dev ? instance.run_dev : instance.run;
 	const proc = Bun.spawn(parse_command_line(run_command), {
 		cwd: process.cwd(),
-		env: { ...process.env, ...instance.env, SPOODER_ENV: is_dev_mode ? 'dev' : 'prod' },
+		env: { ...process.env, ...instance.env, SPOODER_ENV: is_dev_mode ? 'dev' : 'prod', SPOODER_INSTANCE_ID: instance.id },
 		stdout: std_mode,
 		stderr: std_mode,
 		ipc: handle_ipc.bind({ instance_id: instance.id, config })
