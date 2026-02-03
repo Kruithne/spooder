@@ -1904,10 +1904,17 @@ export function http_serve(port: number, hostname?: string) {
 					});
 				}
 
+				const wrap_response = (result: ReturnType<typeof handler>) => {
+					if (result !== null && typeof result === 'object' && !(result instanceof Response) && !(result instanceof Blob))
+						return Response.json(result, { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Pragma': 'no-cache' } });
+
+					return result;
+				};
+
 				try {
 					// GET/HEAD requests don't have bodies, skip validation
 					if (req.method === 'GET' || req.method === 'HEAD')
-						return handler(req, url, null);
+						return wrap_response(await handler(req, url, null));
 
 					if (req.headers.get('Content-Type') !== 'application/json')
 						return 400; // Bad Request
@@ -1916,7 +1923,7 @@ export function http_serve(port: number, hostname?: string) {
 					if (json === null || typeof json !== 'object' || Array.isArray(json))
 						return 400; // Bad Request
 
-					return handler(req, url, json as JsonObject);
+					return wrap_response(await handler(req, url, json as JsonObject));
 				} catch (e) {
 					return 400; // Bad Request
 				}
