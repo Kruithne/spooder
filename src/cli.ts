@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import path from 'node:path';
 import { get_config } from './config';
 import { dispatch_report } from './dispatch';
 import { log_create_logger, IPC_OP, IPC_TARGET, EXIT_CODE, EXIT_CODE_NAMES } from './api';
@@ -31,6 +32,26 @@ const instances = new Map<string, Instance>();
 const instance_ipc_listeners = new Map<ProcessRef, Set<number>>();
 
 let last_instance_start_time = 0;
+
+const SPOODER_STATE_PATH = path.join(process.cwd(), '.spooder');
+
+type SpooderState = {
+	setup_completed: string[];
+};
+
+async function read_spooder_state(): Promise<SpooderState> {
+	try {
+		const data = await Bun.file(SPOODER_STATE_PATH).json();
+		if (Array.isArray(data?.setup_completed))
+			return data;
+	} catch {}
+
+	return { setup_completed: [] };
+}
+
+async function write_spooder_state(state: SpooderState) {
+	await Bun.write(SPOODER_STATE_PATH, JSON.stringify(state, null, '\t'));
+}
 
 function strip_color_codes(str: string): string {
 	return str.replace(/\x1b\[[0-9;]*m/g, '');
@@ -108,6 +129,58 @@ async function apply_updates(config: Config) {
 					break;
 				}
 			}
+		}
+	}
+}
+
+async function apply_setup_scripts(config: Config) {
+	if (argv.includes('--no-setup')) {
+		log_cli('[{setup}] skipping setup scripts due to {--no-setup} flag');
+		return;
+	}
+
+	const setup_scripts = config.setup;
+	const n_setup_scripts = setup_scripts.length;
+
+	if (n_setup_scripts === 0)
+		return;
+
+	const state = await read_spooder_state();
+	const completed = new Set(state.setup_completed);
+	const pending = setup_scripts.filter(s => !completed.has(s));
+
+	if (pending.length === 0) {
+		log_cli(`[{setup}] all {${n_setup_scripts}} setup scripts already completed`);
+		return;
+	}
+
+	log_cli(`[{setup}] running {${pending.length}} pending setup scripts`);
+
+	for (let i = 0; i < pending.length; i++) {
+		const script = pending[i];
+		log_cli(`[{setup}] [{${i}}] ${script}`);
+
+		try {
+			const proc = Bun.spawn(['bun', 'run', script], {
+				cwd: process.cwd(),
+				stdout: 'inherit',
+				stderr: 'inherit'
+			});
+
+			const exit_code = await proc.exited;
+			log_cli(`[{setup}] [{${i}}] exited with code {${exit_code}}`);
+
+			if (exit_code !== 0) {
+				log_cli_err(`[setup] [${i}] script failed with non-zero exit code, will retry next startup`);
+				dispatch_report(`setup script failed: ${script}`, [{ exit_code, script }]);
+				continue;
+			}
+
+			state.setup_completed.push(script);
+			await write_spooder_state(state);
+		} catch (e) {
+			log_cli_err(`[setup] [${i}] failed to execute script: ${e}`);
+			dispatch_report(`setup script error: ${script}`, [{ error: String(e), script }]);
 		}
 	}
 }
@@ -298,6 +371,7 @@ async function start_server() {
 	const config = await get_config();
 
 	await apply_updates(config);
+	await apply_setup_scripts(config);
 
 	const instances = config.instances;
 	const n_instances = instances.length;

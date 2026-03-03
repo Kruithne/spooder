@@ -58,6 +58,12 @@ Below is a full map of the available configuration options in their default stat
 			"bun install"
 		],
 
+		// see CLI > Setup Scripts
+		"setup": [
+			"scripts/seed_db.ts",
+			"scripts/register_webhooks.ts"
+		],
+
 		// see CLI > Canary
 		"canary": {
 			"enabled": false,
@@ -85,6 +91,7 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 - [CLI > Dev Mode](#cli-dev-mode)
 - [CLI > Auto Restart](#cli-auto-restart)
 - [CLI > Auto Update](#cli-auto-update)
+- [CLI > Setup Scripts](#cli-setup-scripts)
 - [CLI > Instancing](#cli-instancing)
 - [CLI > Canary](#cli-canary)
 	- [CLI > Canary > Crash](#cli-canary-crash)
@@ -163,6 +170,7 @@ The following differences will be observed when running in development mode:
 - If `run_dev` is configured, it will be used instead of the default `run` command.
 - Update commands defined in `spooder.update` will not be executed when starting a server.
 - If the server crashes and `auto_restart` is configured, the server will not be restarted, and spooder will exit with the same exit code as the server.
+- Setup scripts defined in `spooder.setup` will still run in dev mode (unlike update commands), since provisioning is needed in all environments. The `.spooder` state file prevents re-runs regardless.
 - If canary is configured, reports will not be dispatched to GitHub and instead be printed to the console; this includes crash reports.
 
 It is possible to detect in userland if a server is running in development mode by checking the `SPOODER_ENV` environment variable.
@@ -272,6 +280,34 @@ See [Instancing](#cli-instancing) for instructions on how to use [Auto Update](#
 ### Skip Updates
 
 In addition to being skipped in [dev mode](#cli-dev-mode), updates can also be skipped in production mode by passing the `--no-update` flag.
+
+<a id="cli-setup-scripts"></a>
+## CLI > Setup Scripts
+
+> [!NOTE]
+> This feature is not enabled by default.
+
+Setup scripts are one-off provisioning tasks (database seeding, webhook registration, directory creation) that need to run once when deploying to a new machine. They are executed sequentially via `bun run` in the project root.
+
+```json
+{
+	"spooder": {
+		"setup": [
+			"scripts/seed_db.ts",
+			"scripts/register_webhooks.ts"
+		]
+	}
+}
+```
+
+Completed scripts are tracked in a `.spooder` file in the project root. Scripts that have already been completed are skipped on subsequent startups. You should add `.spooder` to your `.gitignore` since it is machine-specific state.
+
+> [!IMPORTANT]
+> If a setup script fails (non-zero exit code), the error will be logged and a canary report dispatched (if configured), but the server will still start. Failed scripts are **not** marked as completed and will be retried on the next startup.
+
+### Skip Setup Scripts
+
+Setup scripts can be skipped by passing the `--no-setup` flag.
 
 <a id="cli-instancing"></a>
 ## CLI > Instancing

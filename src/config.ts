@@ -15,6 +15,7 @@ const internal_config = {
 	instances: [],
 	instance_stagger_interval: 0,
 	update: [],
+	setup: [],
 	canary: {
 		enabled: false,
 		account: '',
