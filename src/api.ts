@@ -970,7 +970,10 @@ export async function parse_template(template: string, replacements: Replacement
 				}
 			}
 
-			// missing/undefined items treated as empty array (no output)
+			// preserve tag for later pass if drop_missing is false
+			if (!drop_missing)
+				return match;
+
 			return '';
 		});
 
