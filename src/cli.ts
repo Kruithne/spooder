@@ -32,6 +32,8 @@ const instances = new Map<string, Instance>();
 const instance_ipc_listeners = new Map<ProcessRef, Set<number>>();
 
 let last_instance_start_time = 0;
+let update_in_progress = false;
+let pending_update = false;
 
 const SPOODER_STATE_PATH = path.join(process.cwd(), '.spooder');
 
@@ -185,14 +187,63 @@ async function apply_setup_scripts(config: Config) {
 	}
 }
 
+function broadcast_update_ready() {
+	const msg = { op: IPC_OP.SMSG_UPDATE_READY };
+	for (const instance of instances.values())
+		instance.process.send(msg);
+}
+
+async function rolling_restart(config: Config) {
+	const instance_ids = [...instances.keys()];
+	const delay = config.rolling_restart_delay;
+
+	log_cli(`[{update}] rolling restart: {${instance_ids.length}} instances, {${delay}ms} delay`);
+
+	for (let i = 0; i < instance_ids.length; i++) {
+		const id = instance_ids[i];
+		const instance = instances.get(id);
+
+		if (!instance) {
+			log_cli(`[{update}] instance {${id}} not found, skipping`);
+			continue;
+		}
+
+		log_cli(`[{update}] restarting {${id}} ({${i + 1}}/{${instance_ids.length}})`);
+		instance.process.send({ op: IPC_OP.SMSG_UPDATE_READY });
+
+		if (i < instance_ids.length - 1)
+			await Bun.sleep(delay);
+	}
+}
+
+async function handle_update(config: Config) {
+	if (update_in_progress) {
+		pending_update = true;
+		log_cli(`[{update}] update already in progress, queued for next rollout`);
+		return;
+	}
+
+	update_in_progress = true;
+	await apply_updates(config);
+
+	if (config.rolling_restart_delay > 0)
+		await rolling_restart(config);
+	else
+		broadcast_update_ready();
+
+	update_in_progress = false;
+
+	if (pending_update) {
+		pending_update = false;
+		log_cli(`[{update}] pending update detected, starting new rollout`);
+		await handle_update(config);
+	}
+}
+
 async function handle_ipc(this: { instance_id: string, config: Config }, payload: any, proc: ProcessRef) {
 	if (payload.peer === IPC_TARGET.SPOODER) {
 		if (payload.op === IPC_OP.CMSG_TRIGGER_UPDATE) {
-			await apply_updates(this.config);
-
-			const payload = { op: IPC_OP.SMSG_UPDATE_READY };
-			for (const instance of instances.values())
-				instance.process.send(payload);
+			await handle_update(this.config);
 		} else if (payload.op === IPC_OP.CMSG_REGISTER_LISTENER) {
 			instance_ipc_listeners.get(proc)?.add(payload.data.op);
 		}

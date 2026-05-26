@@ -52,6 +52,9 @@ Below is a full map of the available configuration options in their default stat
 			"max_attempts": -1
 		},
 
+		// see CLI > Instancing > Rolling Restart
+		"rolling_restart_delay": 0,
+
 		// see CLI > Auto Update
 		"update": [
 			"git pull",
@@ -370,6 +373,28 @@ By default, instances are all launched instantly. This behavior can be configure
 
 This interval effects both server start-up, auto-restarting and crash recovery. No two instances will be launched within that interval regardless of the reason.
 
+### Rolling Restart
+
+By default, when an update is triggered via IPC (`CMSG_TRIGGER_UPDATE`), all instances are signaled to restart simultaneously. This can cause resource spikes on the server when all instances reinitialize at the same time.
+
+The `rolling_restart_delay` configuration property (in milliseconds) enables rolling restarts, where instances are signaled one at a time with a delay between each.
+
+```json
+{
+	"spooder": {
+		"rolling_restart_delay": 120000
+	}
+}
+```
+
+In this example, each instance is signaled to restart with a 2-minute gap, ensuring only one instance is reinitializing at any given time.
+
+When `rolling_restart_delay` is set to `0` (default), all instances are signaled simultaneously as before.
+
+#### Overlapping Updates
+
+If a new update is triggered while a rolling restart is already in progress, the update commands are not run immediately. Instead, the update is queued and a new rollout (including update commands) begins automatically after the current rollout completes. This ensures all instances converge to the latest version without conflicting update operations.
+
 ### Canary
 
 The [canary](#cli-canary) feature functions the same for multiple instances as it would for a single instance with the caveat that the `instance` object as defined in the configuration is included in the crash report for diagnostics.
@@ -411,9 +436,12 @@ ipc_register(IPC_OP.SMSG_UPDATE_READY, async () => {
 });
 ```
 
-In this scenario, we instruct the host process from one instance receiving the webhook to apply the updates. Once the update commands have been run, all instances are send the `SMSG_UPDATE_READY` event, indicating they can restart.
+In this scenario, we instruct the host process from one instance receiving the webhook to apply the updates. Once the update commands have been run, all instances are sent the `SMSG_UPDATE_READY` event, indicating they can restart.
 
 Exiting with the `SPOODER_AUTO_UPDATE` exit code instructs spooder that we're exiting as part of this process, and prevents auto-update from running on restart.
+
+> [!TIP]
+> Combine this with [Rolling Restart](#rolling-restart) to stagger the restart signals across instances, reducing resource spikes during deployments.
 
 <a id="cli-canary"></a>
 ## CLI > Canary

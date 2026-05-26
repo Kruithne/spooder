@@ -14,6 +14,7 @@ const internal_config = {
 	},
 	instances: [],
 	instance_stagger_interval: 0,
+	rolling_restart_delay: 0,
 	update: [],
 	setup: [],
 	canary: {
