@@ -76,6 +76,14 @@ Below is a full map of the available configuration options in their default stat
 			"crash_console_history": 64,
 			"throttle": 86400,
 			"sanitize": true
+		},
+
+		// see CLI > Logging
+		"logging": {
+			"enabled": false,
+			"directory": "logs",
+			"max_size": 10485760,
+			"max_files": 3
 		}
 	}
 }
@@ -100,6 +108,7 @@ The `CLI` component of `spooder` is a global command-line tool for running serve
 	- [CLI > Canary > Crash](#cli-canary-crash)
 	- [CLI > Canary > Sanitization](#cli-canary-sanitization)
 	- [CLI > Canary > System Information](#cli-canary-system-information)
+- [CLI > Logging](#cli-logging)
 
 # API
 
@@ -674,6 +683,44 @@ In addition to the information provided by the developer, `spooder` also include
 	}
 }
 ```
+
+<a id="cli-logging"></a>
+## CLI > Logging
+
+> [!NOTE]
+> This feature is not enabled by default.
+
+`spooder` can capture `stdout` and `stderr` output from each instance and write it to log files on disk. Each instance gets its own log file named `{instance_id}.log` inside the configured directory.
+
+```json
+{
+	"spooder": {
+		"logging": {
+			"enabled": true,
+			"directory": "logs",
+			"max_size": 10485760,
+			"max_files": 3
+		}
+	}
+}
+```
+
+| Property | Default | Description |
+| --- | --- | --- |
+| `enabled` | `false` | Enable file logging |
+| `directory` | `"logs"` | Directory for log files (relative to project root) |
+| `max_size` | `10485760` (10MB) | Maximum size in bytes before rotating |
+| `max_files` | `3` | Number of rotated files to keep |
+
+When a log file exceeds `max_size`, it is rotated: `instance.log` becomes `instance.1.log`, `instance.1.log` becomes `instance.2.log`, and so on. Files beyond `max_files` are deleted.
+
+The log directory is created automatically on startup if it does not exist. Output is still printed to the console as normal — file logging is additive.
+
+> [!TIP]
+> You should add the log directory to your `.gitignore` to prevent log files from being committed.
+
+> [!NOTE]
+> When logging is enabled, instance output is piped through the CLI process regardless of the `canary.crash_console_history` setting. Both features can operate independently or together.
 
 # API
 

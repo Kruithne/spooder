@@ -17,6 +17,12 @@ const internal_config = {
 	rolling_restart_delay: 0,
 	update: [],
 	setup: [],
+	logging: {
+		enabled: false,
+		directory: 'logs',
+		max_size: 10 * 1024 * 1024, // 10MB
+		max_files: 3
+	},
 	canary: {
 		enabled: false,
 		account: '',

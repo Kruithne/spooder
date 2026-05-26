@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import fs from 'node:fs';
 import path from 'node:path';
 import { get_config } from './config';
 import { dispatch_report } from './dispatch';
@@ -287,8 +288,10 @@ async function start_instance(instance: InstanceConfig, config: Config, update =
 
 	const crash_console_history = config.canary.crash_console_history;
 	const include_crash_history = crash_console_history > 0;
+	const include_logging = config.logging.enabled;
+	const needs_pipe = include_crash_history || include_logging;
 
-	const std_mode = include_crash_history ? 'pipe' : 'inherit';
+	const std_mode = needs_pipe ? 'pipe' : 'inherit';
 
 	const run_command = is_dev_mode && instance.run_dev ? instance.run_dev : instance.run;
 	const proc = Bun.spawn(parse_command_line(run_command), {
@@ -313,8 +316,51 @@ async function start_instance(instance: InstanceConfig, config: Config, update =
 	instance_ipc_listeners.set(proc, ipc_listeners);
 
 	const stream_history = new Array<string>();
-	if (include_crash_history) {
-		const text_decoder = new TextDecoder();
+	let log_stream: fs.WriteStream | null = null;
+	let log_bytes_written = 0;
+
+	if (include_logging) {
+		const log_dir = path.join(process.cwd(), config.logging.directory);
+		const log_path = path.join(log_dir, `${instance.id}.log`);
+
+		try {
+			log_bytes_written = fs.statSync(log_path).size;
+		} catch {}
+
+		log_stream = fs.createWriteStream(log_path, { flags: 'a' });
+	}
+
+	if (needs_pipe) {
+		const text_decoder = include_crash_history ? new TextDecoder() : null;
+
+		function rotate_log() {
+			if (!log_stream)
+				return;
+
+			log_stream.end();
+
+			const log_dir = path.join(process.cwd(), config.logging.directory);
+			const max_files = config.logging.max_files;
+			const base = instance.id;
+
+			const oldest = path.join(log_dir, `${base}.${max_files}.log`);
+			if (fs.existsSync(oldest))
+				fs.unlinkSync(oldest);
+
+			for (let i = max_files - 1; i >= 1; i--) {
+				const src = path.join(log_dir, `${base}.${i}.log`);
+				const dst = path.join(log_dir, `${base}.${i + 1}.log`);
+
+				if (fs.existsSync(src))
+					fs.renameSync(src, dst);
+			}
+
+			const current = path.join(log_dir, `${base}.log`);
+			fs.renameSync(current, path.join(log_dir, `${base}.1.log`));
+
+			log_stream = fs.createWriteStream(current, { flags: 'a' });
+			log_bytes_written = 0;
+		}
 
 		function capture_stream(stream: ReadableStream, output: NodeJS.WritableStream) {
 			const reader = stream.getReader();
@@ -323,12 +369,22 @@ async function start_instance(instance: InstanceConfig, config: Config, update =
 				if (chunk.done)
 					return;
 
-				const chunk_str = text_decoder.decode(chunk.value);
-				for (const chunk of chunk_str.split(/\r?\n/))
-					stream_history.push(chunk.trimEnd());
+				if (text_decoder) {
+					const chunk_str = text_decoder.decode(chunk.value);
+					for (const part of chunk_str.split(/\r?\n/))
+						stream_history.push(part.trimEnd());
 
-				if (stream_history.length > crash_console_history)
-					stream_history.splice(0, stream_history.length - crash_console_history);
+					if (stream_history.length > crash_console_history)
+						stream_history.splice(0, stream_history.length - crash_console_history);
+				}
+
+				if (log_stream) {
+					log_stream.write(chunk.value);
+					log_bytes_written += chunk.value.byteLength;
+
+					if (log_bytes_written >= config.logging.max_size)
+						rotate_log();
+				}
 
 				output.write(chunk.value);
 				reader.read().then(read_chunk);
@@ -338,8 +394,13 @@ async function start_instance(instance: InstanceConfig, config: Config, update =
 		capture_stream(proc.stdout as ReadableStream, process.stdout);
 		capture_stream(proc.stderr as ReadableStream, process.stderr);
 	}
-	
+
 	const proc_exit_code = await proc.exited;
+
+	if (log_stream) {
+		log_stream.end();
+		log_stream = null;
+	}
 	const instance_data = instances.get(instance.id);
 
 	if (instance_data?.restart_success_timer) {
@@ -423,6 +484,9 @@ async function start_server() {
 
 	await apply_updates(config);
 	await apply_setup_scripts(config);
+
+	if (config.logging.enabled)
+		fs.mkdirSync(path.join(process.cwd(), config.logging.directory), { recursive: true });
 
 	const instances = config.instances;
 	const n_instances = instances.length;
