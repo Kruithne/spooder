@@ -648,6 +648,20 @@ function is_cache_http(target: any): target is ReturnType<typeof cache_http> {
 	return target && typeof target === 'object' && 'entries' in target && typeof target.entries === 'object';
 }
 
+function etag_matches(if_none_match: string | null, etag: string): boolean {
+	if (if_none_match === null)
+		return false;
+
+	for (const entry of if_none_match.split(',')) {
+		const candidate = entry.trim().replace(/^W\//, '').replace(/^"(.*)"$/, '$1');
+
+		if (candidate === etag)
+			return true;
+	}
+
+	return false;
+}
+
 export function cache_http(options?: CacheOptions) {
 	const ttl = options?.ttl ?? CACHE_DEFAULT_TTL;
 	const max_cache_size = options?.max_size ?? CACHE_DEFAULT_MAX_SIZE;
@@ -738,9 +752,9 @@ export function cache_http(options?: CacheOptions) {
 		}, cache_headers) as Record<string, string>;
 		
 		if (use_etags && entry.etag) {
-			headers['ETag'] = entry.etag;
-			
-			if (req.headers.get('If-None-Match') === entry.etag)
+			headers['ETag'] = `"${entry.etag}"`;
+
+			if (etag_matches(req.headers.get('If-None-Match'), entry.etag))
 				return new Response(null, { status: 304, headers });
 		}
 		
