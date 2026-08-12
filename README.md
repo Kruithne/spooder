@@ -1099,7 +1099,7 @@ The handler will automatically return `400 Bad Request` if:
 By default, `spooder` will register routes defined with `server.route()` and `server.dir()` as `GET` routes, while `server.json()` routes default to `POST`. Requests to these routes with other methods will return `405 Method Not Allowed`.
 
 > [!NOTE]
-> spooder does not automatically handle HEAD requests natively.
+> Routes that accept `GET` also accept `HEAD`. The `GET` handler runs and Bun removes the body from the response, keeping the status and headers. Handlers that must tell the two apart can read `req.method`.
 
 This can be controlled by providing the `method` parameter with a string or array defining one or more of the following methods.
 

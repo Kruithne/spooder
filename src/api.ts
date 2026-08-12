@@ -1592,10 +1592,12 @@ function print_request_info(req: Request, res: Response, url: URL, request_time:
 }
 
 function is_valid_method(method: HTTP_METHODS, req: Request): boolean {
+	const req_method = req.method as HTTP_METHOD;
+
 	if (Array.isArray(method))
-		return method.includes(req.method as HTTP_METHOD);
-	
-	return req.method === method;
+		return method.includes(req_method) || (req_method === 'HEAD' && method.includes('GET'));
+
+	return req_method === method || (req_method === 'HEAD' && method === 'GET');
 }
 
 function is_bun_file(obj: any): obj is BunFile {
@@ -1696,10 +1698,14 @@ export function http_serve(port: number, hostname?: string) {
 		if (response instanceof Response)
 			return response;
 		
-		// Content-type/content-length are automatically set for blobs.
-		if (response instanceof Blob)
+		// Content-length is automatically set for blobs; content-type is set
+		// explicitly so that it survives on bodyless (HEAD) responses.
+		if (response instanceof Blob) {
+			const blob_headers = response.type.length > 0 ? { 'Content-Type': response.type } : undefined;
+
 			// @ts-ignore Response does accept Blob in Bun, typing disagrees.
-		return new Response(response, { status: status_code });
+			return new Response(response, { status: status_code, headers: blob_headers });
+		}
 		
 		// Status codes can be returned from some handlers.
 		if (return_status_code && typeof response === 'number')
