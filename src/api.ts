@@ -936,7 +936,23 @@ function get_nested_property(obj: any, path: string): any {
 	return current;
 }
 
+const SUBSTITUTION_PATTERN = /\x00(\d+)\x00/g;
+
+// substituted values are held aside so later passes cannot re-scan them
+function store_substitution(store: string[], value: string): string {
+	return '\x00' + (store.push(value) - 1) + '\x00';
+}
+
+function expand_substitutions(result: string, store: string[]): string {
+	return result.replace(SUBSTITUTION_PATTERN, (match, index) => store[Number(index)] ?? match);
+}
+
 export async function parse_template(template: string, replacements: Replacements, drop_missing = false): Promise<string> {
+	const store: string[] = [];
+	return expand_substitutions(await parse_template_pass(template, replacements, drop_missing, store), store);
+}
+
+async function parse_template_pass(template: string, replacements: Replacements, drop_missing: boolean, store: string[]): Promise<string> {
 	const is_replacer_fn = typeof replacements === 'function';
 	let result = template;
 	let previous_result = '';
@@ -978,7 +994,7 @@ export async function parse_template(template: string, replacements: Replacement
 							};
 						}
 						
-						loop_result += await parse_template(loop_content, scoped_replacements, drop_missing);
+						loop_result += await parse_template_pass(loop_content, scoped_replacements, drop_missing, store);
 					}
 					return loop_result;
 				}
@@ -1024,7 +1040,7 @@ export async function parse_template(template: string, replacements: Replacement
 
 			// render content if condition is truthy, otherwise remove block
 			if (condition_value)
-				return await parse_template(if_content, replacements, drop_missing);
+				return await parse_template_pass(if_content, replacements, drop_missing, store);
 
 			return '';
 		});
@@ -1080,9 +1096,9 @@ export async function parse_template(template: string, replacements: Replacement
 			
 			if (replacement !== undefined) {
 				if (typeof replacement === 'object' && replacement !== null)
-					return JSON.stringify(replacement);
+					return store_substitution(store, JSON.stringify(replacement));
 
-				return replacement;
+				return store_substitution(store, String(replacement));
 			}
 			
 			if (!drop_missing)
